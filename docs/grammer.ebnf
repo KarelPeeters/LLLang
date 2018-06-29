@@ -1,0 +1,71 @@
+//structure
+block
+	: statement*
+
+containedBlock
+	: "{" block "}"
+	: statement
+
+//statements
+statement
+	: ifStatement
+	: whileStatement
+	: ( "break" | "continue" ) ";"
+	: declaration
+	: expression ";"
+	: ";"
+
+declaration
+	: "var" identifier "=" expression
+
+ifStatement
+	: "if" "(" expression ")" containedBlock ( "else" containedBlock )?
+
+whileStatement
+	: "while" "(" expression ")" containedBlock
+
+//expressions
+expressionList
+	: ( expression ( "," expression )* )?
+
+expression
+	: disjunction ( "=" disjunction )?
+
+disjunction
+	: conjunction ( ( "||" | "|" ) conjunction )?
+
+conjunction
+	: equality ( ( "&&" | "&" ) equality)?
+
+equality
+	: comparison ( ( "==" | "!=" ) comparison )?
+
+comparison
+	: addition ( ( "<" | ">" | "<=" | ">=") addition )?
+
+addition
+	: multiplication ( ( "+" | "-" ) multiplication )?
+
+multiplication
+	: power ( ( "*" | "/" | "%" ) power )?
+
+power
+	: prefix ( ** prefix )?
+
+prefix
+	: ( "++" | "--" | "+" | "-" | "!" | "~" )? suffix
+
+suffix
+	: atomic postFixOperation
+
+postFixOperation
+	: "++" | "--"
+	: "(" expressionList ")"
+	: "[" expression "]"
+
+atomic
+	: "(" expression ")"
+	: <booleanLiteral>
+	: <numberLiteral>
+	: <identifier>
+
