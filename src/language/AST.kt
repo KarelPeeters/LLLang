@@ -62,6 +62,11 @@ class Assignment(
     }
 }
 
+private fun ASTRenderer.safePrint(exp: Expression) {
+    if (exp is BinaryOp || exp is UnaryOp) {
+        print("("); print(exp); print(")")
+    } else print(exp)
+}
 
 class BinaryOp(
         position: SourcePosition,
@@ -70,13 +75,7 @@ class BinaryOp(
         val right: Expression
 ) : Expression(position) {
     override fun ASTRenderer.render() {
-        fun safePrint(exp: Expression) {
-            if (exp is BinaryOp || exp is UnaryOp) {
-                print("("); print(exp); print(")")
-            } else print(exp)
-        }
-
-        safePrint(left); print(" ${type.symbol} "); print(right)
+        safePrint(left); print(" ${type.symbol} "); safePrint(right)
     }
 
     enum class Type(val symbol: String) {
@@ -97,9 +96,9 @@ class UnaryOp(
 ) : Expression(position) {
     override fun ASTRenderer.render() {
         if (type == Type.PostInc || type == Type.PostDec) {
-            print(value); print(type.symbol)
+            safePrint(value); print(type.symbol)
         } else {
-            print(type.symbol); print(value)
+            print(type.symbol); safePrint(value)
         }
     }
 
@@ -117,7 +116,7 @@ class Call(
         val arguments: ExpressionList
 ) : Expression(position) {
     override fun ASTRenderer.render() {
-        print(target); print("("); print(arguments); print(")")
+        safePrint(target); print("("); print(arguments); print(")")
     }
 }
 

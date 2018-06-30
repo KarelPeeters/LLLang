@@ -32,25 +32,25 @@ expression
 	: disjunction ( "=" disjunction )?
 
 disjunction
-	: conjunction ( ( "||" | "|" ) conjunction )?
+	: conjunction ( ( "||" | "|" ) conjunction )*
 
 conjunction
-	: equality ( ( "&&" | "&" ) equality)?
+	: equality ( ( "&&" | "&" ) equality)*
 
 equality
-	: comparison ( ( "==" | "!=" ) comparison )?
+	: comparison ( ( "==" | "!=" ) comparison )*
 
 comparison
-	: addition ( ( "<" | ">" | "<=" | ">=") addition )?
+	: addition ( ( "<" | ">" | "<=" | ">=") addition )*
 
 addition
-	: multiplication ( ( "+" | "-" ) multiplication )?
+	: multiplication ( ( "+" | "-" ) multiplication )*
 
 multiplication
-	: power ( ( "*" | "/" | "%" ) power )?
+	: power ( ( "*" | "/" | "%" ) power )*
 
 power
-	: prefix ( ** prefix )?
+	: prefix ( ** prefix )*
 
 prefix
 	: ( "++" | "--" | "+" | "-" | "!" | "~" )? suffix

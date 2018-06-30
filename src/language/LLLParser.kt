@@ -3,6 +3,7 @@ package language
 import language.TokenType.*
 import language.TokenType.Boolean
 import language.TokenType.Number
+import java.util.*
 import kotlin.coroutines.experimental.buildSequence
 
 class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
@@ -67,7 +68,9 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         }
     }.toList())
 
-    private fun expression(): Expression {
+    private fun expression() = assignment()
+
+    private fun assignment(): Expression {
         val left = disjunction()
         val pos = currentPosition
         return when {
@@ -77,106 +80,127 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     }
 
     private fun disjunction(): Expression {
-        val left = conjunction()
-        val pos = currentPosition
-        val type = when {
-            accept(DoublePipe) -> BinaryOp.Type.BOr
-            accept(Pipe) -> BinaryOp.Type.Ior
-            else -> return left
+        var left = conjunction()
+        while (true) {
+            val pos = currentPosition
+            val type = when {
+                accept(DoublePipe) -> BinaryOp.Type.BOr
+                accept(Pipe) -> BinaryOp.Type.Ior
+                else -> return left
+            }
+            left = BinaryOp(pos, type, left, conjunction())
         }
-        return BinaryOp(pos, type, left, conjunction())
+
     }
 
     private fun conjunction(): Expression {
-        val left = equality()
+        var left = equality()
         val pos = currentPosition
-        val type = when {
-            accept(DoubleAmper) -> BinaryOp.Type.BAnd
-            accept(Amper) -> BinaryOp.Type.Iand
-            else -> return left
+        while (true) {
+            val type = when {
+                accept(DoubleAmper) -> BinaryOp.Type.BAnd
+                accept(Amper) -> BinaryOp.Type.Iand
+                else -> return left
+            }
+            left = BinaryOp(pos, type, left, equality())
         }
-        return BinaryOp(pos, type, left, equality())
     }
 
     private fun equality(): Expression {
-        val left = comparison()
-        val pos = currentPosition
-        val type = when {
-            accept(EQ) -> BinaryOp.Type.EQ
-            accept(NEQ) -> BinaryOp.Type.NEQ
-            else -> return left
+        var left = comparison()
+        while (true) {
+            val pos = currentPosition
+            val type = when {
+                accept(EQ) -> BinaryOp.Type.EQ
+                accept(NEQ) -> BinaryOp.Type.NEQ
+                else -> return left
+            }
+            left = BinaryOp(pos, type, left, comparison())
         }
-        return BinaryOp(pos, type, left, comparison())
     }
 
     private fun comparison(): Expression {
-        val left = addition()
-        val pos = currentPosition
-        val type = when {
-            accept(LT) -> BinaryOp.Type.LT
-            accept(GT) -> BinaryOp.Type.GT
-            accept(LTE) -> BinaryOp.Type.LTE
-            accept(GTE) -> BinaryOp.Type.GTE
-            else -> return left
+        var left = addition()
+        while (true) {
+            val pos = currentPosition
+            val type = when {
+                accept(LT) -> BinaryOp.Type.LT
+                accept(GT) -> BinaryOp.Type.GT
+                accept(LTE) -> BinaryOp.Type.LTE
+                accept(GTE) -> BinaryOp.Type.GTE
+                else -> return left
+            }
+            left = BinaryOp(pos, type, left, addition())
         }
-        return BinaryOp(pos, type, left, addition())
     }
 
     private fun addition(): Expression {
-        val left = multiplication()
-        val pos = currentPosition
-        val type = when {
-            accept(Plus) -> BinaryOp.Type.Add
-            accept(Minus) -> BinaryOp.Type.Subtract
-            else -> return left
+        var left = multiplication()
+        while (true) {
+            val pos = currentPosition
+            val type = when {
+                accept(Plus) -> BinaryOp.Type.Add
+                accept(Minus) -> BinaryOp.Type.Subtract
+                else -> return left
+            }
+            left = BinaryOp(pos, type, left, multiplication())
         }
-        return BinaryOp(pos, type, left, multiplication())
     }
 
     private fun multiplication(): Expression {
-        val left = power()
-        val pos = currentPosition
-        val type = when {
-            accept(Times) -> BinaryOp.Type.Multiply
-            accept(Divide) -> BinaryOp.Type.Divide
-            accept(Percent) -> BinaryOp.Type.Modulus
-            else -> return left
+        var left = power()
+        while (true) {
+            val pos = currentPosition
+            val type = when {
+                accept(Times) -> BinaryOp.Type.Multiply
+                accept(Divide) -> BinaryOp.Type.Divide
+                accept(Percent) -> BinaryOp.Type.Modulus
+                else -> return left
+            }
+            left = BinaryOp(pos, type, left, power())
         }
-        return BinaryOp(pos, type, left, power())
     }
 
     private fun power(): Expression {
-        val left = prefix()
-        val pos = currentPosition
-        return if (accept(Power))
-            BinaryOp(pos, BinaryOp.Type.Power, left, prefix())
-        else
-            left
+        var left = prefix()
+        while (true) {
+            val pos = currentPosition
+            if (accept(Power))
+                left = BinaryOp(pos, BinaryOp.Type.Power, left, prefix())
+            else
+                return left
+        }
     }
 
     private fun prefix(): Expression {
-        val pos = currentPosition
-        val type = when {
-            accept(Inc) -> UnaryOp.Type.PreInc
-            accept(Dec) -> UnaryOp.Type.PreDec
-            accept(Plus) -> UnaryOp.Type.Positive
-            accept(Minus) -> UnaryOp.Type.Negative
-            accept(Bang) -> UnaryOp.Type.BNot
-            accept(Tilde) -> UnaryOp.Type.INot
-            else -> return suffix()
+        val ops = LinkedList<Pair<UnaryOp.Type, SourcePosition>>()
+        loop@ while (true) {
+            val pos = currentPosition
+            val type = when {
+                accept(Inc) -> UnaryOp.Type.PreInc
+                accept(Dec) -> UnaryOp.Type.PreDec
+                accept(Plus) -> UnaryOp.Type.Positive
+                accept(Minus) -> UnaryOp.Type.Negative
+                accept(Bang) -> UnaryOp.Type.BNot
+                accept(Tilde) -> UnaryOp.Type.INot
+                else -> break@loop
+            }
+            ops.push(type to pos)
         }
-        return UnaryOp(pos, type, suffix())
+        return ops.fold(suffix()) { acc, (type, pos) -> UnaryOp(pos, type, acc) }
     }
 
     private fun suffix(): Expression {
-        val expr = atomic()
-        val pos = currentPosition
-        return when {
-            accept(Inc) -> UnaryOp(pos, UnaryOp.Type.PostInc, expr)
-            accept(Dec) -> UnaryOp(pos, UnaryOp.Type.PostDec, expr)
-            accept(OpenB) -> Call(pos, expr, expressionList(CloseB))
-            accept(OpenS) -> Index(pos, expr, expression())
-            else -> expr
+        var expr = atomic()
+        while (true) {
+            val pos = currentPosition
+            expr = when {
+                accept(Inc) -> UnaryOp(pos, UnaryOp.Type.PostInc, expr)
+                accept(Dec) -> UnaryOp(pos, UnaryOp.Type.PostDec, expr)
+                accept(OpenB) -> Call(pos, expr, expressionList(CloseB))
+                accept(OpenS) -> Index(pos, expr, expression())
+                else -> return expr
+            }
         }
     }
 
