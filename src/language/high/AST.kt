@@ -1,4 +1,4 @@
-package language
+package language.high
 
 sealed class ASTNode(val position: SourcePosition) {
     abstract fun ASTRenderer.render()
@@ -6,11 +6,20 @@ sealed class ASTNode(val position: SourcePosition) {
 
 sealed class Statement(position: SourcePosition) : ASTNode(position)
 
+class CodeBlock(
+        position: SourcePosition,
+        val statements: List<Statement>
+) : Statement(position) {
+    override fun ASTRenderer.render() {
+        println("{"); nest().apply { statements.forEach { print(it); println(";") } }; print("}")
+    }
+}
+
 class IfStatement(
         position: SourcePosition,
         val condition: Expression,
-        val thenBlock: Block,
-        val elseBlock: Block?
+        val thenBlock: CodeBlock,
+        val elseBlock: CodeBlock?
 ) : Statement(position) {
     override fun ASTRenderer.render() {
         print("if ("); print((condition)); print(")")
@@ -24,7 +33,7 @@ class IfStatement(
 class WhileStatement(
         position: SourcePosition,
         val condition: Expression,
-        val block: Block
+        val block: CodeBlock
 ) : Statement(position) {
     override fun ASTRenderer.render() {
         print("while ("); print(condition); print(")")
@@ -34,36 +43,18 @@ class WhileStatement(
 
 sealed class Expression(position: SourcePosition) : Statement(position)
 
-class Block(
-        position: SourcePosition,
-        val statements: List<Statement>
-) : ASTNode(position) {
-    override fun ASTRenderer.render() {
-        println("{"); nest().apply { statements.forEach { print(it); println(";") } }; print("}")
-    }
-}
-
-class ExpressionList(
-        position: SourcePosition,
-        val expressions: List<Expression>
-) : ASTNode(position) {
-    override fun ASTRenderer.render() {
-        expressions.forEachIndexed { i, exp -> if (i != 0) print(", "); print(exp) }
-    }
-}
-
 class Assignment(
         position: SourcePosition,
         val target: Expression,
         val value: Expression
 ) : Expression(position) {
     override fun ASTRenderer.render() {
-        print(target); print(" = "); print(value)
+        safePrint(target); print(" = "); safePrint(value)
     }
 }
 
 private fun ASTRenderer.safePrint(exp: Expression) {
-    if (exp is BinaryOp || exp is UnaryOp) {
+    if (exp is BinaryOp || exp is UnaryOp || exp is Assignment) {
         print("("); print(exp); print(")")
     } else print(exp)
 }
@@ -79,8 +70,9 @@ class BinaryOp(
     }
 
     enum class Type(val symbol: String) {
-        Power("**"),
-        Multiply("*"), Divide("/"), Modulus("%"),
+        //Power("**"),
+        Multiply("*"),
+        Divide("/"), Modulus("%"),
         Add("+"), Subtract("-"),
         LT("<"), GT(">"), LTE("<="), GTE(">="),
         EQ("=="), NEQ("!="),
@@ -95,28 +87,29 @@ class UnaryOp(
         val value: Expression
 ) : Expression(position) {
     override fun ASTRenderer.render() {
-        if (type == Type.PostInc || type == Type.PostDec) {
+        /*if (type == Type.PostInc || type == Type.PostDec) {
             safePrint(value); print(type.symbol)
-        } else {
+        } else*/ run {
             print(type.symbol); safePrint(value)
         }
     }
 
     enum class Type(val symbol: String) {
         Positive("+"), Negative("-"),
-        PreInc("++"), PreDec("--"),
-        PostInc("++"), PostDec("--"),
-        BNot("!"), INot("~"),
+        /*PreInc("++"), PreDec("--"),
+        PostInc("++"), PostDec("--"),*/
+        BNot("!"),
+        INot("~"),
     }
 }
 
 class Call(
         position: SourcePosition,
         val target: Expression,
-        val arguments: ExpressionList
+        val arguments: List<Expression>
 ) : Expression(position) {
     override fun ASTRenderer.render() {
-        safePrint(target); print("("); print(arguments); print(")")
+        safePrint(target); print("("); arguments.forEachIndexed { i, e -> if (i != 0) print(", "); print(e) }; print(")")
     }
 }
 
@@ -166,7 +159,7 @@ class ContinueStatement(
 class Declaration(
         position: SourcePosition,
         val identifier: String,
-        val type: Type?,
+        val type: TypeAnnotation?,
         val value: Expression
 ) : Statement(position) {
     override fun ASTRenderer.render() {
@@ -176,10 +169,12 @@ class Declaration(
     }
 }
 
-class Type(
+class TypeAnnotation(
         position: SourcePosition,
         val str: String
-)
+) : ASTNode(position) {
+    override fun ASTRenderer.render() = print(str)
+}
 
 class ASTRenderer(private val builder: StringBuilder, private val indent: Int) {
     private var inLine = false

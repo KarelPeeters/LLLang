@@ -1,4 +1,4 @@
-package language
+package language.high
 
 open class AbstractParser(val tokenizer: Tokenizer) {
     val currentPosition
