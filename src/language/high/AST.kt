@@ -22,10 +22,10 @@ class IfStatement(
         val elseBlock: CodeBlock?
 ) : Statement(position) {
     override fun ASTRenderer.render() {
-        print("if ("); print((condition)); print(")")
+        print("if ("); print((condition)); print(") ")
         print(thenBlock)
         if (elseBlock != null) {
-            print("else"); print(elseBlock)
+            print(" else "); print(elseBlock)
         }
     }
 }
@@ -36,7 +36,7 @@ class WhileStatement(
         val block: CodeBlock
 ) : Statement(position) {
     override fun ASTRenderer.render() {
-        print("while ("); print(condition); print(")")
+        print("while ("); print(condition); print(") ")
         print(block)
     }
 }
