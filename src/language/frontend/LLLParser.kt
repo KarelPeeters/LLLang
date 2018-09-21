@@ -1,8 +1,9 @@
-package language.high
+package language.frontend
 
-import language.high.TokenType.*
-import language.high.TokenType.Boolean
-import language.high.TokenType.Number
+import language.frontend.TokenType.*
+import language.frontend.TokenType.Boolean
+import language.frontend.TokenType.Number
+import language.ir.BinaryOpType
 import java.util.*
 import kotlin.coroutines.experimental.buildSequence
 
@@ -99,8 +100,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             val type = when {
-                accept(DoublePipe) -> BinaryOp.Type.BOr
-                accept(Pipe) -> BinaryOp.Type.Ior
+                accept(DoublePipe) -> BinaryOpType.BOr
+                accept(Pipe) -> BinaryOpType.Ior
                 else -> return left
             }
             left = BinaryOp(pos, type, left, conjunction())
@@ -113,8 +114,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         val pos = currentPosition
         while (true) {
             val type = when {
-                accept(DoubleAmper) -> BinaryOp.Type.BAnd
-                accept(Amper) -> BinaryOp.Type.Iand
+                accept(DoubleAmper) -> BinaryOpType.BAnd
+                accept(Amper) -> BinaryOpType.Iand
                 else -> return left
             }
             left = BinaryOp(pos, type, left, equality())
@@ -126,8 +127,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             val type = when {
-                accept(EQ) -> BinaryOp.Type.EQ
-                accept(NEQ) -> BinaryOp.Type.NEQ
+                accept(EQ) -> BinaryOpType.EQ
+                accept(NEQ) -> BinaryOpType.NEQ
                 else -> return left
             }
             left = BinaryOp(pos, type, left, comparison())
@@ -139,10 +140,10 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             val type = when {
-                accept(LT) -> BinaryOp.Type.LT
-                accept(GT) -> BinaryOp.Type.GT
-                accept(LTE) -> BinaryOp.Type.LTE
-                accept(GTE) -> BinaryOp.Type.GTE
+                accept(LT) -> BinaryOpType.LT
+                accept(GT) -> BinaryOpType.GT
+                accept(LTE) -> BinaryOpType.LTE
+                accept(GTE) -> BinaryOpType.GTE
                 else -> return left
             }
             left = BinaryOp(pos, type, left, addition())
@@ -154,8 +155,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             val type = when {
-                accept(Plus) -> BinaryOp.Type.Add
-                accept(Minus) -> BinaryOp.Type.Subtract
+                accept(Plus) -> BinaryOpType.Add
+                accept(Minus) -> BinaryOpType.Subtract
                 else -> return left
             }
             left = BinaryOp(pos, type, left, multiplication())
@@ -167,9 +168,9 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             val type = when {
-                accept(Times) -> BinaryOp.Type.Multiply
-                accept(Divide) -> BinaryOp.Type.Divide
-                accept(Percent) -> BinaryOp.Type.Modulus
+                accept(Times) -> BinaryOpType.Multiply
+                accept(Divide) -> BinaryOpType.Divide
+                accept(Percent) -> BinaryOpType.Modulus
                 else -> return left
             }
             left = BinaryOp(pos, type, left, power())
@@ -181,7 +182,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             if (accept(Power))
-                left = BinaryOp(pos, BinaryOp.Type.Power, left, prefix())
+                left = BinaryOp(pos, BinaryOpType.Power, left, prefix())
             else
                 return left
         }*/

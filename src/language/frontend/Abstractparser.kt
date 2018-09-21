@@ -1,4 +1,4 @@
-package language.high
+package language.frontend
 
 open class AbstractParser(val tokenizer: Tokenizer) {
     val currentPosition
@@ -34,8 +34,7 @@ open class AbstractParser(val tokenizer: Tokenizer) {
         }
     }
 
-    protected fun error(msg: String): Nothing
-            = throw ParseError(msg)
+    protected fun error(msg: String): Nothing = throw ParseError(msg)
 
     protected fun unexpected(): Nothing = error("Unexpected token $next")
 }

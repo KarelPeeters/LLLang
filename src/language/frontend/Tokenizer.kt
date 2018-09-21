@@ -1,4 +1,4 @@
-package language.high
+package language.frontend
 
 data class SourcePosition(
         val line: Int,
@@ -9,12 +9,14 @@ data class SourcePosition(
 
 enum class TokenType(val string: String? = null) {
     //brackets
-    OpenB("("), CloseB(")"),
+    OpenB("("),
+    CloseB(")"),
     OpenS("["), CloseS("]"),
     OpenC("{"), CloseC("}"),
 
     //symbols
-    Inc("++"), Dec("--"),
+    Inc("++"),
+    Dec("--"),
     Power("**"),
     Plus("+"), Minus("-"), Times("*"), Divide("/"), Percent("%"),
     DoubleAmper("&&"), DoublePipe("||"),
@@ -25,7 +27,8 @@ enum class TokenType(val string: String? = null) {
     Assign("="), Semi(";"), EndLn("\n"), Colon(":"), Comma(","),
 
     //keywords
-    If("if"), Else("else"),
+    If("if"),
+    Else("else"),
     While("while"), For("for"),
     Break("break"), Continue("continue"),
     Fun("fun"),

@@ -1,4 +1,6 @@
-package language.high
+package language.frontend
+
+import language.ir.BinaryOpType
 
 sealed class ASTNode(val position: SourcePosition) {
     abstract fun ASTRenderer.render()
@@ -61,23 +63,12 @@ private fun ASTRenderer.safePrint(exp: Expression) {
 
 class BinaryOp(
         position: SourcePosition,
-        val type: Type,
+        val type: BinaryOpType,
         val left: Expression,
         val right: Expression
 ) : Expression(position) {
     override fun ASTRenderer.render() {
         safePrint(left); print(" ${type.symbol} "); safePrint(right)
-    }
-
-    enum class Type(val symbol: String) {
-        //Power("**"),
-        Multiply("*"),
-        Divide("/"), Modulus("%"),
-        Add("+"), Subtract("-"),
-        LT("<"), GT(">"), LTE("<="), GTE(">="),
-        EQ("=="), NEQ("!="),
-        BAnd("&&"), Iand("&"),
-        BOr("||"), Ior("|");
     }
 }
 
