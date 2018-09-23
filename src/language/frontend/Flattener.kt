@@ -17,13 +17,13 @@ class Variable(val name: String, val pointer: Alloc) {
 open class AbstractFlattener {
     private var nextVarId = 0
     private var nextBlockId = 0
-    
+
     fun genVarName() = (nextVarId++).toString()
 
     fun BasicBlock.newVar(name: String? = null): Variable {
         val usedName = name ?: genVarName()
         val alloc = Alloc(usedName)
-        this.push(alloc)
+        this.append(alloc)
         val variable = Variable(usedName, Alloc(usedName))
         vars += variable
         return variable
@@ -92,9 +92,9 @@ class Flattener : AbstractFlattener() {
                 elseBlock
 
             val end = newBlock()
-            
+
             val condValue = Load(genVarName(), condVar.pointer)
-            push(condValue)
+            append(condValue)
 
             afterCond.terminator = Branch(condValue, thenBlock, elseBlock)
             thenEnd.terminator = Jump(end)
@@ -123,18 +123,18 @@ class Flattener : AbstractFlattener() {
 
     private fun BasicBlock.appendExpression(context: Context, exp: Expression, target: Variable): BasicBlock = when (exp) {
         is NumberLiteral -> {
-            push(Store(target.pointer, Constant.of(exp.value.toInt())))
+            append(Store(target.pointer, Constant.of(exp.value.toInt())))
             this
         }
         is BooleanLiteral -> {
-            push(Store(target.pointer, Constant.of(if (exp.value) 1 else 0)))
+            append(Store(target.pointer, Constant.of(if (exp.value) 1 else 0)))
             this
         }
         is IdentifierExpression -> {
             val variable = context.find(exp.identifier)
                     ?: throw IdNotFoundException(exp.position, exp.identifier)
-            val read = Load(genVarName(), variable.pointer).also { push(it) }
-            push(Store(target.pointer, read))
+            val read = Load(genVarName(), variable.pointer).also { append(it) }
+            append(Store(target.pointer, read))
             this
         }
         is Assignment -> {
@@ -143,7 +143,7 @@ class Flattener : AbstractFlattener() {
                     ?: throw IdNotFoundException(exp.target.position, exp.target.identifier)
             val next = appendExpression(context, exp.value, assignTarget)
             val value = Load(genVarName(), assignTarget.pointer)
-            push(Store(target.pointer, value))
+            append(Store(target.pointer, value))
             next
         }
         is BinaryOp -> {
@@ -152,7 +152,7 @@ class Flattener : AbstractFlattener() {
             val rightVar = newVar()
             val afterRight = afterLeft.appendExpression(context, exp.right, rightVar)
             val op = language.ir.BinaryOp(target.name, exp.type, leftVar.pointer, rightVar.pointer)
-            push(Store(target.pointer, op))
+            append(Store(target.pointer, op))
             afterRight
         }
         is UnaryOp -> TODO("unary")
