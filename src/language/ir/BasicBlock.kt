@@ -14,28 +14,24 @@ object Exit : Terminator() {
     override fun toString() = "exit"
 }
 
-class Alloc(val name: String) : Value(PINT32) {
-    override fun valueString() = "%$name $type"
-    override fun toString() = "${valueString()} = alloc"
-}
-
 class BasicBlock(val name: String) {
-    val allocs = mutableListOf<Alloc>()
     val instructions = mutableListOf<Instruction>()
     lateinit var terminator: Terminator
 
-    fun append(alloc: Alloc) {
-        this.allocs += alloc
+    fun insertAt(index: Int, instruction: Instruction): Instruction {
+        this.instructions.add(index, instruction)
+        return instruction
     }
 
-    fun append(instruction: Instruction) {
+    fun append(instruction: Instruction): Instruction {
         this.instructions += instruction
+        return instruction
     }
 
     fun headerString(): String = "<$name>"
 
     override fun toString(): String {
-        return (allocs + instructions + terminator).joinToString(separator = "",
+        return (instructions + terminator).joinToString(separator = "",
                 prefix = "Block ${this.headerString()}\n") { "$it\n" }
     }
 }

@@ -9,25 +9,19 @@ import language.ir.Exit
 import language.ir.Jump
 import language.ir.Load
 import language.ir.Store
+import language.ir.Value
 
-class Variable(val name: String, val pointer: Alloc) {
+class Variable(val name: String, val pointer: Value) {
     override fun toString() = "[$name]"
 }
 
 open class AbstractFlattener {
+    val body = Body()
+
     private var nextVarId = 0
     private var nextBlockId = 0
 
     fun genVarName() = (nextVarId++).toString()
-
-    fun BasicBlock.newVar(name: String? = null): Variable {
-        val usedName = name ?: genVarName()
-        val alloc = Alloc(usedName)
-        this.append(alloc)
-        val variable = Variable(usedName, Alloc(usedName))
-        vars += variable
-        return variable
-    }
 
     fun newBlock(name: String? = null): BasicBlock {
         val block = BasicBlock(name ?: nextBlockId.toString())
@@ -35,12 +29,11 @@ open class AbstractFlattener {
         nextBlockId++
         return block
     }
-
-    val vars = mutableListOf<Variable>()
-    val body = Body()
 }
 
 class Flattener : AbstractFlattener() {
+    val allocs = mutableListOf<Alloc>()
+
     inner class Context(val parent: Context?) {
         private val vars = mutableMapOf<String, Variable>()
 
@@ -59,6 +52,8 @@ class Flattener : AbstractFlattener() {
         val new = newBlock()
         val end = new.appendNestedBlock(Context(null), block)
         end.terminator = Exit
+
+        allocs.asReversed().forEach { new.insertAt(0, it) }
     }
 
     private fun BasicBlock.appendNestedBlock(context: Context, block: CodeBlock): BasicBlock {
@@ -70,17 +65,21 @@ class Flattener : AbstractFlattener() {
 
 
     private fun BasicBlock.appendStatement(context: Context, stmt: Statement): BasicBlock = when (stmt) {
-        is Expression -> appendExpression(context, stmt, newVar())
+        is Expression -> appendExpression(context, stmt).first
         is Declaration -> {
-            val target = newVar(stmt.identifier)
-            val next = appendExpression(context, stmt.value, target)
-            context.register(stmt.identifier, target)
+            val alloc = Alloc(stmt.identifier)
+            allocs += alloc
+
+            val variable = Variable(stmt.identifier, alloc)
+            context.register(stmt.identifier, variable)
+
+            val (next, value) = appendExpression(context, stmt.value)
+            append(Store(variable.pointer, value))
             next
         }
         is CodeBlock -> appendNestedBlock(context, stmt)
         is IfStatement -> {
-            val condVar = newVar()
-            val afterCond = this.appendExpression(context, stmt.condition, condVar)
+            val (afterCond, condValue) = this.appendExpression(context, stmt.condition)
 
             val thenBlock = newBlock()
             val thenEnd = thenBlock.appendNestedBlock(context, stmt.thenBlock)
@@ -93,9 +92,6 @@ class Flattener : AbstractFlattener() {
 
             val end = newBlock()
 
-            val condValue = Load(genVarName(), condVar.pointer)
-            append(condValue)
-
             afterCond.terminator = Branch(condValue, thenBlock, elseBlock)
             thenEnd.terminator = Jump(end)
             elseEnd.terminator = Jump(end)
@@ -104,8 +100,7 @@ class Flattener : AbstractFlattener() {
         }
         is WhileStatement -> {
             val condBlock = newBlock()
-            val condVar = newVar()
-            val afterCond = condBlock.appendExpression(context, stmt.condition, condVar)
+            val (afterCond, condValue) = condBlock.appendExpression(context, stmt.condition)
 
             val bodyBlock = newBlock()
             val bodyEnd = bodyBlock.appendNestedBlock(context, stmt.block)
@@ -113,47 +108,39 @@ class Flattener : AbstractFlattener() {
             val endBlock = newBlock()
 
             this.terminator = Jump(condBlock)
-            afterCond.terminator = Branch(condVar.pointer, bodyBlock, endBlock)
-            bodyEnd.terminator = Jump(this)
+            afterCond.terminator = Branch(condValue, bodyBlock, endBlock)
+            bodyEnd.terminator = Jump(condBlock)
             endBlock
         }
         is BreakStatement -> TODO()
         is ContinueStatement -> TODO()
     }
 
-    private fun BasicBlock.appendExpression(context: Context, exp: Expression, target: Variable): BasicBlock = when (exp) {
+    private fun BasicBlock.appendExpression(context: Context, exp: Expression): Pair<BasicBlock, Value> = when (exp) {
         is NumberLiteral -> {
-            append(Store(target.pointer, Constant.of(exp.value.toInt())))
-            this
+            this to Constant.of(exp.value.toInt())
         }
         is BooleanLiteral -> {
-            append(Store(target.pointer, Constant.of(if (exp.value) 1 else 0)))
-            this
+            this to Constant.of(if (exp.value) 1 else 0)
         }
         is IdentifierExpression -> {
             val variable = context.find(exp.identifier)
                     ?: throw IdNotFoundException(exp.position, exp.identifier)
-            val read = Load(genVarName(), variable.pointer).also { append(it) }
-            append(Store(target.pointer, read))
-            this
+            this to append(Load(genVarName(), variable.pointer))
         }
         is Assignment -> {
             if (exp.target !is IdentifierExpression) TODO("other target types")
             val assignTarget = context.find(exp.target.identifier)
                     ?: throw IdNotFoundException(exp.target.position, exp.target.identifier)
-            val next = appendExpression(context, exp.value, assignTarget)
-            val value = Load(genVarName(), assignTarget.pointer)
-            append(Store(target.pointer, value))
-            next
+            val (next, value) = appendExpression(context, exp.value)
+            append(Store(assignTarget.pointer, value))
+            next to value
         }
         is BinaryOp -> {
-            val leftVar = newVar()
-            val afterLeft = appendExpression(context, exp.left, leftVar)
-            val rightVar = newVar()
-            val afterRight = afterLeft.appendExpression(context, exp.right, rightVar)
-            val op = language.ir.BinaryOp(target.name, exp.type, leftVar.pointer, rightVar.pointer)
-            append(Store(target.pointer, op))
-            afterRight
+            val (afterLeft, leftValue) = appendExpression(context, exp.left)
+            val (afterRight, rightValue) = afterLeft.appendExpression(context, exp.right)
+            val result = language.ir.BinaryOp(genVarName(), exp.type, leftValue, rightValue)
+            afterRight to append(result)
         }
         is UnaryOp -> TODO("unary")
         is Call -> TODO("calls")
