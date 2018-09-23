@@ -1,22 +1,12 @@
 package language.ir
 
-sealed class Terminator
-
-class Branch(var value: Value, var ifTrue: BasicBlock, var ifFalse: BasicBlock) : Terminator() {
-    override fun toString() = "branch ${value.valueString()} T ${ifTrue.headerString()} F ${ifFalse.headerString()}"
-}
-
-class Jump(var target: BasicBlock) : Terminator() {
-    override fun toString() = "jump ${target.headerString()}"
-}
-
-object Exit : Terminator() {
-    override fun toString() = "exit"
-}
-
-class BasicBlock(val name: String) {
+/**
+ * A list of instructions with a Terminator at the end. No control flow happens within the block.
+ */
+class BasicBlock(val name: String) : Value(BlockType, 1) {
     val instructions = mutableListOf<Instruction>()
-    lateinit var terminator: Terminator
+
+    var terminator: Terminator by operand(0)
 
     fun insertAt(index: Int, instruction: Instruction): Instruction {
         this.instructions.add(index, instruction)
@@ -28,18 +18,13 @@ class BasicBlock(val name: String) {
         return instruction
     }
 
-    fun headerString(): String = "<$name>"
+    override fun toString() = "<$name>"
 
-    override fun toString(): String {
-        return (instructions + terminator).joinToString(separator = "",
-                prefix = "Block ${this.headerString()}\n") { "$it\n" }
-    }
+    fun fullString() = instructions.joinToString(
+            separator = "", prefix = "$this\n", postfix = "$terminator"
+    ) { "${it.fullString()}\n" }
 }
 
-class Body {
-    val blocks = mutableListOf<BasicBlock>()
-
-    fun push(block: BasicBlock) {
-        this.blocks += block
-    }
+object BlockType : Type {
+    override fun toString() = "block"
 }

@@ -1,22 +1,33 @@
 package language.ir
 
-sealed class Instruction(val name: String, type: Type) : Value(type) {
-    override fun valueString() = "%$name $type"
+import language.ir.IntegerType.Companion.i32
+
+sealed class Instruction(val name: String, type: Type, operandCount: Int) : Value(type, operandCount) {
+    override fun toString() = "%$name $type"
+
+    abstract fun fullString(): String
 }
 
-class Alloc(name: String) : Instruction(name, PINT32) {
-    override fun valueString() = "%$name $type"
-    override fun toString() = "${valueString()} = alloc"
+class Alloc(name: String) : Instruction(name, i32, 0) {
+    override fun fullString() = "$this = alloc"
 }
 
-class BinaryOp(name: String, val op: BinaryOpType, var left: Value, var right: Value) : Instruction(name, INT32) {
-    override fun toString() = "${valueString()} = $op ${left.valueString()}, ${right.valueString()}"
+class BinaryOp(name: String, val op: BinaryOpType, left: Value, right: Value) : Instruction(name, i32, 2) {
+    var left by operand(0, left)
+    var right by operand(0, right)
+
+    override fun fullString() = "$this = $op $left, $right"
 }
 
-class Store(var pointer: Value, var value: Value) : Instruction("", VOID) {
-    override fun toString() = "store ${value.valueString()} -> ${pointer.valueString()}"
+class Store(pointer: Value, value: Value) : Instruction("", VoidType, 2) {
+    var pointer by operand(0, pointer)
+    var value by operand(1, value)
+
+    override fun fullString() = "store $value -> $pointer"
 }
 
-class Load(name: String, var pointer: Value) : Instruction(name, INT32) {
-    override fun toString() = "${valueString()} = load ${pointer.valueString()}"
+class Load(name: String, pointer: Value) : Instruction(name, i32, 1) {
+    var pointer by operand(0, pointer)
+
+    override fun fullString() = "$this = load $pointer"
 }

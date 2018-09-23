@@ -2,7 +2,7 @@ package language.frontend
 
 import language.ir.Alloc
 import language.ir.BasicBlock
-import language.ir.Body
+import language.ir.Function
 import language.ir.Branch
 import language.ir.Constant
 import language.ir.Exit
@@ -16,7 +16,7 @@ class Variable(val name: String, val pointer: Value) {
 }
 
 open class AbstractFlattener {
-    val body = Body()
+    val body = Function()
 
     private var nextVarId = 0
     private var nextBlockId = 0
