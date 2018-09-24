@@ -2,34 +2,42 @@ package language.optimizer
 
 import language.ir.BasicBlock
 import language.ir.Function
+import language.optimizer.Result.DELETE
+import language.optimizer.Result.UNCHANGED
 
-interface BlockPass {
-    fun optimize(block: BasicBlock): Boolean
+enum class Result {
+    UNCHANGED, CHANGED, DELETE
 }
 
-interface BodyPass {
-    fun optimize(function: Function): Boolean
+interface BlockPass {
+    fun optimize(block: BasicBlock): Result
+}
+
+interface FunctionPass {
+    fun optimize(function: Function): Result
 }
 
 class Optimizer {
-    private val basicBlockPasses = listOf<BlockPass>()
-    private val bodyPasses = listOf<BodyPass>(
-            SimplifyBlocks
-    )
+    private val basicBlockPasses = listOf<BlockPass>(SimplifyBlocks)
+    private val bodyPasses = listOf<FunctionPass>()
 
     fun optimize(function: Function) {
         do {
-            var cont = false
+            var changed = false
 
             basicBlockPasses.forEach { pass ->
-                function.blocks.forEach { block ->
-                    cont = pass.optimize(block) || cont
+                function.blocks.removeAll { block ->
+                    val result = pass.optimize(block)
+                    changed = changed || result != UNCHANGED
+                    result == DELETE
                 }
             }
 
             bodyPasses.forEach { pass ->
-                cont = pass.optimize(function) || cont
+                val result = pass.optimize(function)
+                changed = changed || result != UNCHANGED
+                require(result != DELETE)
             }
-        } while (cont)
+        } while (!changed)
     }
 }

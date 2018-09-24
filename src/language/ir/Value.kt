@@ -4,44 +4,61 @@ import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
 open class User(operandCount: Int) {
-    private val operands = arrayOfNulls<Value>(operandCount)
+    private val _operands = arrayOfNulls<Value>(operandCount)
 
-    fun replaceValue(from: Value, to: Value) {
-        for (i in operands.indices)
-            if (operands[i] == from)
-                operands[i] = to
+    protected fun operandCount() = _operands.size
+
+    /**
+     * Get the operator at [index]
+     */
+    protected operator fun get(index: Int) = _operands[index]!!
+
+    /**
+     * Set the operator at [index] to [value], updating the previous and new [Value.users].
+     */
+    protected operator fun set(index: Int, value: Value) {
+        val prev = _operands[index]
+        if (value == prev) return
+
+        _operands[index] = value
+        value.users += this
+
+        if (prev != null && prev !in _operands) {
+            prev.users -= this
+        }
     }
 
     /**
-     * Get a delegate that writes trough to the internal `operands` array and updates `Value.users` accordingly.
+     * Replace all operands of this [User] equal to [from] with [to], updating [Value.users]
+     */
+    fun replaceOperand(from: Value, to: Value) {
+        for (i in 0 until operandCount())
+            if (this[i] == from)
+                this[i] = to
+    }
+
+    /**
+     * Get a delegate that forwards calls to [get] and [set]
      * @param index Index in the `operands` array
      * @param value Initial value. If `null` the delegate behaves like `lateinit`
      */
     @Suppress("UNCHECKED_CAST")
     protected fun <T : Value> operand(index: Int, value: T? = null): ReadWriteProperty<User, T> {
-        require(index in operands.indices)
+        require(index in 0 until operandCount())
 
         val delegate = UserOperandDelegate.getInstance(index)
         if (value != null)
-            delegate.setValue(this, User::operands, value) //pass in a random property, UserOperandDelegate does't care
+            this[index] = value
         return delegate as ReadWriteProperty<User, T>
     }
 
     private class UserOperandDelegate private constructor(val index: Int) : ReadWriteProperty<User, Value> {
         override fun getValue(thisRef: User, property: KProperty<*>): Value {
-            return thisRef.operands[index]!!
+            return thisRef[index]
         }
 
         override fun setValue(thisRef: User, property: KProperty<*>, value: Value) {
-            val prev = thisRef.operands[index]
-            if (value == prev) return
-
-            thisRef.operands[index] = value
-            value.users += thisRef
-
-            if (prev != null && prev !in thisRef.operands) {
-                prev.users -= thisRef
-            }
+            thisRef[index] = value
         }
 
         companion object {
@@ -58,6 +75,14 @@ open class User(operandCount: Int) {
 
 abstract class Value(val type: Type, operandCount: Int) : User(operandCount) {
     val users = mutableSetOf<User>()
+
+    /**
+     * Replace all uses of this [Value] with [to]
+     */
+    fun replaceWith(to: Value) {
+        for (user in this.users.toSet())
+            user.replaceOperand(this, to)
+    }
 }
 
 class Constant private constructor(val value: Int) : Value(IntegerType.i32, 0) {

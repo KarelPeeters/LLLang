@@ -1,11 +1,10 @@
 package language.ir
 
 /**
- * A list of instructions with a Terminator at the end. No control flow happens within the block.
+ * A list of instructions with a Terminator at the end. No control flow happens within a BasicBlock.
  */
 class BasicBlock(val name: String) : Value(BlockType, 1) {
     val instructions = mutableListOf<Instruction>()
-
     var terminator: Terminator by operand(0)
 
     fun insertAt(index: Int, instruction: Instruction): Instruction {

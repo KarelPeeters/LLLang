@@ -1,23 +1,18 @@
 package language.optimizer
 
 import language.ir.BasicBlock
-import language.ir.Function
 import language.ir.Jump
+import language.optimizer.Result.DELETE
+import language.optimizer.Result.UNCHANGED
 
-object SimplifyBlocks : BodyPass {
-    override fun optimize(function: Function): Boolean {
-        val deadBlocks = mutableListOf<BasicBlock>()
-
-        for (block in function.blocks) {
-            val term = block.terminator
-            if (block.instructions.isEmpty() && term is Jump) {
-                block.users.forEach { user -> user.replaceValue(block, term.target) }
-
-                deadBlocks += block
-            }
+object SimplifyBlocks : BlockPass {
+    override fun optimize(block: BasicBlock): Result {
+        val term = block.terminator
+        if (block.instructions.isEmpty() && term is Jump) {
+            block.replaceWith(term.target)
+            return DELETE
         }
 
-        function.blocks.removeAll(deadBlocks)
-        return deadBlocks.isNotEmpty()
+        return UNCHANGED
     }
 }
