@@ -3,7 +3,8 @@ package language.frontend
 import language.frontend.TokenType.*
 import language.frontend.TokenType.Boolean
 import language.frontend.TokenType.Number
-import language.ir.BinaryOpType
+import language.ir.ArithmeticOpType
+import language.ir.ComparisonOpType
 import java.util.*
 import kotlin.coroutines.experimental.buildSequence
 
@@ -100,8 +101,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             val type = when {
-                accept(DoublePipe) -> BinaryOpType.BOr
-                accept(Pipe) -> BinaryOpType.Ior
+                accept(DoublePipe) -> ComparisonOpType.Bor
+                //accept(Pipe) -> BinaryOpType.Ior
                 else -> return left
             }
             left = BinaryOp(pos, type, left, conjunction())
@@ -114,8 +115,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         val pos = currentPosition
         while (true) {
             val type = when {
-                accept(DoubleAmper) -> BinaryOpType.BAnd
-                accept(Amper) -> BinaryOpType.Iand
+                accept(DoubleAmper) -> ComparisonOpType.BAnd
+                //accept(Amper) -> BinaryOpType.Iand
                 else -> return left
             }
             left = BinaryOp(pos, type, left, equality())
@@ -127,8 +128,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             val type = when {
-                accept(EQ) -> BinaryOpType.EQ
-                accept(NEQ) -> BinaryOpType.NEQ
+                accept(EQ) -> ComparisonOpType.EQ
+                accept(NEQ) -> ComparisonOpType.NEQ
                 else -> return left
             }
             left = BinaryOp(pos, type, left, comparison())
@@ -140,10 +141,10 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             val type = when {
-                accept(LT) -> BinaryOpType.LT
-                accept(GT) -> BinaryOpType.GT
-                accept(LTE) -> BinaryOpType.LTE
-                accept(GTE) -> BinaryOpType.GTE
+                accept(LT) -> ComparisonOpType.LT
+                accept(GT) -> ComparisonOpType.GT
+                accept(LTE) -> ComparisonOpType.LTE
+                accept(GTE) -> ComparisonOpType.GTE
                 else -> return left
             }
             left = BinaryOp(pos, type, left, addition())
@@ -155,8 +156,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             val type = when {
-                accept(Plus) -> BinaryOpType.Add
-                accept(Minus) -> BinaryOpType.Subtract
+                accept(Plus) -> ArithmeticOpType.Add
+                accept(Minus) -> ArithmeticOpType.Sub
                 else -> return left
             }
             left = BinaryOp(pos, type, left, multiplication())
@@ -168,9 +169,9 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             val type = when {
-                accept(Times) -> BinaryOpType.Multiply
-                accept(Divide) -> BinaryOpType.Divide
-                accept(Percent) -> BinaryOpType.Modulus
+                accept(Times) -> ArithmeticOpType.Mul
+                accept(Divide) -> ArithmeticOpType.Div
+                accept(Percent) -> ArithmeticOpType.Mod
                 else -> return left
             }
             left = BinaryOp(pos, type, left, power())

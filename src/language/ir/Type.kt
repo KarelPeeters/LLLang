@@ -1,7 +1,11 @@
 package language.ir
 
-interface Type
-class IntegerType private constructor(val width: Int) : Type {
+abstract class Type {
+    val pointer get() = PointerType.pointTo(this)
+    val unpoint get() = (this as? PointerType)?.inner
+}
+
+class IntegerType private constructor(val width: Int) : Type() {
     override fun toString() = "i$width"
 
     companion object {
@@ -13,10 +17,15 @@ class IntegerType private constructor(val width: Int) : Type {
     }
 }
 
-class PointerType private constructor(val inner: Type) : Type {
+class PointerType private constructor(val inner: Type) : Type() {
     override fun toString() = "$inner*"
+
+    companion object {
+        private val map = mutableMapOf<Type, PointerType>()
+        fun pointTo(type: Type) = map.getOrPut(type) { PointerType(type) }
+    }
 }
 
-object VoidType : Type {
+object VoidType : Type() {
     override fun toString() = "void"
 }

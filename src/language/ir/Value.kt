@@ -85,17 +85,10 @@ abstract class Value(val type: Type, operandCount: Int) : User(operandCount) {
     }
 }
 
-class Constant private constructor(val value: Int) : Value(IntegerType.i32, 0) {
-    override fun toString() = value.toString()
+class Constant private constructor(val value: Int, type: Type) : Value(type, 0) {
+    override fun toString() = "$value $type"
 
     companion object {
-        val ZERO = Constant(0)
-        val ONE = Constant(1)
-
-        fun of(value: Int) = when (value) {
-            0 -> ZERO
-            1 -> ONE
-            else -> Constant(value)
-        }
+        fun of(value: Int, type: Type) = Constant(value, type)
     }
 }

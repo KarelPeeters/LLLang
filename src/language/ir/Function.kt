@@ -18,6 +18,6 @@ class Function : Value(VoidFunctionType, 1) {
     fun fullString() = blocks.joinToString("\n\n") { it.fullString() }
 }
 
-object VoidFunctionType : Type {
+object VoidFunctionType : Type() {
     override fun toString() = "fun"
 }

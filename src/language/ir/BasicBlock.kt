@@ -24,6 +24,6 @@ class BasicBlock(val name: String) : Value(BlockType, 1) {
     ) { "${it.fullString()}\n" }
 }
 
-object BlockType : Type {
+object BlockType : Type() {
     override fun toString() = "block"
 }

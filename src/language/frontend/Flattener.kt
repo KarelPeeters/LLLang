@@ -6,6 +6,8 @@ import language.ir.Branch
 import language.ir.Constant
 import language.ir.Exit
 import language.ir.Function
+import language.ir.IntegerType.Companion.bool
+import language.ir.IntegerType.Companion.i32
 import language.ir.Jump
 import language.ir.Load
 import language.ir.Store
@@ -37,8 +39,8 @@ class Flattener : AbstractFlattener() {
     inner class Context(val parent: Context?) {
         private val vars = mutableMapOf<String, Variable>()
 
-        fun register(name: String, variable: Variable) {
-            if (find(name) != null) throw DuplicateDeclarationException(name)
+        fun register(pos: SourcePosition, name: String, variable: Variable) {
+            if (find(name) != null) throw DuplicateDeclarationException(pos, name)
 
             vars[name] = variable
         }
@@ -67,11 +69,16 @@ class Flattener : AbstractFlattener() {
     private fun BasicBlock.appendStatement(context: Context, stmt: Statement): BasicBlock = when (stmt) {
         is Expression -> appendExpression(context, stmt).first
         is Declaration -> {
-            val alloc = Alloc(stmt.identifier)
+            val type = when (stmt.type?.str) {
+                "bool" -> bool
+                "i32", null -> i32
+                else -> throw IllegalTypeException(stmt.type.position, stmt.type.str)
+            }
+            val alloc = Alloc(stmt.identifier, type)
             allocs += alloc
 
             val variable = Variable(stmt.identifier, alloc)
-            context.register(stmt.identifier, variable)
+            context.register(stmt.position, stmt.identifier, variable)
 
             val (next, value) = appendExpression(context, stmt.value)
             append(Store(variable.pointer, value))
@@ -118,10 +125,10 @@ class Flattener : AbstractFlattener() {
 
     private fun BasicBlock.appendExpression(context: Context, exp: Expression): Pair<BasicBlock, Value> = when (exp) {
         is NumberLiteral -> {
-            this to Constant.of(exp.value.toInt())
+            this to Constant.of(exp.value.toInt(), i32)
         }
         is BooleanLiteral -> {
-            this to Constant.of(if (exp.value) 1 else 0)
+            this to Constant.of(if (exp.value) 1 else 0, bool)
         }
         is IdentifierExpression -> {
             val variable = context.find(exp.identifier)
@@ -149,7 +156,10 @@ class Flattener : AbstractFlattener() {
 }
 
 class IdNotFoundException(pos: SourcePosition, identifier: String)
-    : Exception("'$identifier' not found at $pos")
+    : Exception("$pos: '$identifier' not found")
 
-class DuplicateDeclarationException(identifier: String)
-    : Exception("'$identifier' was already declared")
+class DuplicateDeclarationException(pos: SourcePosition, identifier: String)
+    : Exception("$pos: '$identifier' was already declared")
+
+class IllegalTypeException(pos: SourcePosition, type: String)
+    : Exception("$pos: Illegal type '$type'")
