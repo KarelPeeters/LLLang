@@ -6,13 +6,19 @@ import kotlin.reflect.KProperty
 open class User(operandCount: Int) {
     private val operands = arrayOfNulls<Value>(operandCount)
 
+    fun replaceValue(from: Value, to: Value) {
+        for (i in operands.indices)
+            if (operands[i] == from)
+                operands[i] = to
+    }
+
     /**
      * Get a delegate that writes trough to the internal `operands` array and updates `Value.users` accordingly.
      * @param index Index in the `operands` array
      * @param value Initial value. If `null` the delegate behaves like `lateinit`
      */
     @Suppress("UNCHECKED_CAST")
-    protected fun <T: Value> operand(index: Int, value: T? = null): ReadWriteProperty<User, T> {
+    protected fun <T : Value> operand(index: Int, value: T? = null): ReadWriteProperty<User, T> {
         require(index in operands.indices)
 
         val delegate = UserOperandDelegate.getInstance(index)
@@ -21,7 +27,7 @@ open class User(operandCount: Int) {
         return delegate as ReadWriteProperty<User, T>
     }
 
-    private class UserOperandDelegate private constructor(val index: Int): ReadWriteProperty<User, Value> {
+    private class UserOperandDelegate private constructor(val index: Int) : ReadWriteProperty<User, Value> {
         override fun getValue(thisRef: User, property: KProperty<*>): Value {
             return thisRef.operands[index]!!
         }
@@ -42,7 +48,7 @@ open class User(operandCount: Int) {
             private val instances = mutableListOf<UserOperandDelegate>()
 
             fun getInstance(index: Int): UserOperandDelegate {
-                for (i in instances.size .. index)
+                for (i in instances.size..index)
                     instances.add(UserOperandDelegate(index))
                 return instances[index]
             }
@@ -50,7 +56,7 @@ open class User(operandCount: Int) {
     }
 }
 
-abstract class Value(val type: Type, operandCount: Int): User(operandCount) {
+abstract class Value(val type: Type, operandCount: Int) : User(operandCount) {
     val users = mutableSetOf<User>()
 }
 

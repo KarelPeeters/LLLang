@@ -194,8 +194,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         loop@ while (true) {
             val pos = currentPosition
             val type = when {
-            /*accept(Inc) -> UnaryOp.Type.PreInc
-            accept(Dec) -> UnaryOp.Type.PreDec*/
+                /*accept(Inc) -> UnaryOp.Type.PreInc
+                accept(Dec) -> UnaryOp.Type.PreDec*/
                 accept(Plus) -> UnaryOp.Type.Positive
                 accept(Minus) -> UnaryOp.Type.Negative
                 accept(Bang) -> UnaryOp.Type.BNot
@@ -212,8 +212,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             expr = when {
-            /*accept(Inc) -> UnaryOp(pos, UnaryOp.Type.PostInc, expr)
-            accept(Dec) -> UnaryOp(pos, UnaryOp.Type.PostDec, expr)*/
+                /*accept(Inc) -> UnaryOp(pos, UnaryOp.Type.PostInc, expr)
+                accept(Dec) -> UnaryOp(pos, UnaryOp.Type.PostDec, expr)*/
                 accept(OpenB) -> Call(pos, expr, expressionList(CloseB))
                 accept(OpenS) -> Index(pos, expr, expression())
                 else -> return expr

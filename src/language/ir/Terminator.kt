@@ -1,6 +1,6 @@
 package language.ir
 
-sealed class Terminator(operandCount: Int): Value(VoidType, operandCount)
+sealed class Terminator(operandCount: Int) : Value(VoidType, operandCount)
 
 class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator(3) {
     var value by operand(0, value)

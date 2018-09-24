@@ -1,7 +1,7 @@
 package language.ir
 
 interface Type
-class IntegerType private constructor(val width: Int): Type {
+class IntegerType private constructor(val width: Int) : Type {
     override fun toString() = "i$width"
 
     companion object {
@@ -13,7 +13,7 @@ class IntegerType private constructor(val width: Int): Type {
     }
 }
 
-class PointerType private constructor(val inner: Type): Type {
+class PointerType private constructor(val inner: Type) : Type {
     override fun toString() = "$inner*"
 }
 
