@@ -1,9 +1,6 @@
 package language.ir
 
-abstract class Type {
-    val pointer get() = PointerType.pointTo(this)
-    val unpoint get() = (this as? PointerType)?.inner
-}
+abstract class Type
 
 class IntegerType private constructor(val width: Int) : Type() {
     override fun toString() = "i$width"
@@ -25,6 +22,9 @@ class PointerType private constructor(val inner: Type) : Type() {
         fun pointTo(type: Type) = map.getOrPut(type) { PointerType(type) }
     }
 }
+
+val Type.pointer get() = PointerType.pointTo(this)
+val Type.unpoint get() = (this as? PointerType)?.inner
 
 object VoidType : Type() {
     override fun toString() = "void"

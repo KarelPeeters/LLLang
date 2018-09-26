@@ -21,10 +21,24 @@ open class User(operandCount: Int) {
         if (value == prev) return
 
         _operands[index] = value
-        value.users += this
+        onOperandAdded(value)
 
-        if (prev != null && prev !in _operands) {
-            prev.users -= this
+        if (prev != null)
+            onOperandRemoved(prev)
+    }
+
+    private fun onOperandRemoved(value: Value) {
+        if (value !in _operands)
+            value.users -= this
+    }
+
+    private fun onOperandAdded(value: Value) {
+        value.users += this
+    }
+
+    fun delete() {
+        for (op in _operands) {
+            op?.users?.remove(this)
         }
     }
 
@@ -80,6 +94,8 @@ abstract class Value(val type: Type, operandCount: Int) : User(operandCount) {
      * Replace all uses of this [Value] with [to]
      */
     fun replaceWith(to: Value) {
+        require(this !is Constant) { "can't replace constant value $this" }
+
         for (user in this.users.toSet())
             user.replaceOperand(this, to)
     }
