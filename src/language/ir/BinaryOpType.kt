@@ -2,6 +2,8 @@ package language.ir
 
 sealed class BinaryOpType(val symbol: String) {
     abstract fun returnType(leftType: Type, rightType: Type): Type
+
+    override fun toString(): String = this::class.java.simpleName.toLowerCase()
 }
 
 abstract class ArithmeticOpType(symbol: String) : BinaryOpType(symbol) {

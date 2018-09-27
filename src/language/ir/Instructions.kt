@@ -23,10 +23,10 @@ class Load(name: String, pointer: Value) : Instruction(name, pointer.type.unpoin
     override fun fullString() = "$this = load $pointer"
 }
 
-class BinaryOp(name: String, type: BinaryOpType, left: Value, right: Value) :
-        Instruction(name, type.returnType(left.type, right.type), 2) {
+class BinaryOp(name: String, val opType: BinaryOpType, left: Value, right: Value) :
+        Instruction(name, opType.returnType(left.type, right.type), 2) {
     var left by operand(0, left)
-    var right by operand(0, right)
+    var right by operand(1, right)
 
-    override fun fullString() = "$name = $type $left, $right"
+    override fun fullString() = "$this = $opType $left, $right"
 }

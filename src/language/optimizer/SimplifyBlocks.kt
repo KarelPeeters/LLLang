@@ -22,6 +22,7 @@ object SimplifyBlocks : BlockPass {
                 }
                 if (target != null) {
                     block.terminator = Jump(target)
+                    term.delete()
                 }
             }
         }
@@ -31,6 +32,7 @@ object SimplifyBlocks : BlockPass {
             val term = block.terminator
             if (block.instructions.isEmpty() && term is Jump) {
                 block.replaceWith(term.target)
+                block.delete()
                 return DELETE
             }
         }
