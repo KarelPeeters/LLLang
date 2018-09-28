@@ -147,7 +147,7 @@ class Flattener : AbstractFlattener() {
             val (afterLeft, leftValue) = appendExpression(context, exp.left)
             val (afterRight, rightValue) = afterLeft.appendExpression(context, exp.right)
             val result = language.ir.BinaryOp(genVarName(), exp.type, leftValue, rightValue)
-            afterRight to append(result)
+            afterRight to afterRight.append(result)
         }
         is UnaryOp -> TODO("unary")
         is Call -> TODO("calls")
