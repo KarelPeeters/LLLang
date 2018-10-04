@@ -15,7 +15,7 @@ class Function : Value(VoidFunctionType) {
         this.blocks += block
     }
 
-    fun fullString() = blocks.joinToString("\n\n") { it.fullString() }
+    fun fullString() = "entry: $entry\n${blocks.joinToString("\n\n") { it.fullString() }}"
 }
 
 object VoidFunctionType : Type() {

@@ -4,32 +4,16 @@ import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
 abstract class Node {
-    private var nextOperandIndex = 0
-    private val operands = mutableListOf<Value?>()
+    private var operandList: OperandList? = null
 
-    fun delete() {
-        for (operand in operands)
-            operand?.users?.remove(this)
-        operands.clear()
+    open fun delete() {
+        operandList?.apply { delete() }
+                ?: throw IllegalStateException("Either use operand mode or override this in `${this::class.java.name}`")
     }
 
-    fun replaceOperand(from: Value, to: Value) {
-        operands.replaceAll { if (it === from) to else it }
-        from.users -= this
-        to.users += this
-    }
-
-    private operator fun get(index: Int): Value = operands[index]!!
-
-    private operator fun set(index: Int, value: Value) {
-        val prev = operands[index]
-        if (value === prev) return
-
-        operands[index] = value
-        value.users += this
-
-        if (prev != null && prev !in operands)
-            prev.users -= this
+    open fun replaceOperand(from: Value, to: Value) {
+        operandList?.apply { replaceOperand(from, to) }
+                ?: throw IllegalStateException("Either use operand mode or override this in `${this::class.java.name}`")
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -37,20 +21,57 @@ abstract class Node {
 
     @JvmName("_operand")
     protected fun operand(value: Value? = null): ReadWriteProperty<Node, Value> {
-        val index = nextOperandIndex++
+        val list = operandList ?: OperandList()
+        operandList = list
 
-        val delegate = UserOperandDelegate.getInstance(index)
-        this.operands.add(value)
-        return delegate
+        val index = list.addOperand(value)
+        return UserOperandDelegate.getInstance(index)
+    }
+
+    private inner class OperandList {
+        var nextOperandIndex = 0
+        val operands = mutableListOf<Value?>()
+
+        fun delete() {
+            for (operand in operands)
+                operand?.users?.remove(this@Node)
+            operands.clear()
+        }
+
+        fun replaceOperand(from: Value, to: Value) {
+            operands.replaceAll { if (it == from) to else it }
+            from.users -= this@Node
+            to.users += this@Node
+        }
+
+        fun getOperand(index: Int): Value = operands[index]!!
+
+        fun setOperand(index: Int, value: Value) {
+            val prev = operands[index]
+            if (value == prev) return
+
+            operands[index] = value
+            value.users += this@Node
+
+            if (prev != null && prev !in operands)
+                prev.users -= this@Node
+        }
+
+        fun addOperand(value: Value?): Int {
+            val index = nextOperandIndex++
+            operands.add(value)
+            value?.users?.add(this@Node)
+            return index
+        }
     }
 
     private class UserOperandDelegate private constructor(val index: Int) : ReadWriteProperty<Node, Value> {
         override fun getValue(thisRef: Node, property: KProperty<*>): Value {
-            return thisRef[index]
+            return thisRef.operandList!!.getOperand(index)
         }
 
         override fun setValue(thisRef: Node, property: KProperty<*>, value: Value) {
-            thisRef[index] = value
+            thisRef.operandList!!.setOperand(index, value)
         }
 
         companion object {
@@ -64,3 +85,4 @@ abstract class Node {
         }
     }
 }
+
