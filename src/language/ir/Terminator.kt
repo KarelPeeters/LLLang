@@ -1,21 +1,21 @@
 package language.ir
 
-sealed class Terminator(operandCount: Int) : Value(VoidType, operandCount)
+sealed class Terminator : Value(VoidType)
 
-class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator(3) {
-    var value by operand(0, value)
-    var ifTrue by operand(1, ifTrue)
-    var ifFalse by operand(2, ifFalse)
+class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator() {
+    var value by operand(value)
+    var ifTrue by operand<BasicBlock>(ifTrue)
+    var ifFalse by operand<BasicBlock>(ifFalse)
 
     override fun toString() = "branch $value T $ifTrue F $ifFalse"
 }
 
-class Jump(target: BasicBlock) : Terminator(1) {
-    var target by operand(0, target)
+class Jump(target: BasicBlock) : Terminator() {
+    var target by operand(target)
 
     override fun toString() = "jump $target"
 }
 
-object Exit : Terminator(0) {
+object Exit : Terminator() {
     override fun toString() = "exit"
 }

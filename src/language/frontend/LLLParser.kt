@@ -100,12 +100,9 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         var left = conjunction()
         while (true) {
             val pos = currentPosition
-            val type = when {
-                accept(DoublePipe) -> ComparisonOpType.Bor
-                //accept(Pipe) -> BinaryOpType.Ior
-                else -> return left
-            }
-            left = BinaryOp(pos, type, left, conjunction())
+            if (!accept(DoublePipe) && !accept(Pipe))
+                return left
+            left = BinaryOp(pos, ArithmeticOpType.Or, left, conjunction())
         }
 
     }
@@ -114,12 +111,9 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         var left = equality()
         val pos = currentPosition
         while (true) {
-            val type = when {
-                accept(DoubleAmper) -> ComparisonOpType.BAnd
-                //accept(Amper) -> BinaryOpType.Iand
-                else -> return left
-            }
-            left = BinaryOp(pos, type, left, equality())
+            if (!accept(DoubleAmper) && !accept(Amper))
+                return left
+            left = BinaryOp(pos, ArithmeticOpType.And, left, equality())
         }
     }
 

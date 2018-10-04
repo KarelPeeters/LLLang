@@ -3,8 +3,8 @@ package language.ir
 /**
  * Represents a function with void return type and no parameters
  */
-class Function : Value(VoidFunctionType, 1) {
-    var entry: BasicBlock by operand(0)
+class Function : Value(VoidFunctionType) {
+    var entry by operand<BasicBlock>()
 
     val blocks = mutableListOf<BasicBlock>()
 

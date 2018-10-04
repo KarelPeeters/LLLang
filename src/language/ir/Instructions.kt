@@ -1,32 +1,32 @@
 package language.ir
 
-sealed class Instruction(val name: String, type: Type, operandCount: Int) : Value(type, operandCount) {
+sealed class Instruction(val name: String, type: Type) : Value(type) {
     override fun toString() = "%$name $type"
 
     abstract fun fullString(): String
 }
 
-class Alloc(name: String, val inner: Type) : Instruction(name, inner.pointer, 0) {
+class Alloc(name: String, val inner: Type) : Instruction(name, inner.pointer) {
     override fun fullString() = "$this = alloc $inner"
 }
 
-class Store(pointer: Value, value: Value) : Instruction("", VoidType, 2) {
-    var pointer by operand(0, pointer)
-    var value by operand(1, value)
+class Store(pointer: Value, value: Value) : Instruction("", VoidType) {
+    var pointer by operand(pointer)
+    var value by operand(value)
 
     override fun fullString() = "store $value -> $pointer"
 }
 
-class Load(name: String, pointer: Value) : Instruction(name, pointer.type.unpoint!!, 1) {
-    var pointer by operand(0, pointer)
+class Load(name: String, pointer: Value) : Instruction(name, pointer.type.unpoint!!) {
+    var pointer by operand(pointer)
 
     override fun fullString() = "$this = load $pointer"
 }
 
 class BinaryOp(name: String, val opType: BinaryOpType, left: Value, right: Value) :
-        Instruction(name, opType.returnType(left.type, right.type), 2) {
-    var left by operand(0, left)
-    var right by operand(1, right)
+        Instruction(name, opType.returnType(left.type, right.type)) {
+    var left by operand(left)
+    var right by operand(right)
 
     override fun fullString() = "$this = $opType $left, $right"
 }

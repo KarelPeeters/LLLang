@@ -18,6 +18,9 @@ abstract class ArithmeticOpType(symbol: String) : BinaryOpType(symbol) {
     object Mul : ArithmeticOpType("*")
     object Div : ArithmeticOpType("/")
     object Mod : ArithmeticOpType("%")
+
+    object And : ArithmeticOpType("&")
+    object Or : ArithmeticOpType("|")
 }
 
 abstract class ComparisonOpType(symbol: String) : BinaryOpType(symbol) {
@@ -32,6 +35,4 @@ abstract class ComparisonOpType(symbol: String) : BinaryOpType(symbol) {
     object GTE : ComparisonOpType(">=")
     object EQ : ComparisonOpType("==")
     object NEQ : ComparisonOpType("!=")
-    object BAnd : ComparisonOpType("&&")
-    object Bor : ComparisonOpType("||")
 }
