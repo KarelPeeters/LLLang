@@ -39,7 +39,6 @@ class Phi(name: String, type: Type) : Instruction(name, type) {
         val prev = _sources[block]
         _sources[block] = value
 
-        block.users += this
         value.users += this
         if (prev != null && prev !in _sources.values)
             prev.users -= this
@@ -52,25 +51,10 @@ class Phi(name: String, type: Type) : Instruction(name, type) {
     }
 
     override fun delete() {
-        sources.keys.forEach { it.users -= this }
         sources.values.forEach { it.users -= this }
     }
 
     override fun replaceOperand(from: Value, to: Value) {
-        if (from is BasicBlock) {
-            //can only replace with other BasicBlock
-            require(to is BasicBlock)
-            _sources[from]?.let { fromValue ->
-                val toValue = _sources[to]
-                //only 'overwrite' an existing pair if the values are the same anyway
-                if (toValue != null) require(toValue == fromValue)
-                else {
-                    _sources.remove(from)
-                    _sources[to as BasicBlock] = fromValue
-                }
-            }
-        }
-
         _sources.replaceAll { _, v -> if (v == from) to else v }
 
         from.users -= this

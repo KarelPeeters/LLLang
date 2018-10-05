@@ -8,12 +8,10 @@ abstract class Node {
 
     open fun delete() {
         operandList?.apply { delete() }
-                ?: throw IllegalStateException("Either use operand mode or override this in `${this::class.java.name}`")
     }
 
     open fun replaceOperand(from: Value, to: Value) {
         operandList?.apply { replaceOperand(from, to) }
-                ?: throw IllegalStateException("Either use operand mode or override this in `${this::class.java.name}`")
     }
 
     @Suppress("UNCHECKED_CAST")

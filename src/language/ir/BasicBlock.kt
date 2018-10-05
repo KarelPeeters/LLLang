@@ -4,8 +4,10 @@ package language.ir
  * A list of instructions with a Terminator at the end. No control flow happens within a BasicBlock.
  */
 class BasicBlock(val name: String) : Value(BlockType) {
+    override val replaceAble = false
+
     val instructions = mutableListOf<Instruction>()
-    var terminator by operand<Terminator>()
+    lateinit var terminator: Terminator
 
     fun insertAt(index: Int, instruction: Instruction): Instruction {
         this.instructions.add(index, instruction)

@@ -4,6 +4,7 @@ import language.ir.BasicBlock
 import language.ir.Branch
 import language.ir.Constant
 import language.ir.Jump
+import language.ir.Terminator
 import language.optimizer.Result.DELETE
 import language.optimizer.Result.UNCHANGED
 
@@ -31,7 +32,12 @@ object SimplifyBlocks : BlockPass {
         run {
             val term = block.terminator
             if (block.instructions.isEmpty() && term is Jump) {
-                block.replaceWith(term.target)
+                for (user in block.users.toList()) {
+                    when (user) {
+                        is Terminator -> user.replaceOperand(block, term.target)
+                        else -> throw IllegalStateException()
+                    }
+                }
                 block.delete()
                 return DELETE
             }
