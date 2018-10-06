@@ -17,24 +17,11 @@ class Variable(val name: String, val pointer: Value) {
     override fun toString() = "[$name]"
 }
 
-open class AbstractFlattener {
+class Flattener {
     val body = Function()
-
-    private var nextVarId = 0
-    private var nextBlockId = 0
-
-    fun genVarName() = (nextVarId++).toString()
-
-    fun newBlock(name: String? = null): BasicBlock {
-        val block = BasicBlock(name ?: nextBlockId.toString())
-        body.push(block)
-        nextBlockId++
-        return block
-    }
-}
-
-class Flattener : AbstractFlattener() {
     val allocs = mutableListOf<Alloc>()
+
+    fun newBlock(name: String? = null) = BasicBlock(name).also { body.append(it) }
 
     inner class Context(val parent: Context?) {
         private val vars = mutableMapOf<String, Variable>()
@@ -88,16 +75,16 @@ class Flattener : AbstractFlattener() {
         is IfStatement -> {
             val (afterCond, condValue) = this.appendExpression(context, stmt.condition)
 
-            val thenBlock = newBlock()
+            val thenBlock = newBlock("if.then")
             val thenEnd = thenBlock.appendNestedBlock(context, stmt.thenBlock)
 
-            val elseBlock = newBlock()
+            val elseBlock = newBlock("if.else")
             val elseEnd = if (stmt.elseBlock != null)
                 elseBlock.appendNestedBlock(context, stmt.elseBlock)
             else
                 elseBlock
 
-            val end = newBlock()
+            val end = newBlock("if.end")
 
             afterCond.terminator = Branch(condValue, thenBlock, elseBlock)
             thenEnd.terminator = Jump(end)
@@ -106,13 +93,13 @@ class Flattener : AbstractFlattener() {
             end
         }
         is WhileStatement -> {
-            val condBlock = newBlock()
+            val condBlock = newBlock("while.cond")
             val (afterCond, condValue) = condBlock.appendExpression(context, stmt.condition)
 
-            val bodyBlock = newBlock()
+            val bodyBlock = newBlock("while.body")
             val bodyEnd = bodyBlock.appendNestedBlock(context, stmt.block)
 
-            val endBlock = newBlock()
+            val endBlock = newBlock("while.end")
 
             this.terminator = Jump(condBlock)
             afterCond.terminator = Branch(condValue, bodyBlock, endBlock)
@@ -133,7 +120,7 @@ class Flattener : AbstractFlattener() {
         is IdentifierExpression -> {
             val variable = context.find(exp.identifier)
                     ?: throw IdNotFoundException(exp.position, exp.identifier)
-            this to append(Load(genVarName(), variable.pointer))
+            this to append(Load(null, variable.pointer))
         }
         is Assignment -> {
             if (exp.target !is IdentifierExpression) TODO("other target types")
@@ -146,13 +133,14 @@ class Flattener : AbstractFlattener() {
         is BinaryOp -> {
             val (afterLeft, leftValue) = appendExpression(context, exp.left)
             val (afterRight, rightValue) = afterLeft.appendExpression(context, exp.right)
-            val result = language.ir.BinaryOp(genVarName(), exp.type, leftValue, rightValue)
+            val result = language.ir.BinaryOp(null, exp.type, leftValue, rightValue)
             afterRight to afterRight.append(result)
         }
         is UnaryOp -> TODO("unary")
         is Call -> TODO("calls")
         is Index -> TODO("index")
     }
+
 }
 
 class IdNotFoundException(pos: SourcePosition, identifier: String)

@@ -1,37 +1,37 @@
 package language.ir
 
-sealed class Instruction(val name: String, type: Type) : Value(type) {
-    override fun toString() = "%$name $type"
+sealed class Instruction(val name: String?, type: Type) : Value(type) {
+    override fun str(env: NameEnv) = "%${env.value(this, name)} $type"
 
-    abstract fun fullString(): String
+    abstract fun fullStr(env: NameEnv): String
 }
 
-class Alloc(name: String, val inner: Type) : Instruction(name, inner.pointer) {
-    override fun fullString() = "$this = alloc $inner"
+class Alloc(name: String?, val inner: Type) : Instruction(name, inner.pointer) {
+    override fun fullStr(env: NameEnv) = "${str(env)} = alloc $inner"
 }
 
-class Store(pointer: Value, value: Value) : Instruction("", VoidType) {
+class Store(pointer: Value, value: Value) : Instruction(null, VoidType) {
     var pointer by operand(pointer)
     var value by operand(value)
 
-    override fun fullString() = "store $value -> $pointer"
+    override fun fullStr(env: NameEnv) = "store ${value.str(env)} -> ${pointer.str(env)}"
 }
 
-class Load(name: String, pointer: Value) : Instruction(name, pointer.type.unpoint!!) {
+class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoint!!) {
     var pointer by operand(pointer)
 
-    override fun fullString() = "$this = load $pointer"
+    override fun fullStr(env: NameEnv) = "${str(env)} = load ${pointer.str(env)}"
 }
 
-class BinaryOp(name: String, val opType: BinaryOpType, left: Value, right: Value) :
+class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Value) :
         Instruction(name, opType.returnType(left.type, right.type)) {
     var left by operand(left)
     var right by operand(right)
 
-    override fun fullString() = "$this = $opType $left, $right"
+    override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${left.str(env)}, ${right.str(env)}"
 }
 
-class Phi(name: String, type: Type) : Instruction(name, type) {
+class Phi(name: String?, type: Type) : Instruction(name, type) {
     private val _sources = mutableMapOf<BasicBlock, Value>()
     val sources: Map<BasicBlock, Value> get() = _sources
 
@@ -61,5 +61,10 @@ class Phi(name: String, type: Type) : Instruction(name, type) {
         to.users += this
     }
 
-    override fun fullString() = "$this = phi [${sources.toList().joinToString(", ") { (k, v) -> "$k: $v" }}]"
+    override fun fullStr(env: NameEnv): String {
+        val labels = sources.toList().joinToString(", ") { (k, v) ->
+            "${k.str(env)}: ${v.str(env)}"
+        }
+        return "${str(env)} = phi [$labels]"
+    }
 }

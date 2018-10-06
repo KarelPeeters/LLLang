@@ -16,11 +16,13 @@ abstract class Value(val type: Type) : Node() {
 
         require(users.isEmpty()) { "value should have no users left after replacement" }
     }
+
+    open fun str(env: NameEnv) = toString()
 }
 
 class Constant private constructor(val value: Int, type: Type) : Value(type) {
     override val replaceAble = false
-    override fun toString() = "$value $type"
+    override fun str(env: NameEnv) = "$value $type"
 
     companion object {
         fun of(value: Int, type: Type) = Constant(value, type)

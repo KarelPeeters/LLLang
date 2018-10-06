@@ -8,14 +8,16 @@ class Function : Value(VoidFunctionType) {
 
     val blocks = mutableListOf<BasicBlock>()
 
-    fun push(block: BasicBlock) {
+    fun append(block: BasicBlock) {
         if (this.blocks.isEmpty())
             entry = block
 
         this.blocks += block
     }
 
-    fun fullString() = "entry: $entry\n${blocks.joinToString("\n\n") { it.fullString() }}"
+    override fun toString() = fullStr(NameEnv())
+
+    fun fullStr(env: NameEnv) = "entry: ${entry.str(env)}\n${blocks.joinToString("\n\n") { it.fullStr(env) }}"
 }
 
 object VoidFunctionType : Type() {

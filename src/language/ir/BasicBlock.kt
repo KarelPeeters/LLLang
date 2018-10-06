@@ -3,7 +3,7 @@ package language.ir
 /**
  * A list of instructions with a Terminator at the end. No control flow happens within a BasicBlock.
  */
-class BasicBlock(val name: String) : Value(BlockType) {
+class BasicBlock(val name: String?) : Value(BlockType) {
     override val replaceAble = false
 
     val instructions = mutableListOf<Instruction>()
@@ -19,11 +19,11 @@ class BasicBlock(val name: String) : Value(BlockType) {
         return instruction
     }
 
-    override fun toString() = "<$name>"
+    override fun str(env: NameEnv) = "<${env.block(this, name)}>"
 
-    fun fullString() = instructions.joinToString(
-            separator = "", prefix = "$this\n", postfix = "$terminator"
-    ) { "${it.fullString()}\n" }
+    fun fullStr(env: NameEnv) = instructions.joinToString(
+            separator = "", prefix = "${str(env)}\n", postfix = terminator.fullStr(env)
+    ) { "${it.fullStr(env)}\n" }
 }
 
 object BlockType : Type() {
