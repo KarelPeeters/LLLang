@@ -12,18 +12,22 @@ import language.ir.Jump
 import language.ir.Load
 import language.ir.Store
 import language.ir.Value
+import java.util.*
 
-class Variable(val name: String, val pointer: Value) {
+private class Variable(val name: String, val pointer: Value) {
     override fun toString() = "[$name]"
 }
 
+private class LoopBlocks(val header: BasicBlock, val end: BasicBlock)
+
 class Flattener {
     val body = Function()
-    val allocs = mutableListOf<Alloc>()
+    private val allocs = mutableListOf<Alloc>()
+    private val loopBlockStack = LinkedList<LoopBlocks>()
 
     fun newBlock(name: String? = null) = BasicBlock(name).also { body.append(it) }
 
-    inner class Context(val parent: Context?) {
+    private inner class Context(val parent: Context?) {
         private val vars = mutableMapOf<String, Variable>()
 
         fun register(pos: SourcePosition, name: String, variable: Variable) {
@@ -40,20 +44,20 @@ class Flattener {
     fun flatten(block: CodeBlock) {
         val new = newBlock()
         val end = new.appendNestedBlock(Context(null), block)
-        end.terminator = Exit
+        end?.terminator = Exit
 
         allocs.asReversed().forEach { new.insertAt(0, it) }
     }
 
-    private fun BasicBlock.appendNestedBlock(context: Context, block: CodeBlock): BasicBlock {
+    private fun BasicBlock.appendNestedBlock(context: Context, block: CodeBlock): BasicBlock? {
         val nested = context.nest()
-        return block.statements.fold(this) { accBlock, statement ->
-            accBlock.appendStatement(nested, statement)
+        return block.statements.fold(this) { accBlock: BasicBlock?, statement ->
+            accBlock?.appendStatement(nested, statement)
         }
     }
 
 
-    private fun BasicBlock.appendStatement(context: Context, stmt: Statement): BasicBlock = when (stmt) {
+    private fun BasicBlock.appendStatement(context: Context, stmt: Statement): BasicBlock? = when (stmt) {
         is Expression -> appendExpression(context, stmt).first
         is Declaration -> {
             val type = when (stmt.type?.str) {
@@ -87,8 +91,8 @@ class Flattener {
             val end = newBlock("if.end")
 
             afterCond.terminator = Branch(condValue, thenBlock, elseBlock)
-            thenEnd.terminator = Jump(end)
-            elseEnd.terminator = Jump(end)
+            thenEnd?.terminator = Jump(end)
+            elseEnd?.terminator = Jump(end)
 
             end
         }
@@ -97,17 +101,29 @@ class Flattener {
             val (afterCond, condValue) = condBlock.appendExpression(context, stmt.condition)
 
             val bodyBlock = newBlock("while.body")
-            val bodyEnd = bodyBlock.appendNestedBlock(context, stmt.block)
+            val endBlock = BasicBlock("while.end")
 
-            val endBlock = newBlock("while.end")
+            val blocks = LoopBlocks(condBlock, endBlock)
+
+            loopBlockStack.push(blocks)
+            val bodyEnd = bodyBlock.appendNestedBlock(context, stmt.block)
+            loopBlockStack.pop()
+
+            body.append(endBlock)
 
             this.terminator = Jump(condBlock)
             afterCond.terminator = Branch(condValue, bodyBlock, endBlock)
-            bodyEnd.terminator = Jump(condBlock)
+            bodyEnd?.terminator = Jump(condBlock)
             endBlock
         }
-        is BreakStatement -> TODO()
-        is ContinueStatement -> TODO()
+        is BreakStatement -> {
+            terminator = Jump(loopBlockStack.peek().end)
+            null
+        }
+        is ContinueStatement -> {
+            terminator = Jump(loopBlockStack.peek().header)
+            null
+        }
     }
 
     private fun BasicBlock.appendExpression(context: Context, exp: Expression): Pair<BasicBlock, Value> = when (exp) {
