@@ -5,11 +5,12 @@ import language.ir.Branch
 import language.ir.Constant
 import language.ir.Jump
 import language.ir.Terminator
-import language.optimizer.Result.DELETE
-import language.optimizer.Result.UNCHANGED
+import language.optimizer.Result.*
 
 object SimplifyBlocks : BlockPass {
     override fun optimize(block: BasicBlock): Result {
+        var changed = false
+
         //remove certain Branch
         run {
             val term = block.terminator
@@ -24,6 +25,8 @@ object SimplifyBlocks : BlockPass {
                 if (target != null) {
                     block.terminator = Jump(target)
                     term.delete()
+
+                    changed = true
                 }
             }
         }
@@ -34,7 +37,10 @@ object SimplifyBlocks : BlockPass {
             if (block.instructions.isEmpty() && term is Jump) {
                 for (user in block.users.toList()) {
                     when (user) {
-                        is Terminator -> user.replaceOperand(block, term.target)
+                        is Terminator -> {
+                            user.replaceOperand(block, term.target)
+                            changed = true
+                        }
                         else -> throw IllegalStateException()
                     }
                 }
@@ -43,6 +49,6 @@ object SimplifyBlocks : BlockPass {
             }
         }
 
-        return UNCHANGED
+        return if (changed) CHANGED else UNCHANGED
     }
 }
