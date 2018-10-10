@@ -128,10 +128,10 @@ class Flattener {
 
     private fun BasicBlock.appendExpression(context: Context, exp: Expression): Pair<BasicBlock, Value> = when (exp) {
         is NumberLiteral -> {
-            this to Constant.of(exp.value.toInt(), i32)
+            this to Constant(i32, exp.value.toInt())
         }
         is BooleanLiteral -> {
-            this to Constant.of(if (exp.value) 1 else 0, bool)
+            this to Constant(bool, if (exp.value) 1 else 0)
         }
         is IdentifierExpression -> {
             val variable = context.find(exp.identifier)

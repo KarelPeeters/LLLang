@@ -20,11 +20,7 @@ abstract class Value(val type: Type) : Node() {
     open fun str(env: NameEnv) = toString()
 }
 
-class Constant private constructor(val value: Int, type: Type) : Value(type) {
+class Constant constructor(type: Type, val value: Int) : Value(type) {
     override val replaceAble = false
     override fun str(env: NameEnv) = "$value $type"
-
-    companion object {
-        fun of(value: Int, type: Type) = Constant(value, type)
-    }
 }
