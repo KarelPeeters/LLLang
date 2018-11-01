@@ -1,7 +1,14 @@
 package language.ir
 
 sealed class Instruction(val name: String?, type: Type) : Value(type) {
-    override fun str(env: NameEnv) = "%${env.value(this, name)} $type"
+    private var _block: BasicBlock? = null
+
+    val block get() = _block!!
+    fun setBlock(block: BasicBlock?) {
+        this._block = block
+    }
+
+    override fun str(env: NameEnv) = "%${env.value(this)} $type"
 
     abstract fun fullStr(env: NameEnv): String
 }
@@ -36,6 +43,8 @@ class Phi(name: String?, type: Type) : Instruction(name, type) {
     val sources: Map<BasicBlock, Value> get() = _sources
 
     fun set(block: BasicBlock, value: Value) {
+        require(value.type == this.type) { "value type ${value.type} should match phi type ${this.type}" }
+
         val prev = _sources[block]
         _sources[block] = value
 

@@ -7,19 +7,31 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     override val replaceAble = false
 
     val instructions = mutableListOf<Instruction>()
-    lateinit var terminator: Terminator
 
-    fun insertAt(index: Int, instruction: Instruction): Instruction {
+    private lateinit var _terminator: Terminator
+    var terminator: Terminator
+        get() = _terminator
+        set(value) { value.block = this; _terminator = value }
+
+    fun insertAt(index: Int, instruction: Instruction) {
         this.instructions.add(index, instruction)
-        return instruction
+        instruction.setBlock(this)
     }
 
-    fun append(instruction: Instruction): Instruction {
+    fun append(instruction: Instruction) {
         this.instructions += instruction
-        return instruction
+        instruction.setBlock(this)
     }
 
-    override fun str(env: NameEnv) = "<${env.block(this, name)}>"
+    fun remove(instruction: Instruction) {
+        this.instructions.remove(instruction)
+        instruction.setBlock(null)
+    }
+
+    fun successors() = terminator.targets()
+    fun predecessors() = this.users.mapNotNull { (it as? Terminator)?.block }
+
+    override fun str(env: NameEnv) = "<${env.block(this)}>"
 
     fun fullStr(env: NameEnv) = instructions.joinToString(
             separator = "", prefix = "${str(env)}\n", postfix = terminator.fullStr(env)

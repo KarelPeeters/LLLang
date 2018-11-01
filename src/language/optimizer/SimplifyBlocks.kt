@@ -3,6 +3,7 @@ package language.optimizer
 import language.ir.BasicBlock
 import language.ir.Branch
 import language.ir.Constant
+import language.ir.Function
 import language.ir.Jump
 import language.ir.Terminator
 import language.optimizer.Result.*
@@ -35,12 +36,10 @@ object SimplifyBlocks : BlockPass {
         run {
             val term = block.terminator
             if (block.instructions.isEmpty() && term is Jump) {
+                changed = true
                 for (user in block.users.toList()) {
                     when (user) {
-                        is Terminator -> {
-                            user.replaceOperand(block, term.target)
-                            changed = true
-                        }
+                        is Terminator, is Function -> user.replaceOperand(block, term.target)
                         else -> throw IllegalStateException()
                     }
                 }
