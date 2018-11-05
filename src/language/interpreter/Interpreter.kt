@@ -15,6 +15,7 @@ import language.ir.NameEnv
 import language.ir.Phi
 import language.ir.Store
 import language.ir.Type
+import language.ir.UnaryOp
 import language.ir.Value
 import language.ir.VoidType
 import language.ir.unpoint
@@ -109,6 +110,12 @@ class Interpreter {
                 val left = Constant(leftInst.type, leftInst.value)
                 val right = Constant(rightInst.type, rightInst.value)
                 val result = instr.opType.calculate(left, right)
+                IntegerInst(result.type, result.value)
+            }
+            is UnaryOp -> {
+                val valueInst = getInst(instr.value) as IntegerInst
+                val value = Constant(valueInst.type, valueInst.value)
+                val result = instr.opType.calculate(value)
                 IntegerInst(result.type, result.value)
             }
             is Phi -> {

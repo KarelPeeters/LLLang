@@ -1,6 +1,7 @@
 package language.frontend
 
 import language.ir.BinaryOpType
+import language.ir.UnaryOpType
 
 sealed class ASTNode(val position: SourcePosition) {
     abstract fun ASTRenderer.render()
@@ -74,7 +75,7 @@ class BinaryOp(
 
 class UnaryOp(
         position: SourcePosition,
-        val type: Type,
+        val type: UnaryOpType,
         val value: Expression
 ) : Expression(position) {
     override fun ASTRenderer.render() {
@@ -83,14 +84,6 @@ class UnaryOp(
         } else*/ run {
             print(type.symbol); safePrint(value)
         }
-    }
-
-    enum class Type(val symbol: String) {
-        Positive("+"), Negative("-"),
-        /*PreInc("++"), PreDec("--"),
-        PostInc("++"), PostDec("--"),*/
-        BNot("!"),
-        INot("~"),
     }
 }
 

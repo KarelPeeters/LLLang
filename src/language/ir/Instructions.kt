@@ -31,6 +31,13 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
     override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${left.str(env)}, ${right.str(env)}"
 }
 
+class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
+        Instruction(name, value.type) {
+    var value by operand(value)
+
+    override fun fullStr(env: NameEnv) = "${str(env)} = not ${value.str(env)}"
+}
+
 class Phi(name: String?, type: Type) : Instruction(name, type) {
     private val _sources = mutableMapOf<BasicBlock, Value>()
     val sources: Map<BasicBlock, Value> get() = _sources

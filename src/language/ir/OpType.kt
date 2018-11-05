@@ -1,5 +1,7 @@
 package language.ir
 
+import language.ir.IntegerType.Companion.i32
+
 sealed class BinaryOpType(val symbol: String) {
     abstract fun returnType(leftType: Type, rightType: Type): Type
 
@@ -31,9 +33,16 @@ abstract class ArithmeticOpType(symbol: String, private val calc: (Int, Int) -> 
     object Or : ArithmeticOpType("|", Int::or)
 }
 
-abstract class ComparisonOpType(symbol: String, private val calc: (Int, Int) -> Boolean) : BinaryOpType(symbol) {
+abstract class ComparisonOpType(
+        symbol: String,
+        private val calc: (Int, Int) -> Boolean,
+        private val requireInteger: Boolean
+) : BinaryOpType(symbol) {
+
     override fun returnType(leftType: Type, rightType: Type): Type {
         require(leftType == rightType) { "$leftType != $rightType" }
+        if (requireInteger)
+            require(leftType is IntegerType) { "$leftType is not ${IntegerType::class.java.simpleName}" }
         return IntegerType.bool
     }
 
@@ -43,10 +52,40 @@ abstract class ComparisonOpType(symbol: String, private val calc: (Int, Int) -> 
         return Constant(type, if (value) 1 else 0)
     }
 
-    object LT : ComparisonOpType("<", { a, b -> a < b })
-    object GT : ComparisonOpType(">", { a, b -> a > b })
-    object LTE : ComparisonOpType("<=", { a, b -> a <= b })
-    object GTE : ComparisonOpType(">=", { a, b -> a >= b })
-    object EQ : ComparisonOpType("==", { a, b -> a == b })
-    object NEQ : ComparisonOpType("!=", { a, b -> a != b })
+    object LT : ComparisonOpType("<", { a, b -> a < b }, true)
+    object GT : ComparisonOpType(">", { a, b -> a > b }, true)
+    object LTE : ComparisonOpType("<=", { a, b -> a <= b }, true)
+    object GTE : ComparisonOpType(">=", { a, b -> a >= b }, true)
+
+    object EQ : ComparisonOpType("==", { a, b -> a == b }, true)
+    object NEQ : ComparisonOpType("!=", { a, b -> a != b }, true)
+}
+
+sealed class UnaryOpType(val symbol: String) {
+    object Negative : UnaryOpType("-") {
+        override fun calculate(value: Constant): Constant {
+            require(value.type == i32)
+            return Constant(i32, -value.value)
+        }
+    }
+
+    object Not : UnaryOpType("!") {
+        override fun calculate(value: Constant): Constant {
+            require(value.type is IntegerType)
+            return Constant(value.type, value.value.inv() and lowerMask(value.type.width))
+        }
+    }
+
+    abstract fun calculate(value: Constant): Constant
+
+    //PreInc("++"), PreDec("--"),
+    //-PostInc("++"), PostDec("--"),
+}
+
+private fun lowerMask(width: Int): Int {
+    require(width in 0..Int.SIZE_BITS)
+    return if (width == Int.SIZE_BITS)
+        -1
+    else
+        (1 shl width) - 1
 }

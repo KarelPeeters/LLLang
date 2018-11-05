@@ -152,7 +152,12 @@ class Flattener {
             val result = language.ir.BinaryOp(null, exp.type, leftValue, rightValue)
             afterRight to afterRight.append(result)
         }
-        is UnaryOp -> TODO("unary")
+        is UnaryOp -> {
+            val (afterValue, value) = appendExpression(context, exp.value)
+            val result = language.ir.UnaryOp(null, exp.type, value)
+            afterValue.append(result)
+            afterValue to result
+        }
         is Call -> TODO("calls")
         is Index -> TODO("index")
     }

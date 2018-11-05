@@ -5,8 +5,8 @@ import language.frontend.TokenType.Boolean
 import language.frontend.TokenType.Number
 import language.ir.ArithmeticOpType
 import language.ir.ComparisonOpType
+import language.ir.UnaryOpType
 import java.util.*
-import kotlin.coroutines.experimental.buildSequence
 
 class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     fun parse() = block(Eof)
@@ -185,16 +185,16 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     }
 
     private fun prefix(): Expression {
-        val ops = LinkedList<Pair<UnaryOp.Type, SourcePosition>>()
+        val ops = LinkedList<Pair<UnaryOpType, SourcePosition>>()
         loop@ while (true) {
             val pos = currentPosition
             val type = when {
-                /*accept(Inc) -> UnaryOp.Type.PreInc
-                accept(Dec) -> UnaryOp.Type.PreDec*/
-                accept(Plus) -> UnaryOp.Type.Positive
-                accept(Minus) -> UnaryOp.Type.Negative
-                accept(Bang) -> UnaryOp.Type.BNot
-                accept(Tilde) -> UnaryOp.Type.INot
+                accept(Inc) -> TODO()
+                accept(Dec) -> TODO()
+                accept(Plus) -> TODO()
+                accept(Minus) -> UnaryOpType.Negative
+                accept(Bang) -> UnaryOpType.Not
+                accept(Tilde) -> UnaryOpType.Not
                 else -> break@loop
             }
             ops.push(type to pos)
@@ -207,8 +207,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         while (true) {
             val pos = currentPosition
             expr = when {
-                /*accept(Inc) -> UnaryOp(pos, UnaryOp.Type.PostInc, expr)
-                accept(Dec) -> UnaryOp(pos, UnaryOp.Type.PostDec, expr)*/
+                accept(Inc) -> TODO()
+                accept(Dec) -> TODO()
                 accept(OpenB) -> Call(pos, expr, expressionList(CloseB))
                 accept(OpenS) -> Index(pos, expr, expression())
                 else -> return expr
