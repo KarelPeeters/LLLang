@@ -19,9 +19,11 @@ interface FunctionPass {
 
 class Optimizer {
     private val basicBlockPasses = listOf<BlockPass>(SimplifyBlocks)
-    private val bodyPasses = listOf<FunctionPass>()
+    private val functionPasses = listOf<FunctionPass>()
 
     fun optimize(function: Function) {
+        AllocToPhi.optimize(function)
+
         do {
             var changed = false
 
@@ -33,11 +35,11 @@ class Optimizer {
                 }
             }
 
-            bodyPasses.forEach { pass ->
+            functionPasses.forEach { pass ->
                 val result = pass.optimize(function)
                 changed = changed || result != UNCHANGED
                 require(result != DELETE)
             }
-        } while (!changed)
+        } while (changed)
     }
 }

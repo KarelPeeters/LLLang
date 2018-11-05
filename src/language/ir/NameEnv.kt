@@ -4,8 +4,8 @@ class NameEnv {
     private val values = SubEnv()
     private val blocks = SubEnv()
 
-    fun value(node: Node, name: String?) = values.name(node, name)
-    fun block(node: Node, name: String?) = blocks.name(node, name)
+    fun value(node: Instruction) = values.name(node, node.name)
+    fun block(node: BasicBlock) = blocks.name(node, node.name)
 
     private class SubEnv {
         private val nodeNames = mutableMapOf<Pair<Node, String?>, String>()

@@ -3,7 +3,7 @@ package language.ir
 abstract class Value(val type: Type) : Node() {
     val users = mutableSetOf<Node>()
 
-    open val replaceAble = true
+    protected open val replaceAble = true
 
     /**
      * Replace all uses of this [Value] with [to]

@@ -42,11 +42,12 @@ class Flattener {
     }
 
     fun flatten(block: CodeBlock) {
-        val new = newBlock()
-        val end = new.appendNestedBlock(Context(null), block)
+        val entry = newBlock()
+        body.entry = entry
+        val end = entry.appendNestedBlock(Context(null), block)
         end?.terminator = Exit
 
-        allocs.asReversed().forEach { new.insertAt(0, it) }
+        allocs.asReversed().forEach { entry.insertAt(0, it) }
     }
 
     private fun BasicBlock.appendNestedBlock(context: Context, block: CodeBlock): BasicBlock? {
@@ -55,7 +56,6 @@ class Flattener {
             accBlock?.appendStatement(nested, statement)
         }
     }
-
 
     private fun BasicBlock.appendStatement(context: Context, stmt: Statement): BasicBlock? = when (stmt) {
         is Expression -> appendExpression(context, stmt).first
@@ -136,21 +136,21 @@ class Flattener {
         is IdentifierExpression -> {
             val variable = context.find(exp.identifier)
                     ?: throw IdNotFoundException(exp.position, exp.identifier)
-            this to append(Load(null, variable.pointer))
+            this to Load(null, variable.pointer).also { append(it) }
         }
         is Assignment -> {
             if (exp.target !is IdentifierExpression) TODO("other target types")
             val assignTarget = context.find(exp.target.identifier)
                     ?: throw IdNotFoundException(exp.target.position, exp.target.identifier)
             val (next, value) = appendExpression(context, exp.value)
-            append(Store(assignTarget.pointer, value))
-            next to value
+            next to Store(assignTarget.pointer, value).also { append(it) }
         }
         is BinaryOp -> {
             val (afterLeft, leftValue) = appendExpression(context, exp.left)
             val (afterRight, rightValue) = afterLeft.appendExpression(context, exp.right)
             val result = language.ir.BinaryOp(null, exp.type, leftValue, rightValue)
-            afterRight to afterRight.append(result)
+            afterRight.append(result)
+            afterRight to result
         }
         is UnaryOp -> {
             val (afterValue, value) = appendExpression(context, exp.value)
@@ -161,7 +161,6 @@ class Flattener {
         is Call -> TODO("calls")
         is Index -> TODO("index")
     }
-
 }
 
 class IdNotFoundException(pos: SourcePosition, identifier: String)
