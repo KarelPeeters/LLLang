@@ -11,7 +11,7 @@ import kotlin.coroutines.experimental.buildSequence
 class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     fun parse() = block(Eof)
 
-    private fun block(end: TokenType) = CodeBlock(currentPosition, buildSequence {
+    private fun block(end: TokenType) = CodeBlock(currentPosition, sequence {
         while (!accept(end)) {
             if (accept(Semi))
                 continue
