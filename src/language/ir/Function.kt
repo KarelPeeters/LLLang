@@ -10,6 +10,12 @@ class Function : Value(VoidFunctionType) {
 
     fun append(block: BasicBlock) {
         this.blocks += block
+        block.setFunction(this)
+    }
+
+    fun remove(block: BasicBlock) {
+        require(this.blocks.remove(block))
+        block.setFunction(null)
     }
 
     override fun toString() = fullStr(NameEnv())

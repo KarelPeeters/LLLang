@@ -13,6 +13,12 @@ class BasicBlock(val name: String?) : Value(BlockType) {
         get() = _terminator
         set(value) { value.block = this; _terminator = value }
 
+    private var _function: Function? = null
+    val function get() = _function!!
+    fun setFunction(block: Function?) {
+        this._function = block
+    }
+
     fun insertAt(index: Int, instruction: Instruction) {
         this.instructions.add(index, instruction)
         instruction.setBlock(this)
@@ -24,7 +30,7 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     }
 
     fun remove(instruction: Instruction) {
-        this.instructions.remove(instruction)
+        require(this.instructions.remove(instruction))
         instruction.setBlock(null)
     }
 
