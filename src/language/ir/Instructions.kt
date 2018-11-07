@@ -8,6 +8,11 @@ sealed class Instruction constructor(val name: String?, type: Type, val pure: Bo
         this._block = block
     }
 
+    fun deleteFromBlock() {
+        this.delete()
+        block.remove(this)
+    }
+
     override fun str(env: NameEnv) = "%${env.value(this)} $type"
 
     abstract fun fullStr(env: NameEnv): String

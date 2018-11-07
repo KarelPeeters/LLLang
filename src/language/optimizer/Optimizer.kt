@@ -2,44 +2,41 @@ package language.optimizer
 
 import language.ir.BasicBlock
 import language.ir.Function
-import language.optimizer.Result.DELETE
-import language.optimizer.Result.UNCHANGED
 
-enum class Result {
-    UNCHANGED, CHANGED, DELETE
-}
-
-interface BlockPass {
-    fun optimize(block: BasicBlock): Result
+interface ChangeTracker {
+    fun changed()
+    fun changed(block: BasicBlock)
 }
 
 interface FunctionPass {
-    fun optimize(function: Function): Result
+    fun ChangeTracker.optimize(function: Function)
+}
+
+private class ChangeTrackerImpl : ChangeTracker {
+    var hasChanged = false
+
+    override fun changed() {
+        hasChanged = true
+    }
+
+    override fun changed(block: BasicBlock) = changed()
 }
 
 class Optimizer {
-    private val basicBlockPasses = listOf<BlockPass>(SimplifyBlocks)
-    private val functionPasses = listOf<FunctionPass>()
+    private val passes = listOf(
+            ConstantFolding,
+            DeadInstructionElimination
+    )
 
     fun optimize(function: Function) {
-        AllocToPhi.optimize(function)
+        allocToPhi(function)
+        val changeTracker = ChangeTrackerImpl()
 
         do {
-            var changed = false
-
-            basicBlockPasses.forEach { pass ->
-                function.blocks.removeAll { block ->
-                    val result = pass.optimize(block)
-                    changed = changed || result != UNCHANGED
-                    result == DELETE
-                }
+            changeTracker.hasChanged = false
+            for (pass in passes) {
+                pass.apply { changeTracker.optimize(function) }
             }
-
-            functionPasses.forEach { pass ->
-                val result = pass.optimize(function)
-                changed = changed || result != UNCHANGED
-                require(result != DELETE)
-            }
-        } while (changed)
+        } while (changeTracker.hasChanged)
     }
 }
