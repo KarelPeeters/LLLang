@@ -78,6 +78,8 @@ data class State(
 
 class Interpreter(val function: Function) {
     private val values = mutableMapOf<Instruction, ValueInst>()
+    var steps = 0
+        private set
 
     private fun getInst(key: Value, type: Type? = null): ValueInst {
         val inst = if (key is Constant)
@@ -90,7 +92,6 @@ class Interpreter(val function: Function) {
         return inst
     }
 
-
     private val run = iterator {
         var prevBlock: BasicBlock? = null
         var currBlock = function.entry
@@ -101,11 +102,13 @@ class Interpreter(val function: Function) {
             for (instr in currBlock.instructions) {
                 yield(State(values, Current.Instruction(instr), prevBlock, currBlock))
                 execute(instr, prevBlock)
+                steps++
             }
 
             val term = currBlock.terminator
             yield(State(values, Current.Terminator(term), prevBlock, currBlock))
 
+            prevBlock = currBlock
             val next = when (term) {
                 is Branch -> {
                     val inst = getInst(term.value, bool) as IntegerInst
@@ -118,8 +121,8 @@ class Interpreter(val function: Function) {
                 is Jump -> term.target
                 is Exit -> break@loop
             }
-            prevBlock = currBlock
             currBlock = next
+            steps++
         }
 
         yield(State(values, Current.Done, prevBlock, null))

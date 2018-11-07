@@ -13,7 +13,7 @@ const val ANSI_GRAY = "\u001B[37m"
 
 val WIDTH_REGEX = """w ([+-]?)(\d+)""".toRegex()
 
-class Debugger(function: Function, val env: NameEnv = NameEnv()) {
+class Debugger(val function: Function, val env: NameEnv = NameEnv()) {
     private val interpreter = Interpreter(function)
     private val breakPoints = mutableSetOf<Current>()
 
@@ -21,10 +21,12 @@ class Debugger(function: Function, val env: NameEnv = NameEnv()) {
     private var width = 80
 
     fun start() {
-        loop@ while (true) {
-            render()
+        renderCode()
+        renderPrompt()
 
+        loop@ while (true) {
             val line = readLine()
+
             when (line) {
                 "q", null -> break@loop
                 "" -> if (!done()) step()
@@ -34,7 +36,8 @@ class Debugger(function: Function, val env: NameEnv = NameEnv()) {
                     if (atBreakPoint())
                         break
                 }
-                "p" -> TODO("print entire program")
+                //handled during render
+                "s", "p" -> Unit
                 else -> {
                     val match = WIDTH_REGEX.matchEntire(line)
                     if (match != null) {
@@ -51,6 +54,17 @@ class Debugger(function: Function, val env: NameEnv = NameEnv()) {
                     }
                 }
             }
+
+            when (line) {
+                "s" -> {
+                    renderCode()
+                    println("steps: ${interpreter.steps}")
+                }
+                "p" -> renderCode(true)
+                else -> renderCode()
+            }
+
+            renderPrompt()
         }
     }
 
@@ -62,18 +76,22 @@ class Debugger(function: Function, val env: NameEnv = NameEnv()) {
 
     private fun done() = state.current is Current.Done
 
-    private fun render() {
+    private fun renderCode(full: Boolean = false) {
         val state = state
 
         val prgmLines = sequence<String> {
-            if (state.prevBlock != null)
-                renderBlock(state.prevBlock, ANSI_GRAY)
+            if (full) {
+                for (block in function.blocks)
+                    renderBlock(block)
+            } else {
+                if (state.prevBlock != null)
+                    renderBlock(state.prevBlock)
 
-            if (state.currBlock != null) {
-                renderBlock(state.currBlock, "")
-
-                for (succ in state.currBlock.successors())
-                    renderBlock(succ, ANSI_GRAY)
+                if (state.currBlock != null) {
+                    renderBlock(state.currBlock)
+                    for (succ in state.currBlock.successors())
+                        renderBlock(succ)
+                }
             }
         }.toList().asReversed()
 
@@ -90,12 +108,17 @@ class Debugger(function: Function, val env: NameEnv = NameEnv()) {
             (variableValues.getOrNull(i) ?: "").ansiPadEnd(maxValueWidth)
         }.asReversed()
 
-        val result = "\n\n" + lines.joinToString("\n") + "\n${ANSI_BLUE}dbg> $ANSI_RESET"
-        print(result)
+        println("\n\n" + lines.joinToString("\n"))
     }
 
-    private suspend fun SequenceScope<String>.renderBlock(block: BasicBlock, color: String) {
-        yield("$color${block.str(env)}$ANSI_RESET")
+    private fun renderPrompt() {
+        println("${ANSI_BLUE}dbg> $ANSI_RESET")
+    }
+
+    private suspend fun SequenceScope<String>.renderBlock(block: BasicBlock) {
+        val color = if (block == state.currBlock) "" else ANSI_GRAY
+
+        yield("$color${block.str(env)}${if (block == state.prevBlock) "$ANSI_BLUE ->" else ""}$ANSI_RESET")
 
         val lines = block.instructions.map { Current.Instruction(it) } +
                     Current.Terminator(block.terminator)
