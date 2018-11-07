@@ -8,10 +8,16 @@ class BasicBlock(val name: String?) : Value(BlockType) {
 
     val instructions = mutableListOf<Instruction>()
 
-    private lateinit var _terminator: Terminator
     var terminator: Terminator
-        get() = _terminator
-        set(value) { value.block = this; _terminator = value }
+        get() = instructions.last() as Terminator
+        set(value) {
+            if (hasTerminator())
+                instructions.removeAt(instructions.lastIndex)
+            instructions.add(value)
+            value.setBlock(this)
+        }
+
+    private fun hasTerminator() = instructions.lastOrNull() is Terminator
 
     private var _function: Function? = null
     val function get() = _function!!
@@ -25,11 +31,19 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     }
 
     fun append(instruction: Instruction) {
-        this.instructions += instruction
+        require(instruction !is Terminator)
+
+        if (hasTerminator())
+            this.instructions.add(instructions.lastIndex, instruction)
+        else
+            this.instructions.add(instruction)
+
         instruction.setBlock(this)
     }
 
     fun remove(instruction: Instruction) {
+        require(instruction !is Terminator)
+
         require(this.instructions.remove(instruction))
         instruction.setBlock(null)
     }

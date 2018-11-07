@@ -1,6 +1,6 @@
 package language.ir
 
-sealed class Instruction(val name: String?, type: Type) : Value(type) {
+sealed class Instruction constructor(val name: String?, type: Type) : Value(type) {
     private var _block: BasicBlock? = null
 
     val block get() = _block!!
@@ -83,4 +83,29 @@ class Phi(name: String?, type: Type) : Instruction(name, type) {
         }
         return "${str(env)} = phi [$labels]"
     }
+}
+
+sealed class Terminator : Instruction(null, VoidType) {
+    abstract fun targets(): Set<BasicBlock>
+}
+
+class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator() {
+    var ifTrue by operand<BasicBlock>(ifTrue)
+    var ifFalse by operand<BasicBlock>(ifFalse)
+    var value by operand(value)
+
+    override fun targets() = setOf(ifTrue, ifFalse)
+    override fun fullStr(env: NameEnv) = "branch ${value.str(env)} T ${ifTrue.str(env)} F ${ifFalse.str(env)}"
+}
+
+class Jump(target: BasicBlock) : Terminator() {
+    var target by operand<BasicBlock>(target)
+
+    override fun targets() = setOf(target)
+    override fun fullStr(env: NameEnv) = "jump ${target.str(env)}"
+}
+
+object Exit : Terminator() {
+    override fun targets() = setOf<BasicBlock>()
+    override fun fullStr(env: NameEnv) = "exit"
 }

@@ -2,6 +2,7 @@ package language.interpreter
 
 import language.ir.BasicBlock
 import language.ir.Function
+import language.ir.Instruction
 import language.ir.NameEnv
 import kotlin.math.max
 
@@ -15,7 +16,7 @@ val WIDTH_REGEX = """w ([+-]?)(\d+)""".toRegex()
 
 class Debugger(val function: Function, val env: NameEnv = NameEnv()) {
     private val interpreter = Interpreter(function)
-    private val breakPoints = mutableSetOf<Current>()
+    private val breakPoints = mutableSetOf<Instruction>()
 
     private var state = interpreter.step()
     private var width = 80
@@ -30,7 +31,7 @@ class Debugger(val function: Function, val env: NameEnv = NameEnv()) {
             when (line) {
                 "q", null -> break@loop
                 "" -> if (!done()) step()
-                "b" -> breakPoints.toggle(state.current)
+                "b" -> state.current?.let { breakPoints.toggle(it) }
                 "c" -> while (!done()) {
                     step()
                     if (atBreakPoint())
@@ -74,7 +75,7 @@ class Debugger(val function: Function, val env: NameEnv = NameEnv()) {
 
     private fun atBreakPoint() = state.current in breakPoints
 
-    private fun done() = state.current is Current.Done
+    private fun done() = state.current == null
 
     private fun renderCode(full: Boolean = false) {
         val state = state
@@ -120,10 +121,7 @@ class Debugger(val function: Function, val env: NameEnv = NameEnv()) {
 
         yield("$color${block.str(env)}${if (block == state.prevBlock) "$ANSI_BLUE ->" else ""}$ANSI_RESET")
 
-        val lines = block.instructions.map { Current.Instruction(it) } +
-                    Current.Terminator(block.terminator)
-
-        for (instr in lines) {
+        for (instr in block.instructions) {
             yield((if (state.current == instr) "$ANSI_GREEN>$ANSI_RESET" else " ") +
                   (if (breakPoints.any { it == instr }) "$ANSI_RED*$ANSI_RESET" else " ") +
                   " $color${instr.fullStr(env)}$ANSI_RESET")

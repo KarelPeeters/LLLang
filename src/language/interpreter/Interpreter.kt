@@ -12,13 +12,12 @@ import language.ir.IntegerType
 import language.ir.IntegerType.Companion.bool
 import language.ir.Jump
 import language.ir.Load
-import language.ir.NameEnv
 import language.ir.Phi
 import language.ir.Store
+import language.ir.Terminator
 import language.ir.Type
 import language.ir.UnaryOp
 import language.ir.Value
-import language.ir.VoidType
 import language.ir.unpoint
 
 sealed class ValueInst(val type: Type) {
@@ -48,33 +47,13 @@ class BoxInst(type: Type, value: ValueInst?) : ValueInst(type) {
     override fun toString() = "$type [$value]"
 }
 
-object VoidInst : ValueInst(VoidType) {
-    override fun shortString() = "void"
-    override fun toString() = "void"
-}
-
-sealed class Current {
-    abstract fun fullStr(env: NameEnv): String
-
-    data class Instruction(val instr: language.ir.Instruction) : Current() {
-        override fun fullStr(env: NameEnv) = instr.fullStr(env)
-    }
-
-    data class Terminator(val term: language.ir.Terminator) : Current() {
-        override fun fullStr(env: NameEnv) = term.fullStr(env)
-    }
-
-    object Done : Current() {
-        override fun fullStr(env: NameEnv) = throw IllegalStateException()
-    }
-}
-
 data class State(
         val values: Map<Instruction, ValueInst>,
-        val current: Current,
-        val prevBlock: BasicBlock?,
-        val currBlock: BasicBlock?
-)
+        val current: Instruction?,
+        val prevBlock: BasicBlock?
+) {
+    val currBlock = current?.block
+}
 
 class Interpreter(val function: Function) {
     private val values = mutableMapOf<Instruction, ValueInst>()
@@ -99,73 +78,75 @@ class Interpreter(val function: Function) {
         loop@ while (true) {
             require(currBlock in function.blocks) { "all visited blocks must be listed in function" }
 
-            for (instr in currBlock.instructions) {
-                yield(State(values, Current.Instruction(instr), prevBlock, currBlock))
-                execute(instr, prevBlock)
-                steps++
-            }
+            for ((i, instr) in currBlock.instructions.withIndex()) {
+                yield(State(values, instr, prevBlock))
 
-            val term = currBlock.terminator
-            yield(State(values, Current.Terminator(term), prevBlock, currBlock))
+                if (i == currBlock.instructions.lastIndex)
+                    require(instr is Terminator) { "BasicBlocks must end with a terminator" }
 
-            prevBlock = currBlock
-            val next = when (term) {
-                is Branch -> {
-                    val inst = getInst(term.value, bool) as IntegerInst
-                    when (inst.value) {
-                        0 -> term.ifFalse
-                        1 -> term.ifTrue
-                        else -> throw IllegalArgumentException("branch value must be 0 or 1, was ${inst.value}")
+                val result: ValueInst? = when (instr) {
+                    is Alloc -> {
+                        require(instr !in values) { "alloc instructions can only run once" }
+                        BoxInst(instr.type, null)
+                    }
+                    is Store -> {
+                        val box = getInst(instr.pointer) as BoxInst
+                        box.value = getInst(instr.value)
+                        null
+                    }
+                    is Load -> {
+                        (getInst(instr.pointer) as BoxInst).value!!
+                    }
+                    is BinaryOp -> {
+                        val leftInst = getInst(instr.left) as IntegerInst
+                        val rightInst = getInst(instr.right) as IntegerInst
+                        val left = Constant(leftInst.type, leftInst.value)
+                        val right = Constant(rightInst.type, rightInst.value)
+                        val result = instr.opType.calculate(left, right)
+                        IntegerInst(result.type, result.value)
+                    }
+                    is UnaryOp -> {
+                        val valueInst = getInst(instr.value) as IntegerInst
+                        val value = Constant(valueInst.type, valueInst.value)
+                        val result = instr.opType.calculate(value)
+                        IntegerInst(result.type, result.value)
+                    }
+                    is Phi -> {
+                        getInst(instr.sources[prevBlock!!]!!)
+                    }
+                    is Terminator -> {
+                        require(i == currBlock.instructions.lastIndex) { "Terminators can only appear at the end of a BasicBlock" }
+
+                        val nextBlock = when (instr) {
+                            is Branch -> {
+                                val inst = getInst(instr.value, bool) as IntegerInst
+                                when (inst.value) {
+                                    0 -> instr.ifFalse
+                                    1 -> instr.ifTrue
+                                    else -> throw IllegalArgumentException("branch value must be 0 or 1, was ${inst.value}")
+                                }
+                            }
+                            is Jump -> instr.target
+                            is Exit -> break@loop
+                        }
+
+                        prevBlock = currBlock
+                        currBlock = nextBlock
+                        null
                     }
                 }
-                is Jump -> term.target
-                is Exit -> break@loop
+                if (result != null)
+                    values[instr] = result
+                steps++
             }
-            currBlock = next
-            steps++
         }
 
-        yield(State(values, Current.Done, prevBlock, null))
+        yield(State(values, null, prevBlock))
     }
 
     fun step(): State = run.next()
 
     fun runToEnd(): State = run.asSequence().last()
 
-    private fun execute(instr: Instruction, prev: BasicBlock?) {
-        val result: ValueInst = when (instr) {
-            is Alloc -> {
-                require(instr !in values) { "alloc instructions can only run once" }
-                BoxInst(instr.type, null)
-            }
-            is Store -> {
-                val box = getInst(instr.pointer) as BoxInst
-                box.value = getInst(instr.value)
-                VoidInst
-            }
-            is Load -> {
-                (getInst(instr.pointer) as BoxInst).value!!
-            }
-            is BinaryOp -> {
-                val leftInst = getInst(instr.left) as IntegerInst
-                val rightInst = getInst(instr.right) as IntegerInst
-                val left = Constant(leftInst.type, leftInst.value)
-                val right = Constant(rightInst.type, rightInst.value)
-                val result = instr.opType.calculate(left, right)
-                IntegerInst(result.type, result.value)
-            }
-            is UnaryOp -> {
-                val valueInst = getInst(instr.value) as IntegerInst
-                val value = Constant(valueInst.type, valueInst.value)
-                val result = instr.opType.calculate(value)
-                IntegerInst(result.type, result.value)
-            }
-            is Phi -> {
-                getInst(instr.sources[prev!!]!!)
-            }
-        }
-        if (result != VoidInst)
-            values[instr] = result
-    }
 }
 
