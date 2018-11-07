@@ -6,6 +6,7 @@ import language.ir.Constant
 import language.ir.Function
 import language.ir.Instruction
 import language.ir.Jump
+import language.ir.Phi
 import language.ir.UnaryOp
 import java.util.*
 
@@ -52,6 +53,16 @@ object ConstantFolding : FunctionPass {
 
                         curr.block.terminator = Jump(target)
                         curr.delete()
+                    }
+                }
+                is Phi -> {
+                    if (curr.sources.size == 1) {
+                        changed(curr.block)
+
+                        val value = curr.sources.values.iterator().next()
+
+                        curr.replaceWith(value)
+                        curr.deleteFromBlock()
                     }
                 }
             }

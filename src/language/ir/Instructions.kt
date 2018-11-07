@@ -63,23 +63,34 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
         val prev = _sources[block]
         _sources[block] = value
 
+        block.users += this
         value.users += this
         if (prev != null && prev !in _sources.values)
             prev.users -= this
     }
 
     fun remove(block: BasicBlock) {
+        block.users -= this
         val prev = _sources.remove(block)
         if (prev != null && prev !in _sources.values)
             prev.users -= this
     }
 
     override fun delete() {
-        sources.values.forEach { it.users -= this }
+        (sources.keys + sources.values).forEach { it.users -= this }
     }
 
     override fun replaceOperand(from: Value, to: Value) {
         _sources.replaceAll { _, v -> if (v == from) to else v }
+
+        if (from is BasicBlock && to is BasicBlock && _sources.containsKey(from)) {
+            if (_sources.containsKey(to)) {
+                require(_sources[to] == sources[from])
+            }
+
+            _sources[to] = _sources.getValue(from)
+            _sources.remove(from)
+        }
 
         from.users -= this
         to.users += this

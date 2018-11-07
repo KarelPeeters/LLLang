@@ -53,9 +53,7 @@ class BasicBlock(val name: String?) : Value(BlockType) {
 
     override fun str(env: NameEnv) = "<${env.block(this)}>"
 
-    fun fullStr(env: NameEnv) = instructions.joinToString(
-            separator = "", prefix = "${str(env)}\n", postfix = terminator.fullStr(env)
-    ) { "${it.fullStr(env)}\n" }
+    fun fullStr(env: NameEnv) = instructions.joinToString(separator = "\n", prefix = "${str(env)}\n") { it.fullStr(env) }
 }
 
 object BlockType : Type() {

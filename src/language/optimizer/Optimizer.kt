@@ -25,7 +25,8 @@ private class ChangeTrackerImpl : ChangeTracker {
 class Optimizer {
     private val passes = listOf(
             ConstantFolding,
-            DeadInstructionElimination
+            DeadInstructionElimination,
+            SimplifyBlocks
     )
 
     fun optimize(function: Function) {

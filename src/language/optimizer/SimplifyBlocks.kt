@@ -1,53 +1,37 @@
 package language.optimizer
 
-import language.ir.BasicBlock
-import language.ir.Branch
-import language.ir.Constant
 import language.ir.Function
 import language.ir.Jump
+import language.ir.Phi
 import language.ir.Terminator
-import language.optimizer.Result.*
 
-object SimplifyBlocks : BlockPass {
-    override fun optimize(block: BasicBlock): Result {
-        var changed = false
+object SimplifyBlocks : FunctionPass {
+    override fun ChangeTracker.optimize(function: Function) {
+        val iter = function.blocks.iterator()
 
-        //remove certain Branch
-        run {
+        for (block in iter) {
+            //redirect users of empty blocks that end in Jump
             val term = block.terminator
-            if (term is Branch) {
-                val target = if (term.ifTrue == term.ifFalse)
-                    term.ifTrue
-                else {
-                    (term.value as? Constant)?.value?.let {
-                        if (it == 0) term.ifFalse else term.ifTrue
-                    }
-                }
-                if (target != null) {
-                    block.terminator = Jump(target)
-                    term.delete()
+            if (block.instructions.size == 1 && term is Jump) {
+                val users = block.users.toList()
 
-                    changed = true
+                if (users.all { it is Terminator || it is Function }) {
+                    for (user in users)
+                        user.replaceOperand(block, term.target)
+                    changed()
                 }
             }
-        }
 
-        //remove empty blocks that jump at the end
-        run {
-            val term = block.terminator
-            if (block.instructions.isEmpty() && term is Jump) {
-                changed = true
-                for (user in block.users.toList()) {
-                    when (user) {
-                        is Terminator, is Function -> user.replaceOperand(block, term.target)
-                        else -> throw IllegalStateException()
-                    }
+            //remove block if only passively used in Phi instructions
+            if (block.users.all { it is Phi }) {
+                for (phi in block.users) {
+                    (phi as Phi).remove(block)
                 }
+
                 block.delete()
-                return DELETE
+                iter.remove()
+                changed()
             }
         }
-
-        return if (changed) CHANGED else UNCHANGED
     }
 }
