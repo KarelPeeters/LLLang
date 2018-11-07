@@ -9,6 +9,7 @@ import language.ir.Exit
 import language.ir.Function
 import language.ir.Instruction
 import language.ir.IntegerType
+import language.ir.IntegerType.Companion.bool
 import language.ir.Jump
 import language.ir.Load
 import language.ir.NameEnv
@@ -47,35 +48,62 @@ object VoidInst : ValueInst(VoidType) {
     override fun toString() = "void"
 }
 
-class Interpreter {
-    private val nameEnv = NameEnv()
-    private val values = mutableMapOf<Instruction, ValueInst>()
+sealed class Current {
+    abstract fun fullStr(env: NameEnv): String
 
-    private fun getInst(key: Value): ValueInst {
-        if (key is Constant)
-            return IntegerInst(key.type, key.value)
-        return values[key]!!
+    data class Instruction(val instr: language.ir.Instruction) : Current() {
+        override fun fullStr(env: NameEnv) = instr.fullStr(env)
     }
 
-    fun run(function: Function) {
-        println(function.fullStr(nameEnv))
+    data class Terminator(val term: language.ir.Terminator) : Current() {
+        override fun fullStr(env: NameEnv) = term.fullStr(env)
+    }
 
-        var prev: BasicBlock? = null
-        var current = function.entry
+    object Done : Current() {
+        override fun fullStr(env: NameEnv) = throw IllegalStateException()
+    }
+}
+
+data class State(
+        val values: Map<Instruction, ValueInst>,
+        val current: Current,
+        val prevBlock: BasicBlock?,
+        val currBlock: BasicBlock?
+)
+
+class Interpreter(val function: Function) {
+    private val values = mutableMapOf<Instruction, ValueInst>()
+
+    private fun getInst(key: Value, type: Type? = null): ValueInst {
+        val inst = if (key is Constant)
+            IntegerInst(key.type, key.value)
+        else
+            values[key]!!
+
+        if (type != null)
+            require(type == inst.type)
+        return inst
+    }
+
+
+    private val run = iterator {
+        var prevBlock: BasicBlock? = null
+        var currBlock = function.entry
 
         loop@ while (true) {
-            require(current in function.blocks) { "all visited blocks must be listed in function" }
+            require(currBlock in function.blocks) { "all visited blocks must be listed in function" }
 
-            for (instr in current.instructions) {
-                run(instr, prev)
-                println(values.toList().joinToString("\n") { (k, v) -> k.str(nameEnv) + " = " + v })
-                println()
+            for (instr in currBlock.instructions) {
+                yield(State(values, Current.Instruction(instr), prevBlock, currBlock))
+                execute(instr, prevBlock)
             }
 
-            val term = current.terminator
+            val term = currBlock.terminator
+            yield(State(values, Current.Terminator(term), prevBlock, currBlock))
+
             val next = when (term) {
                 is Branch -> {
-                    val inst = getInst(term.value) as IntegerInst
+                    val inst = getInst(term.value, bool) as IntegerInst
                     when (inst.value) {
                         0 -> term.ifFalse
                         1 -> term.ifTrue
@@ -85,12 +113,18 @@ class Interpreter {
                 is Jump -> term.target
                 is Exit -> break@loop
             }
-            prev = current
-            current = next
+            prevBlock = currBlock
+            currBlock = next
         }
+
+        yield(State(values, Current.Done, prevBlock, null))
     }
 
-    private fun run(instr: Instruction, prev: BasicBlock?) {
+    fun step(): State = run.next()
+
+    fun runToEnd(): State = run.asSequence().last()
+
+    private fun execute(instr: Instruction, prev: BasicBlock?) {
         val result: ValueInst = when (instr) {
             is Alloc -> {
                 require(instr !in values) { "alloc instructions can only run once" }
