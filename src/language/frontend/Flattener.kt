@@ -4,6 +4,7 @@ import language.ir.Alloc
 import language.ir.BasicBlock
 import language.ir.Branch
 import language.ir.Constant
+import language.ir.Eat
 import language.ir.Exit
 import language.ir.Function
 import language.ir.IntegerType.Companion.bool
@@ -135,13 +136,13 @@ class Flattener {
         }
         is IdentifierExpression -> {
             val variable = context.find(exp.identifier)
-                    ?: throw IdNotFoundException(exp.position, exp.identifier)
+                           ?: throw IdNotFoundException(exp.position, exp.identifier)
             this to Load(null, variable.pointer).also { append(it) }
         }
         is Assignment -> {
             if (exp.target !is IdentifierExpression) TODO("other target types")
             val assignTarget = context.find(exp.target.identifier)
-                    ?: throw IdNotFoundException(exp.target.position, exp.target.identifier)
+                               ?: throw IdNotFoundException(exp.target.position, exp.target.identifier)
             val (next, value) = appendExpression(context, exp.value)
             next to Store(assignTarget.pointer, value).also { append(it) }
         }
@@ -158,7 +159,20 @@ class Flattener {
             afterValue.append(result)
             afterValue to result
         }
-        is Call -> TODO("calls")
+        is Call -> {
+            if (exp.target is IdentifierExpression && exp.target.identifier == "eat") {
+                val result = Eat()
+                val after = exp.arguments.fold(this) { before, operand ->
+                    val (after, value) = before.appendExpression(context, operand)
+                    result.addOperand(value)
+                    after
+                }
+                after.append(result)
+                after to result
+            } else {
+                TODO("calls")
+            }
+        }
         is Index -> TODO("index")
     }
 }

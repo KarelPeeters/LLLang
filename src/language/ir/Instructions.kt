@@ -1,6 +1,6 @@
 package language.ir
 
-sealed class Instruction constructor(val name: String?, type: Type) : Value(type) {
+sealed class Instruction constructor(val name: String?, type: Type, val pure: Boolean) : Value(type) {
     private var _block: BasicBlock? = null
 
     val block get() = _block!!
@@ -13,25 +13,25 @@ sealed class Instruction constructor(val name: String?, type: Type) : Value(type
     abstract fun fullStr(env: NameEnv): String
 }
 
-class Alloc(name: String?, val inner: Type) : Instruction(name, inner.pointer) {
+class Alloc(name: String?, val inner: Type) : Instruction(name, inner.pointer, true) {
     override fun fullStr(env: NameEnv) = "${str(env)} = alloc $inner"
 }
 
-class Store(pointer: Value, value: Value) : Instruction(null, VoidType) {
+class Store(pointer: Value, value: Value) : Instruction(null, VoidType, false) {
     var pointer by operand(pointer)
     var value by operand(value)
 
     override fun fullStr(env: NameEnv) = "store ${value.str(env)} -> ${pointer.str(env)}"
 }
 
-class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoint!!) {
+class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoint!!, true) {
     var pointer by operand(pointer)
 
     override fun fullStr(env: NameEnv) = "${str(env)} = load ${pointer.str(env)}"
 }
 
 class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Value) :
-        Instruction(name, opType.returnType(left.type, right.type)) {
+        Instruction(name, opType.returnType(left.type, right.type), true) {
     var left by operand(left)
     var right by operand(right)
 
@@ -39,15 +39,18 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
 }
 
 class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
-        Instruction(name, value.type) {
+        Instruction(name, value.type, true) {
     var value by operand(value)
 
-    override fun fullStr(env: NameEnv) = "${str(env)} = not ${value.str(env)}"
+    override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${value.str(env)}"
 }
 
-class Phi(name: String?, type: Type) : Instruction(name, type) {
+class Phi(name: String?, type: Type) : Instruction(name, type, true) {
     private val _sources = mutableMapOf<BasicBlock, Value>()
     val sources: Map<BasicBlock, Value> get() = _sources
+
+    override val operands: List<Value>
+        get() = sources.values.toList()
 
     fun set(block: BasicBlock, value: Value) {
         require(value.type == this.type) { "value type ${value.type} should match phi type ${this.type}" }
@@ -85,7 +88,37 @@ class Phi(name: String?, type: Type) : Instruction(name, type) {
     }
 }
 
-sealed class Terminator : Instruction(null, VoidType) {
+class Eat : Instruction(null, VoidType, false) {
+    private val _operands = mutableListOf<Value>()
+    override val operands: List<Value> = _operands
+
+    fun addOperand(value: Value) {
+        if (value !in _operands) {
+            _operands += value
+            value.users += this
+        }
+    }
+
+    fun removeOperand(value: Value) {
+        _operands.remove(value)
+        value.users -= this
+    }
+
+    override fun delete() {
+        operands.forEach { it.users -= this }
+        _operands.clear()
+    }
+
+    override fun replaceOperand(from: Value, to: Value) {
+        _operands.replaceAll { if (it == from) to else it }
+        from.users -= this
+        to.users += this
+    }
+
+    override fun fullStr(env: NameEnv) = "eat " + operands.joinToString { it.str(env) }
+}
+
+sealed class Terminator : Instruction(null, VoidType, false) {
     abstract fun targets(): Set<BasicBlock>
 }
 

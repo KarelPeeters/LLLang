@@ -192,7 +192,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
                 accept(Inc) -> TODO()
                 accept(Dec) -> TODO()
                 accept(Plus) -> TODO()
-                accept(Minus) -> UnaryOpType.Negative
+                accept(Minus) -> UnaryOpType.Neg
                 accept(Bang) -> UnaryOpType.Not
                 accept(Tilde) -> UnaryOpType.Not
                 else -> break@loop

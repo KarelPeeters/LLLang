@@ -6,6 +6,17 @@ import kotlin.reflect.KProperty
 abstract class Node {
     private var operandList: OperandList? = null
 
+    open val operands: List<Value>
+        get() {
+            operandList?.operands?.let { list ->
+                require(list.all { it != null })
+                @Suppress("UNCHECKED_CAST")
+                return list as List<Value>
+            }
+
+            return emptyList()
+        }
+
     open fun delete() {
         operandList?.apply { delete() }
     }

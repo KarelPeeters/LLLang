@@ -62,7 +62,11 @@ abstract class ComparisonOpType(
 }
 
 sealed class UnaryOpType(val symbol: String) {
-    object Negative : UnaryOpType("-") {
+    override fun toString(): String = this::class.java.simpleName.toLowerCase()
+
+    abstract fun calculate(value: Constant): Constant
+
+    object Neg : UnaryOpType("-") {
         override fun calculate(value: Constant): Constant {
             require(value.type == i32)
             return Constant(i32, -value.value)
@@ -75,8 +79,6 @@ sealed class UnaryOpType(val symbol: String) {
             return Constant(value.type, value.value.inv() and lowerMask(value.type.width))
         }
     }
-
-    abstract fun calculate(value: Constant): Constant
 
     //PreInc("++"), PreDec("--"),
     //-PostInc("++"), PostDec("--"),

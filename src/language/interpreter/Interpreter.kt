@@ -5,6 +5,7 @@ import language.ir.BasicBlock
 import language.ir.BinaryOp
 import language.ir.Branch
 import language.ir.Constant
+import language.ir.Eat
 import language.ir.Exit
 import language.ir.Function
 import language.ir.Instruction
@@ -114,8 +115,14 @@ class Interpreter(val function: Function) {
                     is Phi -> {
                         getInst(instr.sources[prevBlock!!]!!)
                     }
+                    is Eat -> {
+                        for (operand in instr.operands)
+                            getInst(operand)
+                        null
+                    }
                     is Terminator -> {
                         require(i == currBlock.instructions.lastIndex) { "Terminators can only appear at the end of a BasicBlock" }
+                        prevBlock = currBlock
 
                         val nextBlock = when (instr) {
                             is Branch -> {
@@ -130,7 +137,6 @@ class Interpreter(val function: Function) {
                             is Exit -> break@loop
                         }
 
-                        prevBlock = currBlock
                         currBlock = nextBlock
                         null
                     }
