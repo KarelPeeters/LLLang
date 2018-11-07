@@ -102,18 +102,24 @@ class Debugger(val function: Function, val env: NameEnv = NameEnv()) {
         val maxValueWidth = variableValues.map { it.length }.max() ?: 0
         val maxNameWidth = variableNames.map { it.length }.max() ?: 0
 
+        val codeWidth = width - maxValueWidth - maxNameWidth - 2
+
         val lineCount = max(prgmLines.size, variableNames.size)
         val lines = (0 until lineCount).map { i ->
-            (prgmLines.getOrNull(i) ?: "").ansiPadEnd(width - maxValueWidth - maxNameWidth - 2) +
-            (variableNames.getOrNull(i) ?: "").ansiPadEnd(maxNameWidth + 2) +
-            (variableValues.getOrNull(i) ?: "").ansiPadEnd(maxValueWidth)
+            val hasVariable = 0 <= i && i < variableNames.size
+
+            (prgmLines.getOrNull(i) ?: "").ansiPadEnd(if (hasVariable) codeWidth else 0) +
+            if (hasVariable) {
+                (variableNames.getOrNull(i) ?: "").ansiPadEnd(maxNameWidth + 2) +
+                (variableValues.getOrNull(i) ?: "").ansiPadEnd(maxValueWidth)
+            } else ""
         }.asReversed()
 
         println("\n\n" + lines.joinToString("\n"))
     }
 
     private fun renderPrompt() {
-        println("${ANSI_BLUE}dbg> $ANSI_RESET")
+        print("${ANSI_BLUE}dbg> $ANSI_RESET")
     }
 
     private suspend fun SequenceScope<String>.renderBlock(block: BasicBlock) {
