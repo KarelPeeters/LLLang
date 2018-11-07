@@ -3,6 +3,7 @@ package language.interpreter
 import language.ir.Alloc
 import language.ir.BasicBlock
 import language.ir.BinaryOp
+import language.ir.Blur
 import language.ir.Branch
 import language.ir.Constant
 import language.ir.Eat
@@ -120,6 +121,9 @@ class Interpreter(val function: Function) {
                             getInst(operand)
                         null
                     }
+                    is Blur -> {
+                        getInst(instr.value)
+                    }
                     is Terminator -> {
                         require(i == currBlock.instructions.lastIndex) { "Terminators can only appear at the end of a BasicBlock" }
                         prevBlock = currBlock
@@ -153,6 +157,5 @@ class Interpreter(val function: Function) {
     fun step(): State = run.next()
 
     fun runToEnd(): State = run.asSequence().last()
-
 }
 

@@ -2,6 +2,7 @@ package language.frontend
 
 import language.ir.Alloc
 import language.ir.BasicBlock
+import language.ir.Blur
 import language.ir.Branch
 import language.ir.Constant
 import language.ir.Eat
@@ -160,17 +161,29 @@ class Flattener {
             afterValue to result
         }
         is Call -> {
-            if (exp.target is IdentifierExpression && exp.target.identifier == "eat") {
-                val result = Eat()
-                val after = exp.arguments.fold(this) { before, operand ->
-                    val (after, value) = before.appendExpression(context, operand)
-                    result.addOperand(value)
-                    after
+            if (exp.target is IdentifierExpression) {
+                when (exp.target.identifier) {
+                    "eat" -> {
+                        val result = Eat()
+                        val after = exp.arguments.fold(this) { before, operand ->
+                            val (after, value) = before.appendExpression(context, operand)
+                            result.addOperand(value)
+                            after
+                        }
+                        after.append(result)
+                        after to result
+                    }
+                    "blur" -> {
+                        require(exp.arguments.size == 1) { "blur takes a single argument" }
+                        val (after, value) = appendExpression(context, exp.arguments.first())
+                        val result = Blur(value)
+                        after.append(result)
+                        after to result
+                    }
+                    else -> TODO("calls")
                 }
-                after.append(result)
-                after to result
             } else {
-                TODO("calls")
+                TODO("dynamic calls")
             }
         }
         is Index -> TODO("index")

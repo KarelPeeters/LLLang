@@ -134,6 +134,12 @@ class Eat : Instruction(null, VoidType, false) {
     override fun fullStr(env: NameEnv) = "eat " + operands.joinToString { it.str(env) }
 }
 
+class Blur(value: Value) : Instruction(null, value.type, false) {
+    val value by operand(value)
+
+    override fun fullStr(env: NameEnv) = "${str(env)} = blur ${value.str(env)}"
+}
+
 sealed class Terminator : Instruction(null, VoidType, false) {
     abstract fun targets(): Set<BasicBlock>
 }
