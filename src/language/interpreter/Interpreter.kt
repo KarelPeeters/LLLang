@@ -21,13 +21,16 @@ import language.ir.Value
 import language.ir.VoidType
 import language.ir.unpoint
 
-sealed class ValueInst(val type: Type)
+sealed class ValueInst(val type: Type) {
+    abstract fun shortString(): String
+}
 
 class IntegerInst(type: Type, val value: Int) : ValueInst(type) {
     init {
         require(type is IntegerType)
     }
 
+    override fun shortString() = "$value"
     override fun toString() = "$type $value"
 }
 
@@ -41,10 +44,12 @@ class BoxInst(type: Type, value: ValueInst?) : ValueInst(type) {
         value?.let { require(type.unpoint!! == it.type) }
     }
 
+    override fun shortString() = "$value]"
     override fun toString() = "$type [$value]"
 }
 
 object VoidInst : ValueInst(VoidType) {
+    override fun shortString() = "void"
     override fun toString() = "void"
 }
 
