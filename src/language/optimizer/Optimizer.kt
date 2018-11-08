@@ -26,7 +26,8 @@ class Optimizer {
     private val passes = listOf(
             ConstantFolding,
             DeadInstructionElimination,
-            SimplifyBlocks
+            SimplifyBlocks,
+            DeadBlockElimination
     )
 
     fun optimize(function: Function) {
