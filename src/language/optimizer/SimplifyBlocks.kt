@@ -2,7 +2,6 @@ package language.optimizer
 
 import language.ir.Function
 import language.ir.Jump
-import language.ir.Phi
 import language.ir.Terminator
 
 object SimplifyBlocks : FunctionPass {
@@ -20,17 +19,6 @@ object SimplifyBlocks : FunctionPass {
                         user.replaceOperand(block, term.target)
                     changed()
                 }
-            }
-
-            //remove block if only passively used in Phi instructions
-            if (block.users.all { it is Phi }) {
-                for (phi in block.users) {
-                    (phi as Phi).remove(block)
-                }
-
-                block.delete()
-                iter.remove()
-                changed()
             }
         }
     }
