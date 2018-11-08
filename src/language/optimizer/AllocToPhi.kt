@@ -48,7 +48,9 @@ fun allocToPhi(function: Function) {
                 .toSet()
     }
 
-    val variables = function.blocks.flatMap { it.instructions.filterIsInstance<Alloc>() }
+    val variables = function.blocks
+            .flatMap { it.instructions.filterIsInstance<Alloc>() }
+            .filter { variable -> variable.users.all { it is Store || it is Load } }
 
     for (variable in variables) {
         //remove alloc

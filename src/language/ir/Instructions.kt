@@ -1,5 +1,7 @@
 package language.ir
 
+import language.ir.IntegerType.Companion.bool
+
 sealed class Instruction constructor(val name: String?, type: Type, val pure: Boolean) : Value(type) {
     private var _block: BasicBlock? = null
 
@@ -26,11 +28,19 @@ class Store(pointer: Value, value: Value) : Instruction(null, VoidType, false) {
     var pointer by operand(pointer)
     var value by operand(value)
 
+    override fun invariants() {
+        require(pointer.type.unpoint == value.type)
+    }
+
     override fun fullStr(env: NameEnv) = "store ${value.str(env)} -> ${pointer.str(env)}"
 }
 
 class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoint!!, true) {
     var pointer by operand(pointer)
+
+    override fun invariants() {
+        require(pointer.type.unpoint == this.type)
+    }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = load ${pointer.str(env)}"
 }
@@ -40,12 +50,20 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
     var left by operand(left)
     var right by operand(right)
 
+    override fun invariants() {
+        require(opType.returnType(left.type, right.type) == this.type)
+    }
+
     override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${left.str(env)}, ${right.str(env)}"
 }
 
 class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
         Instruction(name, value.type, true) {
     var value by operand(value)
+
+    override fun invariants() {
+        require(value.type == this.type)
+    }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${value.str(env)}"
 }
@@ -137,6 +155,10 @@ class Eat : Instruction(null, VoidType, false) {
 class Blur(value: Value) : Instruction(null, value.type, false) {
     val value by operand(value)
 
+    override fun invariants() {
+        require(value.type == this.type)
+    }
+
     override fun fullStr(env: NameEnv) = "${str(env)} = blur ${value.str(env)}"
 }
 
@@ -145,9 +167,17 @@ sealed class Terminator : Instruction(null, VoidType, false) {
 }
 
 class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator() {
+    var value by operand(value)
     var ifTrue by operand<BasicBlock>(ifTrue)
     var ifFalse by operand<BasicBlock>(ifFalse)
-    var value by operand(value)
+
+    init {
+        invariants()
+    }
+
+    override fun invariants() {
+        require(value.type == bool)
+    }
 
     override fun targets() = setOf(ifTrue, ifFalse)
     override fun fullStr(env: NameEnv) = "branch ${value.str(env)} T ${ifTrue.str(env)} F ${ifFalse.str(env)}"
