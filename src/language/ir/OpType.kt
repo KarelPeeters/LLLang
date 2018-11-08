@@ -33,16 +33,14 @@ abstract class ArithmeticOpType(symbol: String, private val calc: (Int, Int) -> 
     object Or : ArithmeticOpType("|", Int::or)
 }
 
-abstract class ComparisonOpType(
+sealed class ComparisonOpType(
         symbol: String,
-        private val calc: (Int, Int) -> Boolean,
-        private val requireInteger: Boolean
+        private val calc: (Int, Int) -> Boolean
 ) : BinaryOpType(symbol) {
 
     override fun returnType(leftType: Type, rightType: Type): Type {
         require(leftType == rightType) { "$leftType != $rightType" }
-        if (requireInteger)
-            require(leftType is IntegerType) { "$leftType is not ${IntegerType::class.java.simpleName}" }
+        require(leftType is IntegerType) { "$leftType is not ${IntegerType::class.java.simpleName}" }
         return IntegerType.bool
     }
 
@@ -52,13 +50,13 @@ abstract class ComparisonOpType(
         return Constant(type, if (value) 1 else 0)
     }
 
-    object LT : ComparisonOpType("<", { a, b -> a < b }, true)
-    object GT : ComparisonOpType(">", { a, b -> a > b }, true)
-    object LTE : ComparisonOpType("<=", { a, b -> a <= b }, true)
-    object GTE : ComparisonOpType(">=", { a, b -> a >= b }, true)
+    object LT : ComparisonOpType("<", { a, b -> a < b })
+    object GT : ComparisonOpType(">", { a, b -> a > b })
+    object LTE : ComparisonOpType("<=", { a, b -> a <= b })
+    object GTE : ComparisonOpType(">=", { a, b -> a >= b })
 
-    object EQ : ComparisonOpType("==", { a, b -> a == b }, true)
-    object NEQ : ComparisonOpType("!=", { a, b -> a != b }, true)
+    object EQ : ComparisonOpType("==", { a, b -> a == b })
+    object NEQ : ComparisonOpType("!=", { a, b -> a != b })
 }
 
 sealed class UnaryOpType(val symbol: String) {
@@ -79,9 +77,6 @@ sealed class UnaryOpType(val symbol: String) {
             return Constant(value.type, value.value.inv() and lowerMask(value.type.width))
         }
     }
-
-    //PreInc("++"), PreDec("--"),
-    //-PostInc("++"), PostDec("--"),
 }
 
 private fun lowerMask(width: Int): Int {
