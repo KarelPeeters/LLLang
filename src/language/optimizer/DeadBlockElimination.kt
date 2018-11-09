@@ -29,7 +29,7 @@ object DeadBlockElimination : FunctionPass {
                 }
 
                 iter.remove()
-                block.delete()
+                block.delete(true)
                 changed()
             }
         }

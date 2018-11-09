@@ -42,21 +42,24 @@ object ConstantFolding : FunctionPass {
                 }
                 is Branch -> {
                     val value = curr.value
-                    if (value is Constant) {
-                        changed(curr.block)
 
-                        val target = when (value.value) {
+                    val target = when {
+                        value is Constant -> when (value.value) {
                             0 -> curr.ifFalse
                             1 -> curr.ifTrue
                             else -> throw IllegalStateException()
                         }
+                        curr.ifTrue == curr.ifFalse -> curr.ifTrue
+                        else -> null
+                    }
 
+                    if (target != null) {
                         curr.block.terminator = Jump(target)
                         curr.delete()
                     }
                 }
                 is Phi -> {
-                    if (curr.sources.size == 1) {
+                    if (curr.sources.size == 1 || curr.sources.values.distinct().size == 1) {
                         changed(curr.block)
 
                         val value = curr.sources.values.iterator().next()

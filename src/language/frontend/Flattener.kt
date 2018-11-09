@@ -145,7 +145,8 @@ class Flattener {
             val assignTarget = context.find(exp.target.identifier)
                                ?: throw IdNotFoundException(exp.target.position, exp.target.identifier)
             val (next, value) = appendExpression(context, exp.value)
-            next to Store(assignTarget.pointer, value).also { append(it) }
+            next.append(Store(assignTarget.pointer, value))
+            next to value
         }
         is BinaryOp -> {
             val (afterLeft, leftValue) = appendExpression(context, exp.left)

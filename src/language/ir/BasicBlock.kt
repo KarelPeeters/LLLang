@@ -21,6 +21,9 @@ class BasicBlock(val name: String?) : Value(BlockType) {
 
     private var _function: Function? = null
     val function get() = _function!!
+
+    val isEntry get() = function.entry == this
+
     fun setFunction(block: Function?) {
         this._function = block
     }
@@ -46,6 +49,13 @@ class BasicBlock(val name: String?) : Value(BlockType) {
 
         require(this.instructions.remove(instruction))
         instruction.setBlock(null)
+    }
+
+    fun delete(contents: Boolean = false) {
+        super.delete()
+
+        if (contents)
+            instructions.forEach { it.delete() }
     }
 
     fun successors() = terminator.targets()
