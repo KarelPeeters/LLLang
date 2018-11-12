@@ -22,7 +22,7 @@ object DeadInstructionElimination : FunctionPass {
             for (instr in block.instructions.toList()) {
                 if (instr !in used) {
                     instr.deleteFromBlock()
-                    changed(block)
+                    changed()
                 }
             }
         }

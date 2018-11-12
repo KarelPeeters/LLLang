@@ -54,7 +54,7 @@ fun allocToPhi(function: Function) {
 
     for (variable in variables) {
         //remove alloc
-        variable.block.remove(variable)
+        variable.block?.remove(variable)
 
         val stores = variable.users.filterIsInstance<Store>()
         val loads = variable.users.filterIsInstance<Load>()
@@ -66,7 +66,7 @@ fun allocToPhi(function: Function) {
         while (toVisit.isNotEmpty()) {
             val curr = toVisit.pop()
 
-            for (block in frontiers.getValue(curr)) {
+            for (block in frontiers.getValue(curr!!)) {
                 if (block !in phis) {
                     toVisit.push(block)
 
@@ -105,7 +105,7 @@ fun allocToPhi(function: Function) {
 
         //remap loads
         for (load in loads) {
-            val value = findLastValue(load.block, load) ?: throw NoValueFoundException()
+            val value = findLastValue(load.block!!, load) ?: throw NoValueFoundException()
             load.replaceWith(value)
             load.deleteFromBlock()
         }
@@ -114,7 +114,7 @@ fun allocToPhi(function: Function) {
 
         //add operands to phi nodes
         for (phi in phis.values) {
-            for (pred in phi.block.predecessors()) {
+            for (pred in phi.block!!.predecessors()) {
                 val value = findLastValue(pred, null)
                 if (value == null)
                     problemPhis += phi

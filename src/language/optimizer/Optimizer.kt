@@ -1,11 +1,9 @@
 package language.optimizer
 
-import language.ir.BasicBlock
 import language.ir.Function
 
 interface ChangeTracker {
     fun changed()
-    fun changed(block: BasicBlock)
 }
 
 interface FunctionPass {
@@ -18,8 +16,6 @@ private class ChangeTrackerImpl : ChangeTracker {
     override fun changed() {
         hasChanged = true
     }
-
-    override fun changed(block: BasicBlock) = changed()
 }
 
 class Optimizer {

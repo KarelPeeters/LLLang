@@ -23,7 +23,7 @@ object ConstantFolding : FunctionPass {
                     val right = curr.right
 
                     if (left is Constant && right is Constant) {
-                        changed(curr.block)
+                        changed()
 
                         val result = curr.opType.calculate(left, right)
                         curr.replaceWith(result)
@@ -33,7 +33,7 @@ object ConstantFolding : FunctionPass {
                 is UnaryOp -> {
                     val value = curr.value
                     if (value is Constant) {
-                        changed(curr.block)
+                        changed()
 
                         val result = curr.opType.calculate(value)
                         curr.replaceWith(result)
@@ -54,13 +54,13 @@ object ConstantFolding : FunctionPass {
                     }
 
                     if (target != null) {
-                        curr.block.terminator = Jump(target)
+                        curr.block!!.terminator = Jump(target)
                         curr.delete()
                     }
                 }
                 is Phi -> {
                     if (curr.sources.size == 1 || curr.sources.values.distinct().size == 1) {
-                        changed(curr.block)
+                        changed()
 
                         val value = curr.sources.values.iterator().next()
 

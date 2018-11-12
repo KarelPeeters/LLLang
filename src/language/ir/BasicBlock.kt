@@ -22,8 +22,6 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     private var _function: Function? = null
     val function get() = _function!!
 
-    val isEntry get() = function.entry == this
-
     fun setFunction(block: Function?) {
         this._function = block
     }
