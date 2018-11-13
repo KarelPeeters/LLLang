@@ -25,7 +25,7 @@ object SimplifyBlocks : FunctionPass {
 
             //move code into only pred block
             val preds = block.predecessors()
-            if (preds.size == 1 && preds.first().terminator is Jump) {
+            if (block != function.entry && preds.size == 1 && preds.first().terminator is Jump) {
                 val pred = preds.first()
 
                 for (instr in block.instructions.dropLast(1)) {

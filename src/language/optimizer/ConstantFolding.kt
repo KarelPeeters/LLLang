@@ -70,6 +70,7 @@ object ConstantFolding : FunctionPass {
                         curr.deleteFromBlock()
                     }
                 }
+                else -> Unit
             }
         }
     }
