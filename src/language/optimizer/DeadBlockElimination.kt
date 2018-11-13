@@ -13,11 +13,9 @@ object DeadBlockElimination : FunctionPass {
 
         while (toVisit.isNotEmpty()) {
             val curr = toVisit.poll()
-            if (curr in used)
-                continue
 
-            used += curr
-            toVisit.addAll(curr.successors())
+            if (used.add(curr))
+                toVisit.addAll(curr.successors())
         }
 
         val iter = function.blocks.iterator()

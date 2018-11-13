@@ -5,14 +5,14 @@ import language.ir.IntegerType.Companion.bool
 sealed class Instruction constructor(val name: String?, type: Type, val pure: Boolean) : Value(type) {
     private var _block: BasicBlock? = null
 
-    val block get() = _block
+    val block get() = _block!!
     fun setBlock(block: BasicBlock?) {
         this._block = block
     }
 
     fun deleteFromBlock() {
         this.delete()
-        block?.remove(this)
+        block.remove(this)
     }
 
     override fun str(env: NameEnv) = "%${env.value(this)} $type"

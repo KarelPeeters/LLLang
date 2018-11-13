@@ -54,7 +54,9 @@ object ConstantFolding : FunctionPass {
                     }
 
                     if (target != null) {
-                        curr.block!!.terminator = Jump(target)
+                        changed()
+
+                        curr.block.terminator = Jump(target)
                         curr.delete()
                     }
                 }

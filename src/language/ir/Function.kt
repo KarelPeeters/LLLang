@@ -4,12 +4,7 @@ package language.ir
  * Represents a function with void return type and no parameters
  */
 class Function : Value(VoidFunctionType) {
-    private val jumpToEntry = Jump(null)
-    var entry: BasicBlock
-        get() = jumpToEntry.target
-        set(value) {
-            jumpToEntry.target = value
-        }
+    var entry by operand<BasicBlock>(null)
 
     val blocks = mutableListOf<BasicBlock>()
 
