@@ -22,14 +22,16 @@ sealed class Instruction constructor(val name: String?, type: Type, val pure: Bo
 
 class Alloc(name: String?, val inner: Type) : Instruction(name, inner.pointer, true) {
     override fun fullStr(env: NameEnv) = "${str(env)} = alloc $inner"
+
+    override fun verify() {}
 }
 
 class Store(pointer: Value, value: Value) : Instruction(null, VoidType, false) {
     var pointer by operand(pointer)
     var value by operand(value)
 
-    override fun invariants() {
-        require(pointer.type.unpoint == value.type)
+    override fun verify() {
+        require(pointer.type.unpoint == value.type) { "pointer type must be pointer to value type" }
     }
 
     override fun fullStr(env: NameEnv) = "store ${value.str(env)} -> ${pointer.str(env)}"
@@ -38,8 +40,8 @@ class Store(pointer: Value, value: Value) : Instruction(null, VoidType, false) {
 class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoint!!, true) {
     var pointer by operand(pointer)
 
-    override fun invariants() {
-        require(pointer.type.unpoint == this.type)
+    override fun verify() {
+        require(pointer.type.unpoint == this.type) { "pointer type must be pointer to load type" }
     }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = load ${pointer.str(env)}"
@@ -50,8 +52,8 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
     var left by operand(left)
     var right by operand(right)
 
-    override fun invariants() {
-        require(opType.returnType(left.type, right.type) == this.type)
+    override fun verify() {
+        require(opType.returnType(left.type, right.type) == this.type) { "left and right types must result in binaryOp type" }
     }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${left.str(env)}, ${right.str(env)}"
@@ -61,8 +63,8 @@ class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
         Instruction(name, value.type, true) {
     var value by operand(value)
 
-    override fun invariants() {
-        require(value.type == this.type)
+    override fun verify() {
+        require(value.type == this.type) { "value type must be unaryOp type" }
     }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${value.str(env)}"
@@ -75,9 +77,12 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
     override val operands: List<Value>
         get() = sources.values.toList()
 
-    fun set(block: BasicBlock, value: Value) {
-        require(value.type == this.type) { "value type ${value.type} should match phi type ${this.type}" }
+    override fun verify() {
+        require(sources.keys == block.predecessors().toSet()) { "must have source for every block predecessor" }
+        require(sources.values.all { it.type == this.type }) { "source types must all equal phi type" }
+    }
 
+    fun set(block: BasicBlock, value: Value) {
         val prev = _sources[block]
         _sources[block] = value
 
@@ -126,6 +131,8 @@ class Eat : Instruction(null, VoidType, false) {
     private val _operands = mutableListOf<Value>()
     override val operands: List<Value> = _operands
 
+    override fun verify() {}
+
     fun addOperand(value: Value) {
         if (value !in _operands) {
             _operands += value
@@ -155,8 +162,8 @@ class Eat : Instruction(null, VoidType, false) {
 class Blur(value: Value) : Instruction(null, value.type, false) {
     val value by operand(value)
 
-    override fun invariants() {
-        require(value.type == this.type)
+    override fun verify() {
+        require(value.type == this.type) { "value type must be blur type" }
     }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = blur ${value.str(env)}"
@@ -171,12 +178,8 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
     var ifTrue by operand<BasicBlock>(ifTrue)
     var ifFalse by operand<BasicBlock>(ifFalse)
 
-    init {
-        invariants()
-    }
-
-    override fun invariants() {
-        require(value.type == bool)
+    override fun verify() {
+        require(value.type == bool) { "branch conditional must be a boolean" }
     }
 
     override fun targets() = setOf(ifTrue, ifFalse)
@@ -186,11 +189,15 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
 class Jump(target: BasicBlock?) : Terminator() {
     var target by operand<BasicBlock>(target)
 
+    override fun verify() {}
+
     override fun targets() = setOf(target)
     override fun fullStr(env: NameEnv) = "jump ${target.str(env)}"
 }
 
 object Exit : Terminator() {
+    override fun verify() {}
+
     override fun targets() = setOf<BasicBlock>()
     override fun fullStr(env: NameEnv) = "exit"
 }

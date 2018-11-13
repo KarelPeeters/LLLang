@@ -18,7 +18,7 @@ private class ChangeTrackerImpl : ChangeTracker {
     }
 }
 
-class Optimizer {
+class Optimizer(val verify: Boolean) {
     private val passes = listOf(
             ConstantFolding,
             DeadInstructionElimination,
@@ -27,13 +27,22 @@ class Optimizer {
     )
 
     fun optimize(function: Function) {
-        allocToPhi(function)
+        if (verify)
+            function.verify()
+
         val changeTracker = ChangeTrackerImpl()
+        AllocToPhi.apply { changeTracker.optimize(function) }
+
+        if (verify)
+            function.verify()
 
         do {
             changeTracker.hasChanged = false
             for (pass in passes) {
                 pass.apply { changeTracker.optimize(function) }
+
+                if (verify)
+                    function.verify()
             }
         } while (changeTracker.hasChanged)
     }

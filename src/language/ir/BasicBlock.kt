@@ -26,6 +26,15 @@ class BasicBlock(val name: String?) : Value(BlockType) {
         this._function = block
     }
 
+    override fun verify() {
+        require(instructions.lastOrNull() is Terminator) { "block must end with Terminator" }
+        require(instructions.dropLast(1).all { it !is Terminator }) { "only the last instruction is a Terminator" }
+        require(instructions.all { it.block == this }) { "instruction.block must be this block" }
+        require(instructions.dropWhile { it is Phi }.all { it !is Phi }) { "all phi instructions are at the start of a block" }
+
+        instructions.forEach { it.verify() }
+    }
+
     fun insertAt(index: Int, instruction: Instruction) {
         this.instructions.add(index, instruction)
         instruction.setBlock(this)

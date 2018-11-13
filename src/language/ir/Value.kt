@@ -24,19 +24,22 @@ class Constant constructor(type: Type, val value: Int) : Value(type) {
     override val replaceAble = false
     override fun str(env: NameEnv) = "$value $type"
 
+    override fun verify() {}
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
 
         other as Constant
+        if (type != other.type) return false
         if (value != other.value) return false
-        if (replaceAble != other.replaceAble) return false
 
         return true
     }
 
     override fun hashCode(): Int {
         var result = value
+        result = 31 * result + type.hashCode()
         result = 31 * result + replaceAble.hashCode()
         return result
     }

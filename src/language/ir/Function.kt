@@ -8,6 +8,13 @@ class Function : Value(VoidFunctionType) {
 
     val blocks = mutableListOf<BasicBlock>()
 
+    override fun verify() {
+        require(entry in blocks) { "entry must be one of the blocks" }
+        require(blocks.all { it.function == this }) { "block.function must be this function" }
+
+        blocks.forEach { it.verify() }
+    }
+
     fun append(block: BasicBlock) {
         this.blocks += block
         block.setFunction(this)

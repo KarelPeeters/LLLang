@@ -25,7 +25,7 @@ abstract class Node {
         operandList?.apply { replaceOperand(from, to) }
     }
 
-    open fun invariants() {}
+    abstract fun verify()
 
     @Suppress("UNCHECKED_CAST")
     protected inline fun <reified T : Value> operand(value: T? = null) = operand(value) as ReadWriteProperty<Node, T>
@@ -53,7 +53,6 @@ abstract class Node {
             operands.replaceAll { if (it == from) to else it }
             from.users -= this@Node
             to.users += this@Node
-            invariants()
         }
 
         fun getOperand(index: Int): Value = operands[index]!!
@@ -67,7 +66,6 @@ abstract class Node {
 
             if (prev != null && prev !in operands)
                 prev.users -= this@Node
-            invariants()
         }
 
         fun addOperand(value: Value?): Int {
