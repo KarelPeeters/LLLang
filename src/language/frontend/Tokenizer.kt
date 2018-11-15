@@ -105,16 +105,19 @@ class Tokenizer(private val source: String) {
         while (!reachedEOF()) {
             when {
                 first()!!.isWhitespace() -> eat()
-                startsWith("//") -> skipPast("\n")
-                startsWith("/*") -> skipPast("*/")
+                startsWith("//") -> skipPast("\n", eofOk = true)
+                startsWith("/*") -> skipPast("*/", eofOk = false)
                 else -> return
             }
         }
     }
 
-    private fun skipPast(str: String) {
+    private fun skipPast(str: String, eofOk: Boolean) {
         while (!startsWith(str))
+            if (reachedEOF() && eofOk)
+                return
             eat()
+
         eat(str.length)
     }
 
