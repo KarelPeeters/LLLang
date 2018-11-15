@@ -11,7 +11,7 @@ import language.ir.UnaryOp
 import java.util.*
 
 object ConstantFolding : FunctionPass {
-    override fun ChangeTracker.optimize(function: Function) {
+    override fun OptimizerContext.optimize(function: Function) {
         val toVisit: Queue<Instruction> = ArrayDeque(function.blocks.flatMap { it.instructions })
 
         while (toVisit.isNotEmpty()) {
@@ -23,7 +23,7 @@ object ConstantFolding : FunctionPass {
                     val right = curr.right
 
                     if (left is Constant && right is Constant) {
-                        changed()
+                        instrChanged()
 
                         val result = curr.opType.calculate(left, right)
                         curr.replaceWith(result)
@@ -33,7 +33,7 @@ object ConstantFolding : FunctionPass {
                 is UnaryOp -> {
                     val value = curr.value
                     if (value is Constant) {
-                        changed()
+                        instrChanged()
 
                         val result = curr.opType.calculate(value)
                         curr.replaceWith(result)
@@ -54,7 +54,7 @@ object ConstantFolding : FunctionPass {
                     }
 
                     if (target != null) {
-                        changed()
+                        blocksChanged()
 
                         curr.block.terminator = Jump(target)
                         curr.delete()
@@ -62,7 +62,7 @@ object ConstantFolding : FunctionPass {
                 }
                 is Phi -> {
                     if (curr.sources.size == 1 || curr.sources.values.distinct().size == 1) {
-                        changed()
+                        instrChanged()
 
                         val value = curr.sources.values.iterator().next()
 

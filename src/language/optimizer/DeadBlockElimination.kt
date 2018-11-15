@@ -6,7 +6,7 @@ import language.ir.Phi
 import java.util.*
 
 object DeadBlockElimination : FunctionPass {
-    override fun ChangeTracker.optimize(function: Function) {
+    override fun OptimizerContext.optimize(function: Function) {
         val toVisit: Queue<BasicBlock> = ArrayDeque()
         toVisit.add(function.entry)
         val used = mutableSetOf<BasicBlock>()
@@ -28,7 +28,7 @@ object DeadBlockElimination : FunctionPass {
 
                 iter.remove()
                 block.delete(true)
-                changed()
+                blocksChanged()
             }
         }
     }

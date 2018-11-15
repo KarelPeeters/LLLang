@@ -2,19 +2,37 @@ package language.optimizer
 
 import language.ir.Function
 
-interface ChangeTracker {
-    fun changed()
+interface OptimizerContext {
+    fun instrChanged()
+    fun blocksChanged()
+    fun domInfo(): DominatorInfo
 }
 
 interface FunctionPass {
-    fun ChangeTracker.optimize(function: Function)
+    fun OptimizerContext.optimize(function: Function)
 }
 
-private class ChangeTrackerImpl : ChangeTracker {
+private class OptimizerContextImplt(val function: Function) : OptimizerContext {
     var hasChanged = false
+    var domInfo: DominatorInfo? = null
 
-    override fun changed() {
+    override fun instrChanged() {
         hasChanged = true
+    }
+
+    override fun blocksChanged() {
+        hasChanged = true
+        domInfo = null
+    }
+
+    override fun domInfo(): DominatorInfo {
+        domInfo?.let { return it }
+
+        val start = System.currentTimeMillis()
+        val info = DominatorInfo(function)
+        println(System.currentTimeMillis() - start)
+        domInfo = info
+        return info
     }
 }
 
@@ -30,20 +48,20 @@ class Optimizer(val verify: Boolean) {
         if (verify)
             function.verify()
 
-        val changeTracker = ChangeTrackerImpl()
-        AllocToPhi.apply { changeTracker.optimize(function) }
+        val context = OptimizerContextImplt(function)
+        AllocToPhi.apply { context.optimize(function) }
 
         if (verify)
             function.verify()
 
         do {
-            changeTracker.hasChanged = false
+            context.hasChanged = false
             for (pass in passes) {
-                pass.apply { changeTracker.optimize(function) }
+                pass.apply { context.optimize(function) }
 
                 if (verify)
                     function.verify()
             }
-        } while (changeTracker.hasChanged)
+        } while (context.hasChanged)
     }
 }

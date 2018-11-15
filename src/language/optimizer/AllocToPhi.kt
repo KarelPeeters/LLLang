@@ -10,44 +10,9 @@ import language.ir.Store
 import language.ir.Value
 import java.util.*
 
-private fun calcDominatedBy(function: Function): Map<BasicBlock, Set<BasicBlock>> {
-    val result = function.blocks.associateTo(mutableMapOf()) { it to function.blocks.toMutableSet() }
-    result[function.entry] = mutableSetOf(function.entry)
-
-    do {
-        var changed = false
-        for ((block, domSet) in result) {
-            for (pred in block.predecessors()) {
-                //if something got removed
-                if (domSet.retainAll(result.getValue(pred) + setOf(block)))
-                    changed = true
-            }
-        }
-    } while (changed)
-
-    return result
-}
-
 object AllocToPhi : FunctionPass {
-    override fun ChangeTracker.optimize(function: Function) {
-        val dominatedBy: Map<BasicBlock, Set<BasicBlock>> = calcDominatedBy(function)
-
-        val domParent = function.blocks.associate { block ->
-            val blockDoms = dominatedBy.getValue(block).filter { it != block }
-            block to blockDoms.find { cand ->
-                val candDoms = dominatedBy.getValue(cand)
-                blockDoms.all { it in candDoms }
-            }
-        }
-
-        val frontiers: Map<BasicBlock, Set<BasicBlock>> = function.blocks.associate { block ->
-            block to dominatedBy.asSequence()
-                    .mapNotNull { (k, v) -> if (block in v) k else null }
-                    .flatMap { it.successors().asSequence() }
-                    .filter { candidate -> block !in dominatedBy.getValue(candidate) }
-                    .toSet()
-        }
-
+    override fun OptimizerContext.optimize(function: Function) {
+        val dom = domInfo()
         val variables = function.blocks
                 .flatMap { it.instructions.filterIsInstance<Alloc>() }
                 .filter { variable -> variable.users.all { it is Store || it is Load } }
@@ -55,7 +20,7 @@ object AllocToPhi : FunctionPass {
         for (variable in variables) {
             //remove alloc
             variable.block.remove(variable)
-            changed()
+            instrChanged()
 
             val stores = variable.users.filterIsInstance<Store>()
             val loads = variable.users.filterIsInstance<Load>()
@@ -67,7 +32,7 @@ object AllocToPhi : FunctionPass {
             while (toVisit.isNotEmpty()) {
                 val curr = toVisit.pop()
 
-                for (block in frontiers.getValue(curr!!)) {
+                for (block in dom.frontier(curr)) {
                     if (block !in phis) {
                         toVisit.push(block)
 
@@ -99,7 +64,7 @@ object AllocToPhi : FunctionPass {
                         }
                     }
 
-                    curr = domParent[curr] ?: return null
+                    curr = dom.parent(curr) ?: return null
                 }
             }
 

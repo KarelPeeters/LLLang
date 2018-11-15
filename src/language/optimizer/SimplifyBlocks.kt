@@ -6,7 +6,7 @@ import language.ir.Phi
 import language.ir.Terminator
 
 object SimplifyBlocks : FunctionPass {
-    override fun ChangeTracker.optimize(function: Function) {
+    override fun OptimizerContext.optimize(function: Function) {
         val iter = function.blocks.iterator()
 
         for (block in iter) {
@@ -18,7 +18,7 @@ object SimplifyBlocks : FunctionPass {
                 if (users.all { it is Terminator || it is Function }) {
                     for (user in users)
                         user.replaceOperand(block, term.target)
-                    changed()
+                    blocksChanged()
                     continue
                 }
             }
@@ -37,6 +37,8 @@ object SimplifyBlocks : FunctionPass {
                 block.users.toList().forEach {
                     (it as Phi).replaceOperand(block, pred)
                 }
+                block.delete()
+                iter.remove()
             }
         }
     }
