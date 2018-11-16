@@ -113,10 +113,11 @@ class Tokenizer(private val source: String) {
     }
 
     private fun skipPast(str: String, eofOk: Boolean) {
-        while (!startsWith(str))
+        while (!startsWith(str)) {
             if (reachedEOF() && eofOk)
                 return
             eat()
+        }
 
         eat(str.length)
     }
