@@ -7,11 +7,11 @@ import language.ir.Branch
 import language.ir.Constant
 import language.ir.Eat
 import language.ir.Exit
-import language.ir.Function
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
 import language.ir.Jump
 import language.ir.Load
+import language.ir.Program
 import language.ir.Store
 import language.ir.Value
 import java.util.*
@@ -23,11 +23,11 @@ private class Variable(val name: String, val pointer: Value) {
 private class LoopBlocks(val header: BasicBlock, val end: BasicBlock)
 
 class Flattener {
-    val body = Function()
+    val program = Program()
     private val allocs = mutableListOf<Alloc>()
     private val loopBlockStack = LinkedList<LoopBlocks>()
 
-    fun newBlock(name: String? = null) = BasicBlock(name).also { body.append(it) }
+    fun newBlock(name: String? = null) = BasicBlock(name).also { TODO() /*body.append(it)*/ }
 
     private inner class Context(val parent: Context?) {
         private val vars = mutableMapOf<String, Variable>()
@@ -45,7 +45,8 @@ class Flattener {
 
     fun flatten(block: CodeBlock) {
         val entry = newBlock()
-        body.entry = entry
+        TODO()
+        //body.entry = entry
         val end = entry.appendNestedBlock(Context(null), block)
         end?.terminator = Exit
 
@@ -111,7 +112,8 @@ class Flattener {
             val bodyEnd = bodyBlock.appendNestedBlock(context, stmt.block)
             loopBlockStack.pop()
 
-            body.append(endBlock)
+            TODO()
+            //body.append(endBlock)
 
             this.terminator = Jump(condBlock)
             afterCond.terminator = Branch(condValue, bodyBlock, endBlock)
@@ -126,6 +128,7 @@ class Flattener {
             terminator = Jump(loopBlockStack.peek().header)
             null
         }
+        is ReturnStatement -> TODO("return")
     }
 
     private fun BasicBlock.appendExpression(context: Context, exp: Expression): Pair<BasicBlock, Value> = when (exp) {

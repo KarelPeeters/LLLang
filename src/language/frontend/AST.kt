@@ -7,6 +7,46 @@ sealed class ASTNode(val position: SourcePosition) {
     abstract fun ASTRenderer.render()
 }
 
+class Program(
+        position: SourcePosition,
+        val toplevels: List<TopLevel>
+) : ASTNode(position) {
+    override fun ASTRenderer.render() {
+        for (topLevel in toplevels) {
+            println(topLevel)
+        }
+    }
+}
+
+sealed class TopLevel(
+        position: SourcePosition
+) : ASTNode(position)
+
+class Function(
+        position: SourcePosition,
+        val name: String,
+        val parameters: List<Parameter>,
+        val retType: TypeAnnotation?,
+        val block: CodeBlock
+) : TopLevel(position) {
+    override fun ASTRenderer.render() {
+        print("fun $name(${parameters.joinToString { it.toString() }}): $retType ")
+        print(block)
+    }
+}
+
+class Parameter(
+        position: SourcePosition,
+        val name: String,
+        val type: TypeAnnotation
+) : ASTNode(position) {
+    override fun toString() = "$name: $type"
+
+    override fun ASTRenderer.render() {
+        print("$name: $type")
+    }
+}
+
 sealed class Statement(position: SourcePosition) : ASTNode(position)
 
 class CodeBlock(
@@ -43,6 +83,16 @@ class WhileStatement(
         print(block)
     }
 }
+
+class ReturnStatement(
+        position: SourcePosition,
+        val value: Expression
+) : Statement(position) {
+    override fun ASTRenderer.render() {
+        print("return "); print(value)
+    }
+}
+
 
 sealed class Expression(position: SourcePosition) : Statement(position)
 
@@ -158,6 +208,7 @@ class TypeAnnotation(
         val str: String
 ) : ASTNode(position) {
     override fun ASTRenderer.render() = print(str)
+    override fun toString() = str
 }
 
 class ASTRenderer(private val builder: StringBuilder, private val indent: Int) {

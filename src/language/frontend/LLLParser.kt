@@ -9,7 +9,38 @@ import language.ir.UnaryOpType
 import java.util.*
 
 class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
-    fun parse() = block(Eof)
+    fun parse() = program()
+
+    private fun program() = Program(currentPosition, sequence {
+        while (!at(Eof)) {
+            yield(topLevel())
+        }
+    }.toList())
+
+    private fun topLevel(): TopLevel {
+        return when {
+            at(Fun) -> function()
+            else -> unexpected()
+        }
+    }
+
+    private fun function(): Function {
+        val pos = currentPosition
+        expect(Fun)
+        val name = expect(Id).text
+        expect(OpenB)
+        val parameters = list(CloseB) {
+            val pPos = currentPosition
+            val pName = expect(Id).text
+            expect(Colon)
+            Parameter(pPos, pName, type())
+        }
+        val ret = if (accept(Colon)) type() else null
+
+        expect(OpenC)
+        val content = block(CloseC)
+        return Function(pos, name, parameters, ret, content)
+    }
 
     private fun block(end: TokenType) = CodeBlock(currentPosition, sequence {
         while (!accept(end)) {
@@ -30,6 +61,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
             at(While) -> return whileStatement()
             accept(Break) -> BreakStatement(currentPosition)
             accept(Continue) -> ContinueStatement(currentPosition)
+            accept(Return) -> ReturnStatement(currentPosition, expression())
             at(Var) -> declaration()
             at(OpenC) -> return containedBlock()
             else -> expression()
@@ -66,14 +98,16 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         return WhileStatement(pos, condition, block)
     }
 
-    private fun expressionList(end: TokenType): List<Expression> {
-        val list = mutableListOf<Expression>()
+    private fun expressionList(end: TokenType) = list(end) { expression() }
+
+    private inline fun <T> list(end: TokenType, element: () -> T): List<T> {
+        val list = mutableListOf<T>()
         if (!accept(end)) {
-            list += expression()
+            list += element()
 
             while (!accept(end)) {
                 expect(Comma)
-                list += expression()
+                list += element()
             }
         }
         return list

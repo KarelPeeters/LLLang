@@ -31,7 +31,7 @@ enum class TokenType(val string: String? = null) {
     Else("else"),
     While("while"), For("for"),
     Break("break"), Continue("continue"),
-    Fun("fun"),
+    Fun("fun"), Return("return"),
     Val("val"), Var("var"),
 
     //values
