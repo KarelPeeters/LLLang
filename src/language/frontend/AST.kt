@@ -30,7 +30,10 @@ class Function(
         val block: CodeBlock
 ) : TopLevel(position) {
     override fun ASTRenderer.render() {
-        print("fun $name(${parameters.joinToString { it.toString() }}): $retType ")
+        print("fun $name(${parameters.joinToString { it.toString() }})")
+        if (retType != null)
+            print(": $retType")
+        print(" ")
         print(block)
     }
 }

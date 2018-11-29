@@ -14,7 +14,7 @@ const val ANSI_GRAY = "\u001B[37m"
 
 val WIDTH_REGEX = """w ([+-]?)(\d+)""".toRegex()
 
-class Debugger(val function: Function, val env: NameEnv = NameEnv()) {
+class Debugger(val function: Function, val env: NameEnv) {
     private val interpreter = Interpreter(function)
     private val breakPoints = mutableSetOf<Instruction>()
 

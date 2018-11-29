@@ -17,7 +17,7 @@ abstract class Value(val type: Type) : Node() {
         require(users.isEmpty()) { "value should have no users left after replacement" }
     }
 
-    open fun str(env: NameEnv) = toString()
+    abstract fun str(env: NameEnv): String
 }
 
 class Constant constructor(type: Type, val value: Int) : Value(type) {
@@ -43,4 +43,9 @@ class Constant constructor(type: Type, val value: Int) : Value(type) {
         result = 31 * result + replaceAble.hashCode()
         return result
     }
+}
+
+object UnitValue : Value(UnitType) {
+    override fun verify() {}
+    override fun str(env: NameEnv) = "Unit"
 }

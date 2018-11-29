@@ -26,7 +26,7 @@ class Alloc(name: String?, val inner: Type) : Instruction(name, inner.pointer, t
     override fun verify() {}
 }
 
-class Store(pointer: Value, value: Value) : Instruction(null, VoidType, false) {
+class Store(pointer: Value, value: Value) : Instruction(null, UnitType, false) {
     var pointer by operand(pointer)
     var value by operand(value)
 
@@ -127,7 +127,7 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
     }
 }
 
-class Eat : Instruction(null, VoidType, false) {
+class Eat : Instruction(null, UnitType, false) {
     private val _operands = mutableListOf<Value>()
     override val operands: List<Value> = _operands
 
@@ -200,4 +200,13 @@ object Exit : Terminator() {
 
     override fun targets() = setOf<BasicBlock>()
     override fun fullStr(env: NameEnv) = "exit"
+}
+
+class Return(value: Value) : Terminator() {
+    var value by operand(value)
+
+    override fun verify() {}
+
+    override fun targets() = emptySet<BasicBlock>()
+    override fun fullStr(env: NameEnv) = "return ${value.str(env)}"
 }

@@ -1,11 +1,8 @@
 package language.ir
 
-/**
- * Represents a function with void return type and no parameters
- */
-class Function : Value(VoidFunctionType) {
+class Function(val name: String, parameters: List<Pair<String?, Type>>, val ret: Type) : Value(FunctionType) {
     var entry by operand<BasicBlock>(null)
-
+    val parameters = parameters.map { ParameterValue(it.first, it.second) }
     val blocks = mutableListOf<BasicBlock>()
 
     override fun verify() {
@@ -25,14 +22,21 @@ class Function : Value(VoidFunctionType) {
         block.setFunction(null)
     }
 
-    override fun toString() = fullStr(NameEnv())
-
     fun fullStr(env: NameEnv): String {
         blocks.forEach { env.block(it) } //preset names to keep them ordered
-        return "entry: ${entry.str(env)}\n${blocks.joinToString("\n\n") { it.fullStr(env) }}"
+
+        return """
+            fun $name(${parameters.joinToString { it.str(env) }}): $ret {
+            entry: ${entry.str(env)}
+        """.trimIndent() + blocks.joinToString("\n\n") { it.fullStr(env) } + "\n}\n"
     }
+
+    override fun str(env: NameEnv) = name
 }
 
-object VoidFunctionType : Type() {
-    override fun toString() = "fun"
+class ParameterValue(val name: String?, type: Type) : Value(type) {
+    override fun verify() {}
+    override fun str(env: NameEnv) = "%${env.value(this)} $type"
 }
+
+object FunctionType : Type()

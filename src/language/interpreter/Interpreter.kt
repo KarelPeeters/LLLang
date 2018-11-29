@@ -15,6 +15,7 @@ import language.ir.IntegerType.Companion.bool
 import language.ir.Jump
 import language.ir.Load
 import language.ir.Phi
+import language.ir.Return
 import language.ir.Store
 import language.ir.Terminator
 import language.ir.Type
@@ -139,6 +140,7 @@ class Interpreter(val function: Function) {
                             }
                             is Jump -> instr.target
                             is Exit -> break@loop
+                            is Return -> TODO("return")
                         }
 
                         currBlock = nextBlock

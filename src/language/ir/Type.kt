@@ -26,6 +26,6 @@ class PointerType private constructor(val inner: Type) : Type() {
 val Type.pointer get() = PointerType.pointTo(this)
 val Type.unpoint get() = (this as? PointerType)?.inner
 
-object VoidType : Type() {
-    override fun toString() = "void"
+object UnitType : Type() {
+    override fun toString() = "Unit"
 }

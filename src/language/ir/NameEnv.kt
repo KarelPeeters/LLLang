@@ -5,6 +5,7 @@ class NameEnv {
     private val blocks = SubEnv()
 
     fun value(node: Instruction) = values.name(node, node.name)
+    fun value(node: ParameterValue) = values.name(node, node.name)
     fun block(node: BasicBlock) = blocks.name(node, node.name)
 
     private class SubEnv {
