@@ -28,7 +28,7 @@ object DeadBlockElimination : FunctionPass {
 
                 iter.remove()
                 block.delete(true)
-                blocksChanged()
+                graphChanged()
             }
         }
     }

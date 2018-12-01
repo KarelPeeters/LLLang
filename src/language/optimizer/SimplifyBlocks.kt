@@ -18,7 +18,7 @@ object SimplifyBlocks : FunctionPass {
                 if (users.all { it is Terminator || it is Function }) {
                     for (user in users)
                         user.replaceOperand(block, term.target)
-                    blocksChanged()
+                    graphChanged()
                     continue
                 }
             }

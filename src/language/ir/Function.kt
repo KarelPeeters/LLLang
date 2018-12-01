@@ -5,6 +5,12 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
     val parameters = parameters.map { ParameterValue(it.first, it.second) }
     val blocks = mutableListOf<BasicBlock>()
 
+    init {
+        for (param in this.parameters) {
+            param.users += this
+        }
+    }
+
     override fun verify() {
         require(entry in blocks) { "entry must be one of the blocks" }
         require(blocks.all { it.function == this }) { "block.function must be this function" }
@@ -28,6 +34,7 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
         return """
             fun $name(${parameters.joinToString { it.str(env) }}): $returnType {
             entry: ${entry.str(env)}
+
         """.trimIndent() + blocks.joinToString("\n\n") { it.fullStr(env) } + "\n}\n"
     }
 

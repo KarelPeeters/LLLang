@@ -195,6 +195,9 @@ class Call(name: String?, function: Function, arguments: List<Value>) : Instruct
         super.replaceOperand(from, to)
     }
 
+    override val operands: List<Value>
+        get() = super.operands + arguments
+
     override fun fullStr(env: NameEnv): String {
         return "${str(env)} = call ${function.str(env)}(${_arguments.joinToString { it.str(env) }})"
     }

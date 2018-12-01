@@ -1,10 +1,11 @@
 package language.optimizer
 
 import language.ir.Function
+import language.ir.Program
 
 interface OptimizerContext {
     fun instrChanged()
-    fun blocksChanged()
+    fun graphChanged()
     fun domInfo(): DominatorInfo
 }
 
@@ -20,7 +21,7 @@ private class OptimizerContextImplt(val function: Function) : OptimizerContext {
         hasChanged = true
     }
 
-    override fun blocksChanged() {
+    override fun graphChanged() {
         hasChanged = true
         domInfo = null
     }
@@ -28,21 +29,25 @@ private class OptimizerContextImplt(val function: Function) : OptimizerContext {
     override fun domInfo(): DominatorInfo {
         domInfo?.let { return it }
 
-        val start = System.currentTimeMillis()
         val info = DominatorInfo(function)
-        println(System.currentTimeMillis() - start)
         domInfo = info
         return info
     }
 }
 
 class Optimizer(val verify: Boolean) {
-    private val passes = listOf(
+    private val passes = listOf<FunctionPass>(
             ConstantFolding,
             DeadInstructionElimination,
             SimplifyBlocks,
             DeadBlockElimination
     )
+
+    fun optimize(program: Program) {
+        for (function in program.functions) {
+            optimize(function)
+        }
+    }
 
     fun optimize(function: Function) {
         if (verify)
