@@ -5,6 +5,7 @@ import language.ir.BasicBlock
 import language.ir.BinaryOp
 import language.ir.Blur
 import language.ir.Branch
+import language.ir.Call
 import language.ir.Constant
 import language.ir.Eat
 import language.ir.Exit
@@ -125,6 +126,7 @@ class Interpreter(val function: Function) {
                     is Blur -> {
                         getInst(instr.value)
                     }
+                    is Call -> TODO("call")
                     is Terminator -> {
                         require(i == currBlock.instructions.lastIndex) { "Terminators can only appear at the end of a BasicBlock" }
                         prevBlock = currBlock

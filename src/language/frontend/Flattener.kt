@@ -18,6 +18,7 @@ import language.ir.UnitValue
 import language.ir.Value
 import java.util.*
 import language.ir.BinaryOp as IrBinaryOp
+import language.ir.Call as IrCall
 import language.ir.Function as IrFunction
 import language.ir.Program as IrProgram
 import language.ir.UnaryOp as IrUnaryOp
@@ -243,7 +244,18 @@ class Flattener {
                         after.append(result)
                         after to result
                     }
-                    else -> TODO("calls")
+                    else -> {
+                        var next = this
+                        val arguments = exp.arguments.map {
+                            val (after, value) = next.appendExpression(scope, it)
+                            next = after
+                            value
+                        }
+
+                        val call = IrCall(null, functions.getValue(exp.target.identifier), arguments)
+                        next.append(call)
+                        next to call
+                    }
                 }
             } else {
                 TODO("dynamic calls")

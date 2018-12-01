@@ -169,7 +169,38 @@ class Blur(value: Value) : Instruction(null, value.type, false) {
     override fun fullStr(env: NameEnv) = "${str(env)} = blur ${value.str(env)}"
 }
 
-sealed class Terminator : Instruction(null, VoidType, false) {
+class Call(name: String?, function: Function, arguments: List<Value>) : Instruction(name, function.returnType, false) {
+    val function by operand<Function>(function)
+    val _arguments = arguments.toMutableList()
+    val arguments: List<Value> = _arguments
+
+    override fun verify() {
+        require(function.parameters.size == arguments.size)
+        require(function.parameters.zip(arguments).all { (x, y) -> x.type == y.type })
+    }
+
+    fun setArgument(i: Int, value: Value) {
+        val prev = _arguments[i]
+        _arguments[i] = value
+
+        value.users += this
+        if (prev !in _arguments)
+            prev.users -= this
+    }
+
+    override fun replaceOperand(from: Value, to: Value) {
+        _arguments.replaceAll { if (it == from) to else it }
+        from.users -= this
+        to.users += this
+        super.replaceOperand(from, to)
+    }
+
+    override fun fullStr(env: NameEnv): String {
+        return "${str(env)} = call ${function.str(env)}(${_arguments.joinToString { it.str(env) }})"
+    }
+}
+
+sealed class Terminator : Instruction(null, UnitType, false) {
     abstract fun targets(): Set<BasicBlock>
 }
 

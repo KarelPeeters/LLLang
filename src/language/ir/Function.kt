@@ -1,6 +1,6 @@
 package language.ir
 
-class Function(val name: String, parameters: List<Pair<String?, Type>>, val ret: Type) : Value(FunctionType) {
+class Function(val name: String, parameters: List<Pair<String?, Type>>, val returnType: Type) : Value(FunctionType) {
     var entry by operand<BasicBlock>(null)
     val parameters = parameters.map { ParameterValue(it.first, it.second) }
     val blocks = mutableListOf<BasicBlock>()
@@ -26,7 +26,7 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val ret:
         blocks.forEach { env.block(it) } //preset names to keep them ordered
 
         return """
-            fun $name(${parameters.joinToString { it.str(env) }}): $ret {
+            fun $name(${parameters.joinToString { it.str(env) }}): $returnType {
             entry: ${entry.str(env)}
         """.trimIndent() + blocks.joinToString("\n\n") { it.fullStr(env) } + "\n}\n"
     }
