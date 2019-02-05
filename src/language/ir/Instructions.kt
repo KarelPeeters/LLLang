@@ -174,6 +174,12 @@ class Call(name: String?, function: Function, arguments: List<Value>) : Instruct
     val _arguments = arguments.toMutableList()
     val arguments: List<Value> = _arguments
 
+    init {
+        for (arg in arguments) {
+            arg.users += this
+        }
+    }
+
     override fun verify() {
         require(function.parameters.size == arguments.size)
         require(function.parameters.zip(arguments).all { (x, y) -> x.type == y.type })
