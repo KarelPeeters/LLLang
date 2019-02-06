@@ -36,7 +36,7 @@ private class OptimizerContextImplt(val function: Function) : OptimizerContext {
 }
 
 class Optimizer(val verify: Boolean) {
-    private val passes = listOf<FunctionPass>(
+    private val passes: List<FunctionPass> = listOf(
             ConstantFolding,
             DeadInstructionElimination,
             SimplifyBlocks,

@@ -74,7 +74,7 @@ class Flattener {
             when (toplevel) {
                 is Function -> {
                     if (toplevel.name in functions)
-                        throw DuplicateFunctionDeclaration(toplevel.position, toplevel.name)
+                        throw DuplicateDeclarationException(toplevel.position, toplevel.name)
                     val irFunction = IrFunction(
                             toplevel.name,
                             toplevel.parameters.map { it.name to resolveType(it.type) },
@@ -110,7 +110,11 @@ class Flattener {
         val entry = newBlock("entry")
         irFunction.entry = entry
         val end = entry.appendNestedBlock(bodyScope, function.block)
-        end?.terminator = Return(UnitValue)
+        if (end != null) {
+            if (irFunction.returnType != UnitType)
+                throw MissingReturnStatement(function)
+            end.terminator = Return(UnitValue)
+        }
         allocs.asReversed().forEach { entry.insertAt(0, it) }
     }
 
@@ -148,13 +152,15 @@ class Flattener {
             else
                 elseBlock
 
-            val end = newBlock("if.end")
 
             afterCond.terminator = Branch(condValue, thenBlock, elseBlock)
-            thenEnd?.terminator = Jump(end)
-            elseEnd?.terminator = Jump(end)
+            if (thenEnd != null || elseEnd != null) {
+                val end = newBlock("if.end")
+                thenEnd?.terminator = Jump(end)
+                elseEnd?.terminator = Jump(end)
+                end
+            } else null
 
-            end
         }
         is WhileStatement -> {
             val condBlock = newBlock("while.cond")
@@ -252,7 +258,9 @@ class Flattener {
                             value
                         }
 
-                        val call = IrCall(null, functions.getValue(exp.target.identifier), arguments)
+                        val func = functions[exp.target.identifier]
+                                   ?: throw IdNotFoundException(exp.position, exp.target.identifier)
+                        val call = IrCall(null, func, arguments)
                         next.append(call)
                         next to call
                     }
@@ -270,7 +278,7 @@ class Flattener {
     private fun resolveType(annotation: TypeAnnotation) = when (annotation.str) {
         "bool" -> bool
         "i32" -> i32
-        else -> throw IllegalTypeException(annotation.position, annotation.str)
+        else -> throw IllegalTypeException(annotation)
     }
 }
 
@@ -280,11 +288,11 @@ class IdNotFoundException(pos: SourcePosition, identifier: String)
 class DuplicateDeclarationException(pos: SourcePosition, identifier: String)
     : Exception("$pos: '$identifier' was already declared")
 
-class IllegalTypeException(pos: SourcePosition, type: String)
-    : Exception("$pos: Illegal type '$type'")
+class IllegalTypeException(type: TypeAnnotation)
+    : Exception("${type.position}: Illegal type '${type.str}'")
 
 class ParameterValueImmutableException(name: String)
     : Exception("Can't mutate parameter '$name'")
 
-class DuplicateFunctionDeclaration(pos: SourcePosition, name: String)
-    : Exception("Function $name at $pos was already declared")
+class MissingReturnStatement(function: Function)
+    : Exception("Function ${function.name} at ${function.position} missing return statement")

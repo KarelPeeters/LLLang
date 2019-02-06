@@ -1,9 +1,9 @@
 package language.interpreter
 
 import language.ir.BasicBlock
-import language.ir.Function
 import language.ir.Instruction
 import language.ir.NameEnv
+import language.ir.Program
 import kotlin.math.max
 
 const val ANSI_RESET = "\u001B[0m"
@@ -12,18 +12,25 @@ const val ANSI_GREEN = "\u001B[32m"
 const val ANSI_BLUE = "\u001B[34m"
 const val ANSI_GRAY = "\u001B[37m"
 
+private fun colored(str: String, color: String) = color + str + ANSI_RESET
+private fun red(str: String) = colored(str, ANSI_RED)
+private fun green(str: String) = colored(str, ANSI_GREEN)
+private fun blue(str: String) = colored(str, ANSI_BLUE)
+private fun gray(str: String) = colored(str, ANSI_GRAY)
+
 val WIDTH_REGEX = """w ([+-]?)(\d+)""".toRegex()
 
-class Debugger(val function: Function, val env: NameEnv) {
-    private val interpreter = Interpreter(function)
+class Debugger(val program: Program, val env: NameEnv) {
+    private val interpreter = Interpreter(program)
     private val breakPoints = mutableSetOf<Instruction>()
 
     private var state = interpreter.step()
+    private var frame = state.topFrame
+
     private var width = 80
 
     fun start() {
-        renderCode()
-        renderPrompt()
+        render()
 
         loop@ while (true) {
             val line = readLine()
@@ -31,7 +38,7 @@ class Debugger(val function: Function, val env: NameEnv) {
             when (line) {
                 "q", null -> break@loop
                 "" -> if (!done()) step()
-                "b" -> state.current?.let { breakPoints.toggle(it) }
+                "b" -> state.topFrame.current?.let { breakPoints.toggle(it) }
                 "c" -> while (!done()) {
                     step()
                     if (atBreakPoint())
@@ -56,85 +63,91 @@ class Debugger(val function: Function, val env: NameEnv) {
                 }
             }
 
-            when (line) {
-                "s" -> {
-                    renderCode()
-                    println("steps: ${interpreter.steps}")
-                }
-                "p" -> renderCode(true)
-                else -> renderCode()
-            }
-
-            renderPrompt()
+            render()
         }
     }
 
     private fun step() {
         state = interpreter.step()
+        frame = state.topFrame
     }
 
-    private fun atBreakPoint() = state.current in breakPoints
+    private fun atBreakPoint() = state.topFrame.current in breakPoints
 
-    private fun done() = state.current == null
+    private fun done() = state.topFrame.current == null
 
-    private fun renderCode(full: Boolean = false) {
-        val state = state
+    private fun render() {
+        val codeLines = renderCode()
+        val varLines = renderVariables()
+        val stackLines = renderStack()
 
-        val prgmLines = sequence<String> {
-            if (full) {
-                for (block in function.blocks)
-                    renderBlock(block)
-            } else {
-                if (state.prevBlock != null)
-                    renderBlock(state.prevBlock)
+        val codeWidth = 70 //max(70, (codeLines.maxBy { it.length }?.length ?: 0) + 2)
+        val varWidth = 15 //max(15, (varLines.maxBy { it.length }?.length ?: 0) + 2)
 
-                if (state.currBlock != null) {
-                    renderBlock(state.currBlock)
-                    for (succ in state.currBlock.successors())
-                        renderBlock(succ)
-                }
-            }
-        }.toList().asReversed()
+        val lineCount = max(codeLines.size, varLines.size, stackLines.size)
 
-        val variableNames = state.values.map { it.key.str(env) }.asReversed()
-        val variableValues = state.values.map { it.value.shortString() }.asReversed()
+        val result = (-lineCount until 0).joinToString(
+                "\n",
+//                prefix = "\n\n\n",
+                postfix = "\n" + blue("dbg> ")
+        ) { i ->
+            val codeLine = codeLines.getOrElse(codeLines.size + i) { "" }
+            val varLine = varLines.getOrElse(varLines.size + i) { "" }
+            val stackLine = stackLines.getOrElse(stackLines.size + i) { "" }
 
-        val maxValueWidth = variableValues.map { it.length }.max() ?: 0
-        val maxNameWidth = variableNames.map { it.length }.max() ?: 0
-
-        val codeWidth = width - maxValueWidth - maxNameWidth - 2
-
-        val lineCount = max(prgmLines.size, variableNames.size)
-        val lines = (0 until lineCount).map { i ->
-            val hasVariable = 0 <= i && i < variableNames.size
-
-            (prgmLines.getOrNull(i) ?: "").ansiPadEnd(if (hasVariable) codeWidth else 0) +
-            if (hasVariable) {
-                (variableNames.getOrNull(i) ?: "").ansiPadEnd(maxNameWidth + 2) +
-                (variableValues.getOrNull(i) ?: "").ansiPadEnd(maxValueWidth)
-            } else ""
-        }.asReversed()
-
-        println("\n\n" + lines.joinToString("\n"))
+            codeLine.ansiPadEnd(codeWidth) + varLine.ansiPadEnd(varWidth) + stackLine
+        }
+        println(result)
     }
 
-    private fun renderPrompt() {
-        print("${ANSI_BLUE}dbg> $ANSI_RESET")
-    }
+    private fun renderCode(): List<String> = sequence<String> {
+        val frame = frame
+        if (frame.prevBlock != null) renderBlock(frame.prevBlock)
+        if (frame.currBlock != null) {
+            renderBlock(frame.currBlock)
+            for (succ in frame.currBlock.successors())
+                renderBlock(succ)
+        }
+    }.toList()
 
-    private suspend fun SequenceScope<String>.renderBlock(block: BasicBlock) {
-        val color = if (block == state.currBlock) "" else ANSI_GRAY
+    private fun renderVariables(): List<String> {
+        val names = frame.values.map { (k, _) -> k.str(env) }
+        val values = frame.values.map { (_, v) -> v.shortString() }
 
-        yield("$color${block.str(env)}${if (block == state.prevBlock) "$ANSI_BLUE ->" else ""}$ANSI_RESET")
-
-        for (instr in block.instructions) {
-            yield((if (state.current == instr) "$ANSI_GREEN>$ANSI_RESET" else " ") +
-                  (if (breakPoints.any { it == instr }) "$ANSI_RED*$ANSI_RESET" else " ") +
-                  " $color${instr.fullStr(env)}$ANSI_RESET")
+        val maxNameWidth = names.maxBy { it.length }?.length ?: 0
+        return names.zip(values) { n, v ->
+            n.padEnd(maxNameWidth + 1) + v
         }
     }
 
+    private fun renderStack(): List<String> = state.stack.map {
+        val func = it.currFunction?.str(env) ?: "null"
+        val block = it.currBlock?.str(env) ?: "null"
+        val instr = it.currBlock?.instructions?.indexOf(it.current)
+        "$func:$block:$instr"
+    }
+
+    private suspend fun SequenceScope<String>.renderBlock(block: BasicBlock) {
+        val color = if (block == frame.currBlock) "" else ANSI_GRAY
+
+        val postHeader = if (block == frame.prevBlock && block in frame.currBlock?.successors() ?: emptySet())
+            " ↔" else "  "
+
+        val header = block.str(env)
+
+        yield(colored(header + postHeader, color))
+
+        for (instr in block.instructions) {
+            val pointer = if (instr == frame.current) ">" else " "
+            val breakPoint = if (instr in breakPoints) "*" else " "
+            val code = instr.fullStr(env)
+
+            yield("  ${green(pointer)}${red(breakPoint)} ${colored(code, color)}")
+        }
+    }
 }
+
+private fun max(a: Int, b: Int, c: Int) = max(a, max(b, c))
 
 private fun String.ansiPadEnd(length: Int, padChar: Char = ' '): String {
     val currentLength = this.replace("\u001B\\[[;\\d]*m".toRegex(), "").length

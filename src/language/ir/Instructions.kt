@@ -171,7 +171,7 @@ class Blur(value: Value) : Instruction(null, value.type, false) {
 
 class Call(name: String?, function: Function, arguments: List<Value>) : Instruction(name, function.returnType, false) {
     val function by operand<Function>(function)
-    val _arguments = arguments.toMutableList()
+    private val _arguments = arguments.toMutableList()
     val arguments: List<Value> = _arguments
 
     init {

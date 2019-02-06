@@ -21,6 +21,10 @@ abstract class Value(val type: Type) : Node() {
 }
 
 class Constant constructor(type: Type, val value: Int) : Value(type) {
+    init {
+        require(type is IntegerType)
+    }
+
     override val replaceAble = false
     override fun str(env: NameEnv) = "$value $type"
 
@@ -47,5 +51,5 @@ class Constant constructor(type: Type, val value: Int) : Value(type) {
 
 object UnitValue : Value(UnitType) {
     override fun verify() {}
-    override fun str(env: NameEnv) = "Unit"
+    override fun str(env: NameEnv) = "unit"
 }

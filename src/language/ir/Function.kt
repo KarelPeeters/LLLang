@@ -2,7 +2,7 @@ package language.ir
 
 class Function(val name: String, parameters: List<Pair<String?, Type>>, val returnType: Type) : Value(FunctionType) {
     var entry by operand<BasicBlock>(null)
-    val parameters = parameters.map { ParameterValue(it.first, it.second) }
+    val parameters = parameters.map { (name, type) -> ParameterValue(name, type) }
     val blocks = mutableListOf<BasicBlock>()
 
     init {
@@ -14,6 +14,11 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
     override fun verify() {
         require(entry in blocks) { "entry must be one of the blocks" }
         require(blocks.all { it.function == this }) { "block.function must be this function" }
+        for (block in blocks) {
+            val term = block.terminator
+            if (term is Return)
+                require(term.value.type == returnType) { "return type must match, ${term.value.type} != $returnType" }
+        }
 
         blocks.forEach { it.verify() }
     }
@@ -33,9 +38,9 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
 
         return """
             fun $name(${parameters.joinToString { it.str(env) }}): $returnType {
-            entry: ${entry.str(env)}
+                entry: ${entry.str(env)}
 
-        """.trimIndent() + blocks.joinToString("\n\n") { it.fullStr(env) } + "\n}\n"
+        """.trimIndent() + blocks.joinToString("\n\n    ", prefix = "    ") { it.fullStr(env).replace("\n", "\n    ") } + "\n}\n"
     }
 
     override fun str(env: NameEnv) = name

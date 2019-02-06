@@ -3,6 +3,10 @@ package language.ir
 abstract class Type
 
 class IntegerType private constructor(val width: Int) : Type() {
+    init {
+        require(width > 0)
+    }
+
     override fun toString() = "i$width"
 
     companion object {
