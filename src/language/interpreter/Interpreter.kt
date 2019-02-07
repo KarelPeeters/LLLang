@@ -62,11 +62,11 @@ typealias ValuesMap = Map<Value, ValueInst>
 
 class StackFrame(
         val values: ValuesMap,
-        val current: Instruction?,
+        val current: Instruction,
         val prevBlock: BasicBlock?
 ) {
-    val currBlock = current?.block
-    val currFunction = current?.block?.function
+    val currBlock = current.block
+    val currFunction = current.block.function
 }
 
 class State(val stack: List<StackFrame>) {

@@ -1,36 +1,44 @@
 package language.interpreter
 
+import language.interpreter.Color.*
 import language.ir.BasicBlock
+import language.ir.Function
 import language.ir.Instruction
 import language.ir.NameEnv
 import language.ir.Program
 import kotlin.math.max
 
-const val ANSI_RESET = "\u001B[0m"
-const val ANSI_RED = "\u001B[31m"
-const val ANSI_GREEN = "\u001B[32m"
-const val ANSI_BLUE = "\u001B[34m"
-const val ANSI_GRAY = "\u001B[37m"
+private const val ANSI_RESET = "\u001B[0m"
 
-private fun colored(str: String, color: String) = color + str + ANSI_RESET
-private fun red(str: String) = colored(str, ANSI_RED)
-private fun green(str: String) = colored(str, ANSI_GREEN)
-private fun blue(str: String) = colored(str, ANSI_BLUE)
-private fun gray(str: String) = colored(str, ANSI_GRAY)
+private enum class Color(val ansi: String) {
+    WHITE(""),
+    RED("\u001B[31m"),
+    GREEN("\u001B[32m"),
+    BLUE("\u001B[34m"),
+    GRAY("\u001B[37m");
+}
 
-val WIDTH_REGEX = """w ([+-]?)(\d+)""".toRegex()
+private fun colored(str: String, color: Color) = color.ansi + str + ANSI_RESET
+private fun red(str: String) = colored(str, RED)
+private fun green(str: String) = colored(str, GREEN)
+private fun blue(str: String) = colored(str, BLUE)
+private fun gray(str: String) = colored(str, GRAY)
 
-class Debugger(val program: Program, val env: NameEnv) {
-    private val interpreter = Interpreter(program)
+class Debugger(val program: Program) {
+    private lateinit var interpreter: Interpreter
+
+    private lateinit var state: State
+    private val frame get() = state.topFrame
+
     private val breakPoints = mutableSetOf<Instruction>()
 
-    private var state = interpreter.step()
-    private var frame = state.topFrame
-
     fun start() {
-        render()
+        reset()
+        printInterface()
 
         main@ while (true) {
+            printPrompt()
+
             val line = readLine() ?: break@main
             if (line == "") {
                 if (!doCommand("")) break@main
@@ -45,78 +53,94 @@ class Debugger(val program: Program, val env: NameEnv) {
 
     private fun doCommand(cmd: String): Boolean {
         when (cmd) {
-            "" -> {
+            "", "." -> {
                 val depth = state.stack.size
                 do step() while (!done() && state.stack.size > depth)
+                printInterface()
             }
             "o" -> {
                 val depth = state.stack.size
                 do step() while (!done() && state.stack.size >= depth)
+                printInterface()
             }
-            "i" -> step()
+            "i" -> {
+                step()
+                printInterface()
+            }
             "c" -> while (!done()) {
                 step()
                 if (atBreakPoint())
                     break
+                printInterface()
             }
-            "b" -> state.topFrame.current?.let { breakPoints.toggle(it) }
+            "b" -> {
+                state.topFrame.current.let { breakPoints.toggle(it) }
+                printInterface()
+            }
+            "r" -> {
+                reset()
+                printInterface()
+            }
+            "f" -> println(renderFunction(frame.currFunction, NameEnv()))
+            "p" -> println(renderProgram(program, NameEnv()))
             "q" -> return false
-            else -> {
-                println(red("Unknown command '$cmd'"))
-                return true //skip render
-            }
+            else -> println(red("Unknown command '$cmd'"))
         }
 
-        render()
         return true
+    }
+
+    private fun reset() {
+        interpreter = Interpreter(program)
+        state = interpreter.step()
     }
 
     private fun step() {
         if (done())
             return
-
         state = interpreter.step()
-        frame = state.topFrame
     }
 
     private fun atBreakPoint() = state.topFrame.current in breakPoints
 
     private fun done() = interpreter.isDone()
 
-    private fun render() {
-        val codeLines = renderCode()
-        val varLines = renderVariables()
-        val stackLines = renderStack()
+    private fun printInterface() {
+        val env = NameEnv()
+
+        val codeLines = renderCode(env)
+        val varLines = renderVariables(env)
+        val stackLines = renderStack(env)
 
         val codeWidth = 70 //max(70, (codeLines.maxBy { it.length }?.length ?: 0) + 2)
         val varWidth = 15 //max(15, (varLines.maxBy { it.length }?.length ?: 0) + 2)
 
         val lineCount = max(codeLines.size, varLines.size, stackLines.size)
 
-        val result = (-lineCount until 0).joinToString(
-                "\n",
-                postfix = "\n" + blue("dbg> ")
-        ) { i ->
+        val result = (-lineCount until 0).joinToString("\n") { i ->
             val codeLine = codeLines.getOrElse(codeLines.size + i) { "" }
             val varLine = varLines.getOrElse(varLines.size + i) { "" }
             val stackLine = stackLines.getOrElse(stackLines.size + i) { "" }
 
             codeLine.ansiPadEnd(codeWidth) + varLine.ansiPadEnd(varWidth) + stackLine
         }
-        print(result)
+        println(result)
     }
 
-    private fun renderCode(): List<String> = sequence<String> {
+    private fun printPrompt() {
+        print(blue("dbg> "))
+    }
+
+    private fun renderCode(env: NameEnv): List<String> = sequence<String> {
         val frame = frame
-        if (frame.prevBlock != null) renderBlock(frame.prevBlock)
-        if (frame.currBlock != null) {
-            renderBlock(frame.currBlock)
-            for (succ in frame.currBlock.successors())
-                renderBlock(succ)
-        }
+        if (frame.prevBlock != null)
+            renderBlock(frame.prevBlock, env)
+        renderBlock(frame.currBlock, env)
+        for (succ in frame.currBlock.successors())
+            renderBlock(succ, env)
     }.toList()
 
-    private fun renderVariables(): List<String> {
+    private fun renderVariables(env: NameEnv): List<String> {
         val names = frame.values.map { (k, _) -> k.str(env) }
         val values = frame.values.map { (_, v) -> v.shortString() }
 
@@ -126,17 +150,36 @@ class Debugger(val program: Program, val env: NameEnv) {
         }
     }
 
-    private fun renderStack(): List<String> = state.stack.map {
-        val func = it.currFunction?.str(env) ?: "null"
-        val block = it.currBlock?.str(env) ?: "null"
-        val instr = it.currBlock?.instructions?.indexOf(it.current)
+    private fun renderStack(env: NameEnv): List<String> = state.stack.map {
+        val func = it.currFunction.str(env)
+        val block = it.currBlock.str(env)
+        val instr = it.currBlock.instructions.indexOf(it.current)
         "$func:$block:$instr"
     }
 
-    private suspend fun SequenceScope<String>.renderBlock(block: BasicBlock) {
-        val color = if (block == frame.currBlock) "" else ANSI_GRAY
+    private fun renderProgram(program: Program, env: NameEnv): String =
+            program.functions.joinToString("\n") {
+                renderFunction(it, NameEnv())
+            }
 
-        val postHeader = if (block == frame.prevBlock && block in frame.currBlock?.successors() ?: emptySet())
+    private fun renderFunction(function: Function, env: NameEnv): String = buildString {
+        with(function) {
+            val color = if (function == frame.currFunction) WHITE else GRAY
+
+            val paramStr = parameters.joinToString { it.str(env) }
+            appendln(colored("fun $name($paramStr): $returnType {", color))
+            appendln(colored("  entry: ${entry.str(env)}", color))
+            for (block in blocks) {
+                for (line in sequence<String> { renderBlock(block, env) })
+                    appendln("  $line")
+            }
+        }
+    }
+
+    private suspend fun SequenceScope<String>.renderBlock(block: BasicBlock, env: NameEnv) {
+        val color = if (block == frame.currBlock) WHITE else GRAY
+
+        val postHeader = if (block == frame.prevBlock && block in frame.currBlock.successors())
             " ↔" else "  "
 
         val header = block.str(env)
@@ -145,7 +188,7 @@ class Debugger(val program: Program, val env: NameEnv) {
 
         for (instr in block.instructions) {
             val pointer = if (instr == frame.current) ">" else " "
-            val pointerColor = if (done()) ANSI_GRAY else ANSI_GREEN
+            val pointerColor = if (done()) GRAY else GREEN
             val breakPoint = if (instr in breakPoints) "*" else " "
             val code = instr.fullStr(env)
 

@@ -35,9 +35,10 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
 
     fun fullStr(env: NameEnv): String {
         blocks.forEach { env.block(it) } //preset names to keep them ordered
+        val paramStr = parameters.joinToString { it.str(env) }
 
         return """
-            fun $name(${parameters.joinToString { it.str(env) }}): $returnType {
+            fun $name($paramStr): $returnType {
                 entry: ${entry.str(env)}
 
         """.trimIndent() + blocks.joinToString("\n\n    ", prefix = "    ") { it.fullStr(env).replace("\n", "\n    ") } + "\n}\n"
