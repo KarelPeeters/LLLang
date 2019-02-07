@@ -27,54 +27,61 @@ class Debugger(val program: Program, val env: NameEnv) {
     private var state = interpreter.step()
     private var frame = state.topFrame
 
-    private var width = 80
-
     fun start() {
         render()
 
-        loop@ while (true) {
-            val line = readLine()
-
-            when (line) {
-                "q", null -> break@loop
-                "" -> if (!done()) step()
-                "b" -> state.topFrame.current?.let { breakPoints.toggle(it) }
-                "c" -> while (!done()) {
-                    step()
-                    if (atBreakPoint())
-                        break
-                }
-                //handled during render
-                "s", "p" -> Unit
-                else -> {
-                    val match = WIDTH_REGEX.matchEntire(line)
-                    if (match != null) {
-                        val (_, sign, numberStr) = match.groupValues
-                        val number = numberStr.toInt()
-                        width = when (sign) {
-                            "+" -> width + number
-                            "-" -> width - number
-                            "" -> number
-                            else -> throw IllegalStateException()
-                        }
-                    } else {
-                        println("${ANSI_RED}Unknown command '$line'$ANSI_RESET")
-                    }
+        main@ while (true) {
+            val line = readLine() ?: break@main
+            if (line == "") {
+                if (!doCommand("")) break@main
+            } else {
+                for (c in line) {
+                    val cont = doCommand(c.toString())
+                    if (!cont) break@main
                 }
             }
-
-            render()
         }
     }
 
+    private fun doCommand(cmd: String): Boolean {
+        when (cmd) {
+            "" -> {
+                val depth = state.stack.size
+                do step() while (!done() && state.stack.size > depth)
+            }
+            "o" -> {
+                val depth = state.stack.size
+                do step() while (!done() && state.stack.size >= depth)
+            }
+            "i" -> step()
+            "c" -> while (!done()) {
+                step()
+                if (atBreakPoint())
+                    break
+            }
+            "b" -> state.topFrame.current?.let { breakPoints.toggle(it) }
+            "q" -> return false
+            else -> {
+                println(red("Unknown command '$cmd'"))
+                return true //skip render
+            }
+        }
+
+        render()
+        return true
+    }
+
     private fun step() {
+        if (done())
+            return
+
         state = interpreter.step()
         frame = state.topFrame
     }
 
     private fun atBreakPoint() = state.topFrame.current in breakPoints
 
-    private fun done() = state.topFrame.current == null
+    private fun done() = interpreter.isDone()
 
     private fun render() {
         val codeLines = renderCode()
@@ -88,7 +95,6 @@ class Debugger(val program: Program, val env: NameEnv) {
 
         val result = (-lineCount until 0).joinToString(
                 "\n",
-//                prefix = "\n\n\n",
                 postfix = "\n" + blue("dbg> ")
         ) { i ->
             val codeLine = codeLines.getOrElse(codeLines.size + i) { "" }
@@ -97,7 +103,7 @@ class Debugger(val program: Program, val env: NameEnv) {
 
             codeLine.ansiPadEnd(codeWidth) + varLine.ansiPadEnd(varWidth) + stackLine
         }
-        println(result)
+        print(result)
     }
 
     private fun renderCode(): List<String> = sequence<String> {
@@ -139,10 +145,11 @@ class Debugger(val program: Program, val env: NameEnv) {
 
         for (instr in block.instructions) {
             val pointer = if (instr == frame.current) ">" else " "
+            val pointerColor = if (done()) ANSI_GRAY else ANSI_GREEN
             val breakPoint = if (instr in breakPoints) "*" else " "
             val code = instr.fullStr(env)
 
-            yield("  ${green(pointer)}${red(breakPoint)} ${colored(code, color)}")
+            yield("  ${colored(pointer, pointerColor)}${red(breakPoint)} ${colored(code, color)}")
         }
     }
 }
