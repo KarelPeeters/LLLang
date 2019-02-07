@@ -89,10 +89,10 @@ class WhileStatement(
 
 class ReturnStatement(
         position: SourcePosition,
-        val value: Expression
+        val value: Expression?
 ) : Statement(position) {
     override fun ASTRenderer.render() {
-        print("return "); print(value)
+        print("return "); if (value != null) print(value)
     }
 }
 

@@ -16,6 +16,7 @@ import language.ir.Type
 import language.ir.UnitType
 import language.ir.UnitValue
 import language.ir.Value
+import language.ir.unpoint
 import java.util.*
 import language.ir.BinaryOp as IrBinaryOp
 import language.ir.Call as IrCall
@@ -24,10 +25,12 @@ import language.ir.Program as IrProgram
 import language.ir.UnaryOp as IrUnaryOp
 
 sealed class Variable(val name: String) {
+    abstract val type: Type
     abstract fun loadValue(block: BasicBlock): Value
     abstract fun storeValue(block: BasicBlock, value: Value)
 
     class Memory(name: String, val pointer: Value) : Variable(name) {
+        override val type = pointer.type.unpoint!!
         override fun loadValue(block: BasicBlock) = Load(name, pointer).also { block.append(it) }
         override fun storeValue(block: BasicBlock, value: Value) {
             block.append(Store(pointer, value))
@@ -35,6 +38,7 @@ sealed class Variable(val name: String) {
     }
 
     class Parameter(name: String, val value: Value) : Variable(name) {
+        override val type = value.type
         override fun loadValue(block: BasicBlock) = value
         override fun storeValue(block: BasicBlock, value: Value) =
                 throw ParameterValueImmutableException(name)
@@ -136,6 +140,7 @@ class Flattener {
             scope.register(stmt.position, variable)
 
             val (next, value) = appendExpression(scope, stmt.value)
+            requireTypeMatch(stmt.position, type, value.type)
             variable.storeValue(next, value)
             next
         }
@@ -192,12 +197,16 @@ class Flattener {
         }
         is ReturnStatement -> {
             val (afterValue, value) = appendExpression(scope, stmt.value)
+            requireTypeMatch(stmt.position, function.returnType, value.type)
             afterValue.terminator = Return(value)
             null
         }
     }
 
-    private fun BasicBlock.appendExpression(scope: Scope, exp: Expression): Pair<BasicBlock, Value> = when (exp) {
+    private fun BasicBlock.appendExpression(scope: Scope, exp: Expression?): Pair<BasicBlock, Value> = when (exp) {
+        null -> {
+            this to UnitValue
+        }
         is NumberLiteral -> {
             this to Constant(i32, exp.value.toInt())
         }
@@ -214,6 +223,8 @@ class Flattener {
             val assignTarget = scope.find(exp.target.identifier)
                                ?: throw IdNotFoundException(exp.target.position, exp.target.identifier)
             val (next, value) = appendExpression(scope, exp.value)
+            requireTypeMatch(exp.position, assignTarget.type, value.type)
+
             assignTarget.storeValue(next, value)
             next to value
         }
@@ -282,6 +293,10 @@ class Flattener {
     }
 }
 
+fun requireTypeMatch(pos: SourcePosition, expected: Type, actual: Type) {
+    if (expected != actual) throw TypeMismatchException(pos, expected, actual)
+}
+
 class IdNotFoundException(pos: SourcePosition, identifier: String)
     : Exception("$pos: '$identifier' not found")
 
@@ -296,3 +311,6 @@ class ParameterValueImmutableException(name: String)
 
 class MissingReturnStatement(function: Function)
     : Exception("Function ${function.name} at ${function.position} missing return statement")
+
+class TypeMismatchException(pos: SourcePosition, expected: Type, actual: Type)
+    : Exception("Expected type was $expected, actual $actual at $pos")

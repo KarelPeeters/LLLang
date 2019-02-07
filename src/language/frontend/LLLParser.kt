@@ -61,7 +61,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
             at(While) -> return whileStatement()
             accept(Break) -> BreakStatement(currentPosition)
             accept(Continue) -> ContinueStatement(currentPosition)
-            accept(Return) -> ReturnStatement(currentPosition, expression())
+            accept(Return) -> returnStatement()
             at(Var) -> declaration()
             at(OpenC) -> return containedBlock()
             else -> expression()
@@ -77,6 +77,11 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         val value = expression()
 
         return Declaration(pos, identifier, type, value)
+    }
+
+    private fun returnStatement(): Statement = when {
+        at(Semi) -> ReturnStatement(currentPosition, null)
+        else -> ReturnStatement(currentPosition, expression())
     }
 
     private fun ifStatement(): Statement {
