@@ -2,21 +2,13 @@ package language.optimizer
 
 import language.ir.Function
 import language.ir.Instruction
-import java.util.*
 
 object DeadInstructionElimination : FunctionPass {
-    override fun OptimizerContext.optimize(function: Function) {
-        val toVisit: Queue<Instruction> = ArrayDeque(function.blocks.flatMap { it.instructions }.filter { !it.pure })
-        val used = mutableSetOf<Instruction>()
-
-        while (toVisit.isNotEmpty()) {
-            val curr = toVisit.poll()
-            if (curr in used)
-                continue
-
-            used += curr
-            toVisit.addAll(curr.operands.filterIsInstance<Instruction>())
-        }
+    override fun FunctionContext.optimize(function: Function) {
+        val used = object : Graph<Instruction> {
+            override val roots = function.blocks.flatMap { it.instructions }.filter { !it.pure }
+            override fun children(node: Instruction) = node.operands.filterIsInstance<Instruction>()
+        }.reached()
 
         for (block in function.blocks) {
             for (instr in block.instructions.toList()) {

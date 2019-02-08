@@ -3,20 +3,14 @@ package language.optimizer
 import language.ir.BasicBlock
 import language.ir.Function
 import language.ir.Phi
-import java.util.*
+
 
 object DeadBlockElimination : FunctionPass {
-    override fun OptimizerContext.optimize(function: Function) {
-        val toVisit: Queue<BasicBlock> = ArrayDeque()
-        toVisit.add(function.entry)
-        val used = mutableSetOf<BasicBlock>()
-
-        while (toVisit.isNotEmpty()) {
-            val curr = toVisit.poll()
-
-            if (used.add(curr))
-                toVisit.addAll(curr.successors())
-        }
+    override fun FunctionContext.optimize(function: Function) {
+        val used = object : Graph<BasicBlock> {
+            override val roots = setOf(function.entry)
+            override fun children(node: BasicBlock) = node.successors()
+        }.reached()
 
         val iter = function.blocks.iterator()
         for (block in iter) {

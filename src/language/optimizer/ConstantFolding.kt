@@ -11,7 +11,7 @@ import language.ir.UnaryOp
 import java.util.*
 
 object ConstantFolding : FunctionPass {
-    override fun OptimizerContext.optimize(function: Function) {
+    override fun FunctionContext.optimize(function: Function) {
         val toVisit: Queue<Instruction> = ArrayDeque(function.blocks.flatMap { it.instructions })
 
         while (toVisit.isNotEmpty()) {

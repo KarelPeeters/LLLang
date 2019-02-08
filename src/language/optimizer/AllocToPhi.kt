@@ -11,7 +11,7 @@ import language.ir.Value
 import java.util.*
 
 object AllocToPhi : FunctionPass {
-    override fun OptimizerContext.optimize(function: Function) {
+    override fun FunctionContext.optimize(function: Function) {
         val dom = domInfo()
         val variables = function.blocks
                 .flatMap { it.instructions.filterIsInstance<Alloc>() }

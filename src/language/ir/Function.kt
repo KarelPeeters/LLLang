@@ -33,6 +33,13 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
         block.setFunction(null)
     }
 
+    override fun delete() {
+        super.delete()
+        for (block in blocks) {
+            block.delete(true)
+        }
+    }
+
     fun fullStr(env: NameEnv): String {
         blocks.forEach { env.block(it) } //preset names to keep them ordered
 

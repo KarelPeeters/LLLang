@@ -3,17 +3,33 @@ package language.optimizer
 import language.ir.Function
 import language.ir.Program
 
-interface OptimizerContext {
+interface ProgramPass {
+    fun ProgramContext.optimize(program: Program)
+}
+
+interface ProgramContext {
+    fun changed()
+}
+
+interface FunctionPass {
+    fun FunctionContext.optimize(function: Function)
+}
+
+interface FunctionContext {
     fun instrChanged()
     fun graphChanged()
     fun domInfo(): DominatorInfo
 }
 
-interface FunctionPass {
-    fun OptimizerContext.optimize(function: Function)
+private class ProgramContextImpl(val program: Program) : ProgramContext {
+    var hasChanged = false
+
+    override fun changed() {
+        hasChanged = true
+    }
 }
 
-private class OptimizerContextImplt(val function: Function) : OptimizerContext {
+private class FunctionContextImpl(val function: Function) : FunctionContext {
     var hasChanged = false
     var domInfo: DominatorInfo? = null
 
@@ -35,8 +51,13 @@ private class OptimizerContextImplt(val function: Function) : OptimizerContext {
     }
 }
 
-class Optimizer(val verify: Boolean) {
-    private val passes: List<FunctionPass> = listOf(
+class Optimizer(var doVerify: Boolean = true) {
+    private val programPasses: List<ProgramPass> = listOf(
+            DeadFunctionElimination
+    )
+
+    private val functionPasses: List<FunctionPass> = listOf(
+            AllocToPhi,
             ConstantFolding,
             DeadInstructionElimination,
             SimplifyBlocks,
@@ -44,29 +65,44 @@ class Optimizer(val verify: Boolean) {
     )
 
     fun optimize(program: Program) {
-        for (function in program.functions) {
-            optimize(function)
+        fun verify(subject: Any?, pass: Any?) {
+            if (doVerify) {
+                try {
+                    program.verify()
+                } catch (e: Exception) {
+                    throw IllegalStateException("verify fail after pass $pass on $subject", e)
+                }
+            }
         }
-    }
 
-    fun optimize(function: Function) {
-        if (verify)
-            function.verify()
+        verify(null, null)
 
-        val context = OptimizerContextImplt(function)
-        AllocToPhi.apply { context.optimize(function) }
-
-        if (verify)
-            function.verify()
+        val programContext = ProgramContextImpl(program)
+        val functionContexts = program.functions.associate { it to FunctionContextImpl(it) }
 
         do {
-            context.hasChanged = false
-            for (pass in passes) {
-                pass.apply { context.optimize(function) }
-
-                if (verify)
-                    function.verify()
+            //program passes
+            for (pass in programPasses) {
+                pass.apply { programContext.optimize(program) }
+                verify(program, pass)
             }
-        } while (context.hasChanged)
+
+            //function passes
+            for (function in program.functions) {
+                val context = functionContexts.getValue(function)
+                for (pass in functionPasses) {
+                    pass.apply { context.optimize(function) }
+                    verify(function, pass)
+                }
+            }
+
+            //changed
+            var changed = programContext.hasChanged
+            programContext.hasChanged = false
+            for (context in functionContexts.values) {
+                changed = changed || context.hasChanged
+                context.hasChanged = false
+            }
+        } while (changed)
     }
 }

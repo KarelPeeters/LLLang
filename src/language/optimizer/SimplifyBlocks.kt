@@ -6,7 +6,7 @@ import language.ir.Phi
 import language.ir.Terminator
 
 object SimplifyBlocks : FunctionPass {
-    override fun OptimizerContext.optimize(function: Function) {
+    override fun FunctionContext.optimize(function: Function) {
         val iter = function.blocks.iterator()
 
         for (block in iter) {
