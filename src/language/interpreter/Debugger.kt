@@ -36,6 +36,8 @@ class Debugger(
 
     private val breakPoints = mutableSetOf<Instruction>()
 
+    private val out = StringBuilder()
+
     fun start() {
         reset()
         printInterface()
@@ -85,10 +87,10 @@ class Debugger(
                 reset()
                 printInterface()
             }
-            "f" -> println(renderFunction(frame.currFunction))
-            "p" -> println(renderProgram(program))
+            "f" -> out.appendln(renderFunction(frame.currFunction))
+            "p" -> out.appendln(renderProgram(program))
             "q" -> return false
-            else -> println(red("Unknown command '$cmd'"))
+            else -> out.appendln(red("Unknown command '$cmd'"))
         }
 
         return true
@@ -110,6 +112,7 @@ class Debugger(
     private fun done() = interpreter.isDone()
 
     private fun printInterface() {
+        out.append("\n\n\n\n\n\n")
         val env = prgmEnv.subEnv(frame.currFunction)
 
         val codeLines = renderCode(env)
@@ -128,11 +131,13 @@ class Debugger(
 
             codeLine.ansiPadEnd(codeWidth) + varLine.ansiPadEnd(varWidth) + stackLine
         }
-        println(result)
+        out.appendln(result)
     }
 
     private fun printPrompt() {
-        print(blue("dbg> "))
+        out.append(blue("dbg>") + " ")
+        print(out.toString())
+        out.clear()
     }
 
     private fun renderCode(env: NameEnv): List<String> = sequence<String> {
