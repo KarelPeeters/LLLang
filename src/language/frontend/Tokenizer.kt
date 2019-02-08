@@ -67,7 +67,7 @@ class Tokenizer(private val source: String) {
         //trivial match
         for (type in TokenType.values()) {
             val str = type.string ?: continue
-            if (startsWith(str)) {
+            if (at(str)) {
                 eat(str.length)
                 return Token(type, str, position)
             }
@@ -75,8 +75,8 @@ class Tokenizer(private val source: String) {
 
         //boolean
         when {
-            startsWithEat("true") -> return Token(TokenType.Boolean, "true", position)
-            startsWithEat("false") -> return Token(TokenType.Boolean, "false", position)
+            accept("true") -> return Token(TokenType.Boolean, "true", position)
+            accept("false") -> return Token(TokenType.Boolean, "false", position)
         }
 
         //number
@@ -105,17 +105,21 @@ class Tokenizer(private val source: String) {
         while (!reachedEOF()) {
             when {
                 first()!!.isWhitespace() -> eat()
-                startsWith("//") -> skipPast("\n", eofOk = true)
-                startsWith("/*") -> skipPast("*/", eofOk = false)
+                accept("//") -> skipPast("\n", eofOk = true)
+                accept("/*") -> skipPast("*/", eofOk = false)
                 else -> return
             }
         }
     }
 
     private fun skipPast(str: String, eofOk: Boolean) {
-        while (!startsWith(str)) {
-            if (reachedEOF() && eofOk)
-                return
+        while (!at(str)) {
+            if (reachedEOF()) {
+                if (eofOk)
+                    return
+                else
+                    throw TokenizeError("expected '$str', got EOF")
+            }
             eat()
         }
 
@@ -154,9 +158,9 @@ class Tokenizer(private val source: String) {
 
     private fun reachedEOF() = index > source.lastIndex
 
-    private fun startsWith(prefix: String) = source.regionMatches(index, prefix, 0, prefix.length)
+    private fun at(prefix: String) = source.regionMatches(index, prefix, 0, prefix.length)
 
-    private fun startsWithEat(prefix: String) = startsWith(prefix).also {
+    private fun accept(prefix: String) = at(prefix).also {
         if (it) eat(prefix.length)
     }
 }
