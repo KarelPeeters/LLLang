@@ -11,7 +11,10 @@ class Program : Value(UnitType) {
         functions.forEach { it.verify() }
     }
 
-    fun fullString() = functions.joinToString("\n\n") { it.fullStr(NameEnv()) }
+    fun fullString(prgmEnv: ProgramNameEnv) {
+        functions.forEach { prgmEnv.function(it) } //preset names to keep them ordered
+        functions.joinToString("\n\n") { it.fullStr(prgmEnv.subEnv(it)) }
+    }
 
     override fun str(env: NameEnv) = toString()
 }

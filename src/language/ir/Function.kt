@@ -35,16 +35,19 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
 
     fun fullStr(env: NameEnv): String {
         blocks.forEach { env.block(it) } //preset names to keep them ordered
+
+        val nameStr = env.function(this)
         val paramStr = parameters.joinToString { it.str(env) }
+        val returnStr = if (returnType == UnitType) "" else ": $returnType"
 
         return """
-            fun $name($paramStr): $returnType {
+            fun $nameStr($paramStr): $returnStr {
                 entry: ${entry.str(env)}
 
         """.trimIndent() + blocks.joinToString("\n\n    ", prefix = "    ") { it.fullStr(env).replace("\n", "\n    ") } + "\n}\n"
     }
 
-    override fun str(env: NameEnv) = name
+    override fun str(env: NameEnv) = env.function(this)
 }
 
 class ParameterValue(val name: String?, type: Type) : Value(type) {

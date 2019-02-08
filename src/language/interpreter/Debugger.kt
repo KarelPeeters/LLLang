@@ -6,6 +6,7 @@ import language.ir.Function
 import language.ir.Instruction
 import language.ir.NameEnv
 import language.ir.Program
+import language.ir.ProgramNameEnv
 import kotlin.math.max
 
 private const val ANSI_RESET = "\u001B[0m"
@@ -24,7 +25,10 @@ private fun green(str: String) = colored(str, GREEN)
 private fun blue(str: String) = colored(str, BLUE)
 private fun gray(str: String) = colored(str, GRAY)
 
-class Debugger(val program: Program) {
+class Debugger(
+        val program: Program,
+        val prgmEnv: ProgramNameEnv = ProgramNameEnv()
+) {
     private lateinit var interpreter: Interpreter
 
     private lateinit var state: State
@@ -81,8 +85,8 @@ class Debugger(val program: Program) {
                 reset()
                 printInterface()
             }
-            "f" -> println(renderFunction(frame.currFunction, NameEnv()))
-            "p" -> println(renderProgram(program, NameEnv()))
+            "f" -> println(renderFunction(frame.currFunction))
+            "p" -> println(renderProgram(program))
             "q" -> return false
             else -> println(red("Unknown command '$cmd'"))
         }
@@ -106,7 +110,7 @@ class Debugger(val program: Program) {
     private fun done() = interpreter.isDone()
 
     private fun printInterface() {
-        val env = NameEnv()
+        val env = prgmEnv.subEnv(frame.currFunction)
 
         val codeLines = renderCode(env)
         val varLines = renderVariables(env)
@@ -157,13 +161,14 @@ class Debugger(val program: Program) {
         "$func:$block:$instr"
     }
 
-    private fun renderProgram(program: Program, env: NameEnv): String =
+    private fun renderProgram(program: Program): String =
             program.functions.joinToString("\n") {
-                renderFunction(it, NameEnv())
+                renderFunction(it)
             }
 
-    private fun renderFunction(function: Function, env: NameEnv): String = buildString {
+    private fun renderFunction(function: Function): String = buildString {
         with(function) {
+            val env = prgmEnv.subEnv(function)
             val color = if (function == frame.currFunction) WHITE else GRAY
 
             val paramStr = parameters.joinToString { it.str(env) }
