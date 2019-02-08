@@ -15,6 +15,8 @@ sealed class Instruction constructor(val name: String?, type: Type, val pure: Bo
         block.remove(this)
     }
 
+    abstract fun clone(): Instruction
+
     override fun str(env: NameEnv) = "%${env.value(this)} $type"
 
     abstract fun fullStr(env: NameEnv): String
@@ -23,12 +25,16 @@ sealed class Instruction constructor(val name: String?, type: Type, val pure: Bo
 class Alloc(name: String?, val inner: Type) : Instruction(name, inner.pointer, true) {
     override fun fullStr(env: NameEnv) = "${str(env)} = alloc $inner"
 
+    override fun clone() = Alloc(name, inner)
+
     override fun verify() {}
 }
 
 class Store(pointer: Value, value: Value) : Instruction(null, UnitType, false) {
     var pointer by operand(pointer)
     var value by operand(value)
+
+    override fun clone() = Store(pointer, value)
 
     override fun verify() {
         require(pointer.type.unpoint == value.type) { "pointer type must be pointer to value type" }
@@ -39,6 +45,8 @@ class Store(pointer: Value, value: Value) : Instruction(null, UnitType, false) {
 
 class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoint!!, true) {
     var pointer by operand(pointer)
+
+    override fun clone() = Load(name, pointer)
 
     override fun verify() {
         require(pointer.type.unpoint == this.type) { "pointer type must be pointer to load type" }
@@ -52,6 +60,8 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
     var left by operand(left)
     var right by operand(right)
 
+    override fun clone() = BinaryOp(name, opType, left, right)
+
     override fun verify() {
         require(opType.returnType(left.type, right.type) == this.type) { "left and right types must result in binaryOp type" }
     }
@@ -62,6 +72,8 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
 class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
         Instruction(name, value.type, true) {
     var value by operand(value)
+
+    override fun clone() = UnaryOp(name, opType, value)
 
     override fun verify() {
         require(value.type == this.type) { "value type must be unaryOp type" }
@@ -76,6 +88,13 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
 
     override val operands: List<Value>
         get() = sources.values.toList()
+
+    override fun clone(): Phi {
+        val new = Phi(name, type)
+        for ((block, value) in this.sources)
+            new.set(block, value)
+        return new
+    }
 
     override fun verify() {
         require(sources.keys == block.predecessors().toSet()) { "must have source for every block predecessor" }
@@ -131,6 +150,8 @@ class Eat : Instruction(null, UnitType, false) {
     private val _operands = mutableListOf<Value>()
     override val operands: List<Value> = _operands
 
+    override fun clone() = Eat()
+
     override fun verify() {}
 
     fun addOperand(value: Value) {
@@ -162,6 +183,8 @@ class Eat : Instruction(null, UnitType, false) {
 class Blur(value: Value) : Instruction(null, value.type, false) {
     val value by operand(value)
 
+    override fun clone() = Blur(value)
+
     override fun verify() {
         require(value.type == this.type) { "value type must be blur type" }
     }
@@ -179,6 +202,8 @@ class Call(name: String?, function: Function, arguments: List<Value>) : Instruct
             arg.users += this
         }
     }
+
+    override fun clone() = Call(name, function, arguments.toList())
 
     override fun verify() {
         require(function.parameters.size == arguments.size)
@@ -218,6 +243,8 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
     var ifTrue by operand<BasicBlock>(ifTrue)
     var ifFalse by operand<BasicBlock>(ifFalse)
 
+    override fun clone() = Branch(value, ifTrue, ifFalse)
+
     override fun verify() {
         require(value.type == bool) { "branch conditional must be a boolean" }
     }
@@ -229,13 +256,17 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
 class Jump(target: BasicBlock?) : Terminator() {
     var target by operand<BasicBlock>(target)
 
+    override fun clone() = Jump(target)
+
     override fun verify() {}
 
     override fun targets() = setOf(target)
     override fun fullStr(env: NameEnv) = "jump ${target.str(env)}"
 }
 
-object Exit : Terminator() {
+class Exit : Terminator() {
+    override fun clone() = Exit()
+
     override fun verify() {}
 
     override fun targets() = setOf<BasicBlock>()
@@ -244,6 +275,8 @@ object Exit : Terminator() {
 
 class Return(value: Value) : Terminator() {
     var value by operand(value)
+
+    override fun clone() = Return(value)
 
     override fun verify() {}
 

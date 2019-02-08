@@ -11,6 +11,40 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
         }
     }
 
+    fun deepClone(): Function {
+        val newFunc = Function(this.name, this.parameters.map { it.name to it.type }, this.returnType)
+        val paramMap = this.parameters.zip(newFunc.parameters).toMap()
+
+        //shallow clone, keep mappings old -> new
+        val instrMap = mutableMapOf<Instruction, Instruction>()
+        val blockMap = blocks.associate { oldBlock ->
+            val newBlock = BasicBlock(oldBlock.name)
+            for (instr in oldBlock.instructions) {
+                val newInstr = instr.clone()
+                instrMap[instr] = newInstr
+
+                if (newInstr is Terminator)
+                    newBlock.terminator = newInstr
+                else
+                    newBlock.append(newInstr)
+            }
+            oldBlock to newBlock
+        }
+
+        //replace instructions and blocks
+        val replaceMap = paramMap + instrMap + blockMap
+        for (node in instrMap.values + blockMap.values) {
+            for ((old, new) in replaceMap)
+                node.replaceOperand(old, new)
+        }
+
+        //finish new function
+        for (block in blockMap.values)
+            newFunc.append(block)
+        newFunc.entry = blockMap.getValue(this.entry)
+        return newFunc
+    }
+
     override fun verify() {
         require(entry in blocks) { "entry must be one of the blocks" }
         require(blocks.all { it.function == this }) { "block.function must be this function" }
