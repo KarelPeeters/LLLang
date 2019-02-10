@@ -7,14 +7,19 @@ object DeadFunctionElimination : ProgramPass {
     override fun ProgramContext.optimize(program: Program) {
         val used = object : Graph<Function> {
             override val roots = setOf(program.entry)
-            override fun children(node: Function) =
-                    node.blocks.flatMap { it.instructions.flatMap { it.operands } }.filterIsInstance<Function>()
+            override fun children(node: Function) = node.blocks
+                    .flatMap { f -> f.instructions.flatMap { i -> i.operands } }
+                    .filterIsInstance<Function>()
         }.reached()
 
-        for (func in program.functions.toList()) {
+        val iter = program.functions.iterator()
+        for (func in iter) {
             if (func !in used) {
-                func.delete()
-                program.functions -= func
+                require(func.users.isEmpty())
+
+                func.deepDelete()
+                iter.remove()
+                changed()
             }
         }
     }

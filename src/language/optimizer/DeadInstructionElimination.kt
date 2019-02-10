@@ -11,9 +11,11 @@ object DeadInstructionElimination : FunctionPass {
         }.reached()
 
         for (block in function.blocks) {
-            for (instr in block.instructions.toList()) {
+            val iter = block.instructions.iterator()
+            for (instr in iter) {
                 if (instr !in used) {
-                    instr.deleteFromBlock()
+                    instr.delete()
+                    iter.remove()
                     instrChanged()
                 }
             }

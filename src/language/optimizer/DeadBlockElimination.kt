@@ -20,8 +20,8 @@ object DeadBlockElimination : FunctionPass {
                     user.remove(block)
                 }
 
+                block.deepDelete()
                 iter.remove()
-                block.delete(true)
                 graphChanged()
             }
         }

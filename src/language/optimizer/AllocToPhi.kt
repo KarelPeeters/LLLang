@@ -103,6 +103,6 @@ object AllocToPhi : FunctionPass {
             }
         }
     }
-}
 
-class NoValueFoundException : Exception()
+    class NoValueFoundException : Exception()
+}

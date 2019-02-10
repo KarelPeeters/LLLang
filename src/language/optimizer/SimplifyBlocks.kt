@@ -37,7 +37,7 @@ object SimplifyBlocks : FunctionPass {
                 block.users.toList().forEach {
                     (it as Phi).replaceOperand(block, pred)
                 }
-                block.delete()
+                block.shallowDelete()
                 iter.remove()
             }
         }

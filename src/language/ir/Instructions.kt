@@ -10,9 +10,12 @@ sealed class Instruction constructor(val name: String?, type: Type, val pure: Bo
         this._block = block
     }
 
+    /** Instructions don't contain any nested structures, so "shallow" is a confusing name */
+    fun delete() = shallowDelete()
+
     fun deleteFromBlock() {
-        this.delete()
         block.remove(this)
+        delete()
     }
 
     abstract fun clone(): Instruction
@@ -118,7 +121,8 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
             prev.users -= this
     }
 
-    override fun delete() {
+    override fun shallowDelete() {
+        super.shallowDelete()
         (sources.keys + sources.values).forEach { it.users -= this }
     }
 
@@ -166,7 +170,8 @@ class Eat : Instruction(null, UnitType, false) {
         value.users -= this
     }
 
-    override fun delete() {
+    override fun shallowDelete() {
+        super.shallowDelete()
         operands.forEach { it.users -= this }
         _operands.clear()
     }

@@ -17,7 +17,10 @@ abstract class Node {
             return emptyList()
         }
 
-    open fun delete() {
+    /**
+     * Shallow delete this Node: _only_ remove this Node as user of its operands
+     */
+    open fun shallowDelete() {
         operandList?.apply { delete() }
     }
 

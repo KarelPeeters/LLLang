@@ -85,7 +85,7 @@ class Flattener {
                             resolveType(toplevel.retType, UnitType)
                     )
                     functions[toplevel.name] = irFunction
-                    program.functions += irFunction
+                    program.addFunction(irFunction)
                     if (irFunction.name == "main")
                         program.entry = irFunction
                 }

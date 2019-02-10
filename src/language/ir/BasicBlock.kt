@@ -58,11 +58,9 @@ class BasicBlock(val name: String?) : Value(BlockType) {
         instruction.setBlock(null)
     }
 
-    fun delete(contents: Boolean = false) {
-        super.delete()
-
-        if (contents)
-            instructions.forEach { it.delete() }
+    fun deepDelete() {
+        instructions.forEach { it.delete() }
+        shallowDelete()
     }
 
     fun successors() = terminator.targets()

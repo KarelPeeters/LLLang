@@ -11,6 +11,13 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
         }
     }
 
+    private var _program: Program? = null
+    val program get() = _program!!
+
+    fun setProgram(program: Program?) {
+        this._program = program
+    }
+
     fun deepClone(): Function {
         val newFunc = Function(this.name, this.parameters.map { it.name to it.type }, this.returnType)
         val paramMap = this.parameters.zip(newFunc.parameters).toMap()
@@ -67,11 +74,10 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
         block.setFunction(null)
     }
 
-    override fun delete() {
-        super.delete()
-        for (block in blocks) {
-            block.delete(true)
-        }
+    fun deepDelete() {
+        for (block in blocks)
+            block.deepDelete()
+        shallowDelete()
     }
 
     fun fullStr(env: NameEnv): String {
