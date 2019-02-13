@@ -25,20 +25,23 @@ object SimplifyBlocks : FunctionPass {
 
             //move code into only pred block
             val preds = block.predecessors()
-            if (block != function.entry && preds.size == 1 && preds.first().terminator is Jump) {
+            if (block != function.entry && preds.size == 1) {
                 val pred = preds.first()
+                val predTerm = pred.terminator
 
-                for (instr in block.instructions.dropLast(1)) {
-                    pred.append(instr)
-                }
-                pred.terminator.delete()
-                pred.terminator = block.terminator
+                if (pred != block && predTerm is Jump) {
+                    for (instr in block.instructions.dropLast(1)) {
+                        pred.append(instr)
+                    }
+                    pred.terminator.delete()
+                    pred.terminator = block.terminator
 
-                block.users.toList().forEach {
-                    (it as Phi).replaceOperand(block, pred)
+                    block.users.toList().forEach {
+                        (it as Phi).replaceOperand(block, pred)
+                    }
+                    block.shallowDelete()
+                    iter.remove()
                 }
-                block.shallowDelete()
-                iter.remove()
             }
         }
     }

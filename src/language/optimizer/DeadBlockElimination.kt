@@ -3,6 +3,7 @@ package language.optimizer
 import language.ir.BasicBlock
 import language.ir.Function
 import language.ir.Phi
+import language.ir.Terminator
 
 
 object DeadBlockElimination : FunctionPass {
@@ -16,8 +17,11 @@ object DeadBlockElimination : FunctionPass {
         for (block in iter) {
             if (block !in used) {
                 for (user in block.users) {
-                    require(user is Phi)
-                    user.remove(block)
+                    //dead blocks can only be used in phi nodes or in terminators of other dead blocks
+                    if (user is Phi)
+                        user.remove(block)
+                    else
+                        require(user is Terminator && user.block !in used)
                 }
 
                 block.deepDelete()
