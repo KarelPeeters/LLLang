@@ -1,5 +1,6 @@
 package language.ir
 
+import language.util.replace
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
@@ -53,9 +54,10 @@ abstract class Node {
         }
 
         fun replaceOperand(from: Value, to: Value) {
-            operands.replaceAll { if (it == from) to else it }
-            from.users -= this@Node
-            to.users += this@Node
+            if (operands.replace(from, to)) {
+                from.users -= this@Node
+                to.users += this@Node
+            }
         }
 
         fun getOperand(index: Int): Value = operands[index]!!

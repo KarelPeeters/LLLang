@@ -1,6 +1,6 @@
 package language.ir
 
-class Program : Value(UnitType) {
+class Program : Node() {
     var entry by operand<Function>(null)
     val functions = mutableListOf<Function>()
 
@@ -18,13 +18,14 @@ class Program : Value(UnitType) {
         require(entry in functions) { "entry must be one of the functions" }
         require(entry.parameters.isEmpty()) { "entry must be a parameterless function" }
 
-        functions.forEach { it.verify() }
+        functions.forEach {
+            require(it.program == this)
+            it.verify()
+        }
     }
 
-    fun fullString(prgmEnv: ProgramNameEnv) {
+    fun fullString(prgmEnv: ProgramNameEnv): String {
         functions.forEach { prgmEnv.function(it) } //preset names to keep them ordered
-        functions.joinToString("\n\n") { it.fullStr(prgmEnv.subEnv(it)) }
+        return functions.joinToString("\n\n") { it.fullStr(prgmEnv.subEnv(it)) }
     }
-
-    override fun str(env: NameEnv) = toString()
 }

@@ -1,6 +1,8 @@
 package language.ir
 
 import language.ir.IntegerType.Companion.bool
+import language.util.replace
+import language.util.replaceValues
 
 sealed class Instruction constructor(val name: String?, type: Type, val pure: Boolean) : Value(type) {
     private var _block: BasicBlock? = null
@@ -127,19 +129,26 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
     }
 
     override fun replaceOperand(from: Value, to: Value) {
-        _sources.replaceAll { _, v -> if (v == from) to else v }
+        var changed = _sources.replaceValues(from, to)
 
-        if (from is BasicBlock && to is BasicBlock && _sources.containsKey(from)) {
-            if (_sources.containsKey(to)) {
-                require(_sources[to] == sources[from])
+        if (from is BasicBlock) {
+            require(to is BasicBlock)
+
+            if (_sources.containsKey(from)) {
+                //if to is already a source assert they're the same value
+                if (_sources.containsKey(to))
+                    require(_sources[to] == sources[from])
+
+                _sources[to] = _sources.getValue(from)
+                _sources.remove(from)
+                changed = true
             }
-
-            _sources[to] = _sources.getValue(from)
-            _sources.remove(from)
         }
 
-        from.users -= this
-        to.users += this
+        if (changed) {
+            from.users -= this
+            to.users += this
+        }
     }
 
     override fun fullStr(env: NameEnv): String {
@@ -177,9 +186,11 @@ class Eat : Instruction(null, UnitType, false) {
     }
 
     override fun replaceOperand(from: Value, to: Value) {
-        _operands.replaceAll { if (it == from) to else it }
-        from.users -= this
-        to.users += this
+        super.replaceOperand(from, to)
+        if (_operands.replace(from, to)) {
+            from.users -= this
+            to.users += this
+        }
     }
 
     override fun fullStr(env: NameEnv) = "eat " + operands.joinToString { it.str(env) }
@@ -225,10 +236,11 @@ class Call(name: String?, function: Function, arguments: List<Value>) : Instruct
     }
 
     override fun replaceOperand(from: Value, to: Value) {
-        _arguments.replaceAll { if (it == from) to else it }
-        from.users -= this
-        to.users += this
         super.replaceOperand(from, to)
+        if (_arguments.replace(from, to)) {
+            from.users -= this
+            to.users += this
+        }
     }
 
     override val operands: List<Value>

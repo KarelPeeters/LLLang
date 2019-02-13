@@ -5,12 +5,6 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
     val parameters = parameters.map { (name, type) -> ParameterValue(name, type) }
     val blocks = mutableListOf<BasicBlock>()
 
-    init {
-        for (param in this.parameters) {
-            param.users += this
-        }
-    }
-
     private var _program: Program? = null
     val program get() = _program!!
 
@@ -59,9 +53,8 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
             val term = block.terminator
             if (term is Return)
                 require(term.value.type == returnType) { "return type must match, ${term.value.type} != $returnType" }
+            block.verify()
         }
-
-        blocks.forEach { it.verify() }
     }
 
     fun append(block: BasicBlock) {

@@ -40,6 +40,12 @@ class BasicBlock(val name: String?) : Value(BlockType) {
         instruction.setBlock(this)
     }
 
+    fun appendOrReplaceTerminator(instruction: Instruction) {
+        if (instruction is Terminator)
+            terminator = instruction
+        else append(instruction)
+    }
+
     fun append(instruction: Instruction) {
         require(instruction !is Terminator)
 
@@ -52,8 +58,6 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     }
 
     fun remove(instruction: Instruction) {
-        require(instruction !is Terminator)
-
         require(this.instructions.remove(instruction))
         instruction.setBlock(null)
     }

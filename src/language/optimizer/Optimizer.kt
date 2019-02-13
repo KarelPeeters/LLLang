@@ -53,7 +53,8 @@ private class FunctionContextImpl(val function: Function) : FunctionContext {
 
 class Optimizer(var doVerify: Boolean = true) {
     private val programPasses: List<ProgramPass> = listOf(
-            DeadFunctionElimination
+            DeadFunctionElimination,
+            FunctionInlining
     )
 
     private val functionPasses: List<FunctionPass> = listOf(
