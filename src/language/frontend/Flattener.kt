@@ -67,7 +67,7 @@ class Flattener {
     var functions = mutableMapOf<String, IrFunction>()
     private lateinit var currentFunction: IrFunction
     private val allocs = mutableListOf<Alloc>()
-    private val loopBlockStack = LinkedList<LoopBlocks>()
+    private val loopBlockStack = ArrayDeque<LoopBlocks>()
 
     fun newBlock(name: String? = null) = BasicBlock(name).also { currentFunction.append(it) }
 

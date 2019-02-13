@@ -26,7 +26,7 @@ object AllocToPhi : FunctionPass {
             val loads = variable.users.filterIsInstance<Load>()
 
             //insert phi nodes
-            val toVisit = stores.mapTo(LinkedList()) { it.block }
+            val toVisit = stores.mapTo(ArrayDeque()) { it.block }
             val phis = mutableMapOf<BasicBlock, Phi>()
 
             while (toVisit.isNotEmpty()) {

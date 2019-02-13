@@ -224,7 +224,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     }
 
     private fun prefix(): Expression {
-        val ops = LinkedList<Pair<UnaryOpType, SourcePosition>>()
+        val ops = ArrayDeque<Pair<UnaryOpType, SourcePosition>>()
         loop@ while (true) {
             val pos = currentPosition
             val type = when {
