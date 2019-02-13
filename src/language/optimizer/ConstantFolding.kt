@@ -12,66 +12,77 @@ import java.util.*
 
 object ConstantFolding : FunctionPass {
     override fun FunctionContext.optimize(function: Function) {
-        val toVisit: Queue<Instruction> = ArrayDeque(function.blocks.flatMap { it.instructions })
+        val toVisit = ArrayDeque<Instruction>()
+        function.blocks.flatMapTo(toVisit) { it.instructions }
 
         while (toVisit.isNotEmpty()) {
             val curr = toVisit.poll()
+            val visitUsers = visit(curr)
 
-            when (curr) {
-                is BinaryOp -> {
-                    val left = curr.left
-                    val right = curr.right
-
-                    if (left is Constant && right is Constant) {
-                        instrChanged()
-
-                        val result = curr.opType.calculate(left, right)
-                        curr.replaceWith(result)
-                        curr.deleteFromBlock()
-                    }
-                }
-                is UnaryOp -> {
-                    val value = curr.value
-                    if (value is Constant) {
-                        instrChanged()
-
-                        val result = curr.opType.calculate(value)
-                        curr.replaceWith(result)
-                        curr.deleteFromBlock()
-                    }
-                }
-                is Branch -> {
-                    val value = curr.value
-
-                    val target = when {
-                        value is Constant -> when (value.value) {
-                            0 -> curr.ifFalse
-                            1 -> curr.ifTrue
-                            else -> throw IllegalStateException()
-                        }
-                        curr.ifTrue == curr.ifFalse -> curr.ifTrue
-                        else -> null
-                    }
-
-                    if (target != null) {
-                        graphChanged()
-
-                        curr.block.terminator = Jump(target)
-                        curr.delete()
-                    }
-                }
-                is Phi -> {
-                    if (curr.sources.size == 1 || curr.sources.values.distinct().size == 1) {
-                        instrChanged()
-
-                        val value = curr.sources.values.iterator().next()
-
-                        curr.replaceWith(value)
-                        curr.deleteFromBlock()
-                    }
-                }
-                else -> Unit
-            }
+            if (visitUsers)
+                toVisit.addAll(curr.users.filterIsInstance<Instruction>())
         }
+    }
+
+    private fun FunctionContext.visit(instr: Instruction): Boolean {
+        when (instr) {
+            is BinaryOp -> {
+                val left = instr.left
+                val right = instr.right
+
+                if (left is Constant && right is Constant) {
+                    val result = instr.opType.calculate(left, right)
+                    instr.replaceWith(result)
+                    instr.deleteFromBlock()
+
+                    instrChanged()
+                    return true
+                }
+            }
+            is UnaryOp -> {
+                val value = instr.value
+                if (value is Constant) {
+                    val result = instr.opType.calculate(value)
+                    instr.replaceWith(result)
+                    instr.deleteFromBlock()
+
+                    instrChanged()
+                    return true
+                }
+            }
+            is Branch -> {
+                val value = instr.value
+
+                val target = when {
+                    value is Constant -> when (value.value) {
+                        0 -> instr.ifFalse
+                        1 -> instr.ifTrue
+                        else -> throw IllegalStateException()
+                    }
+                    instr.ifTrue == instr.ifFalse -> instr.ifTrue
+                    else -> null
+                }
+
+                if (target != null) {
+                    instr.block.terminator = Jump(target)
+                    instr.delete()
+
+                    graphChanged()
+                }
+            }
+            is Phi -> {
+                if (instr.sources.size == 1 || instr.sources.values.distinct().size == 1) {
+                    val value = instr.sources.values.iterator().next()
+                    instr.replaceWith(value)
+                    instr.deleteFromBlock()
+
+                    instrChanged()
+                    return true
+                }
+            }
+            else -> Unit
+        }
+
+        return false
     }
 }
