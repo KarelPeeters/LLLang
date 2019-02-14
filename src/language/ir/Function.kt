@@ -23,11 +23,7 @@ class Function(val name: String, parameters: List<Pair<String?, Type>>, val retu
             for (instr in oldBlock.instructions) {
                 val newInstr = instr.clone()
                 instrMap[instr] = newInstr
-
-                if (newInstr is Terminator)
-                    newBlock.terminator = newInstr
-                else
-                    newBlock.append(newInstr)
+                newBlock.appendOrReplaceTerminator(newInstr)
             }
             oldBlock to newBlock
         }

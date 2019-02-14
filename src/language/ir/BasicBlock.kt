@@ -43,7 +43,8 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     fun appendOrReplaceTerminator(instruction: Instruction) {
         if (instruction is Terminator)
             terminator = instruction
-        else append(instruction)
+        else
+            append(instruction)
     }
 
     fun append(instruction: Instruction) {
