@@ -136,10 +136,8 @@ class Interpreter(val program: Program) {
                         values.getInst(instr.sources.getValue(prevBlock!!))
                     }
                     is Eat -> {
-                        print("eat")
                         for (operand in instr.operands)
-                            print(" " + values.getInst(operand).shortString())
-                        println()
+                            values.getInst(operand)
                         null
                     }
                     is Blur -> {
