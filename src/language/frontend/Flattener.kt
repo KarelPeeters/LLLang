@@ -113,12 +113,24 @@ class Flattener {
 
         val entry = newBlock("entry")
         irFunction.entry = entry
-        val end = entry.appendNestedBlock(bodyScope, function.block)
-        if (end != null) {
-            if (irFunction.returnType != UnitType)
-                throw MissingReturnStatement(function)
-            end.terminator = Return(UnitValue)
+
+        val body = function.body
+        when (body) {
+            is Function.FunctionBody.Block -> {
+                val end = entry.appendNestedBlock(bodyScope, body.block)
+                if (end != null) {
+                    if (irFunction.returnType != UnitType)
+                        throw MissingReturnStatement(function)
+                    end.terminator = Return(UnitValue)
+                }
+            }
+            is Function.FunctionBody.Expr -> {
+                val (end, value) = entry.appendExpression(bodyScope, body.exp)
+                requireTypeMatch(body.exp.position, irFunction.returnType, value.type)
+                end.terminator = Return(value)
+            }
         }
+
         allocs.asReversed().forEach { entry.insertAt(0, it) }
     }
 

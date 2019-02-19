@@ -27,14 +27,25 @@ class Function(
         val name: String,
         val parameters: List<Parameter>,
         val retType: TypeAnnotation?,
-        val block: CodeBlock
+        val body: FunctionBody
 ) : TopLevel(position) {
     override fun ASTRenderer.render() {
         print("fun $name(${parameters.joinToString { it.toString() }})")
         if (retType != null)
             print(": $retType")
         print(" ")
-        print(block)
+        when (body) {
+            is FunctionBody.Block -> print(body.block)
+            is FunctionBody.Expr -> {
+                print("= ")
+                print(body.exp)
+            }
+        }
+    }
+
+    sealed class FunctionBody {
+        class Block(val block: CodeBlock) : FunctionBody()
+        class Expr(val exp: Expression) : FunctionBody()
     }
 }
 

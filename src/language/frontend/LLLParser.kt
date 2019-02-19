@@ -37,8 +37,12 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         }
         val ret = if (accept(Colon)) type() else null
 
-        expect(OpenC)
-        val content = block(CloseC)
+        val content = when {
+            accept(OpenC) -> Function.FunctionBody.Block(block(CloseC))
+            accept(Assign) -> Function.FunctionBody.Expr(expression())
+            else -> unexpected()
+        }
+
         return Function(pos, name, parameters, ret, content)
     }
 
