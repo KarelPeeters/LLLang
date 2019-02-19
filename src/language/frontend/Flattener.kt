@@ -26,22 +26,24 @@ import language.ir.UnaryOp as IrUnaryOp
 
 sealed class Variable(val name: String) {
     abstract val type: Type
-    abstract fun loadValue(block: BasicBlock): Value
-    abstract fun storeValue(block: BasicBlock, value: Value)
+    abstract fun loadValue(pos: SourcePosition, block: BasicBlock): Value
+    abstract fun storeValue(pos: SourcePosition, block: BasicBlock, value: Value)
 
-    class Memory(name: String, val pointer: Value) : Variable(name) {
+    class Memory(name: String, val pointer: Value, val mutable: Boolean) : Variable(name) {
         override val type = pointer.type.unpoint!!
-        override fun loadValue(block: BasicBlock) = Load(name, pointer).also { block.append(it) }
-        override fun storeValue(block: BasicBlock, value: Value) {
+        override fun loadValue(pos: SourcePosition, block: BasicBlock) = Load(name, pointer).also { block.append(it) }
+        override fun storeValue(pos: SourcePosition, block: BasicBlock, value: Value) {
+            if (!mutable)
+                throw VariableImmutableException(pos, name)
             block.append(Store(pointer, value))
         }
     }
 
     class Parameter(name: String, val value: Value) : Variable(name) {
         override val type = value.type
-        override fun loadValue(block: BasicBlock) = value
-        override fun storeValue(block: BasicBlock, value: Value) =
-                throw ParameterValueImmutableException(name)
+        override fun loadValue(pos: SourcePosition, block: BasicBlock) = value
+        override fun storeValue(pos: SourcePosition, block: BasicBlock, value: Value) =
+                throw VariableImmutableException(pos, name)
     }
 }
 
@@ -148,12 +150,12 @@ class Flattener {
             val alloc = Alloc(stmt.identifier, type)
             allocs += alloc
 
-            val variable = Variable.Memory(stmt.identifier, alloc)
+            val variable = Variable.Memory(stmt.identifier, alloc, stmt.mutable)
             scope.register(stmt.position, variable)
 
             val (next, value) = appendExpression(scope, stmt.value)
             requireTypeMatch(stmt.position, type, value.type)
-            variable.storeValue(next, value)
+            variable.storeValue(stmt.position, next, value)
             next
         }
         is CodeBlock -> appendNestedBlock(scope, stmt)
@@ -228,16 +230,17 @@ class Flattener {
         is IdentifierExpression -> {
             val variable = scope.find(exp.identifier)
                            ?: throw IdNotFoundException(exp.position, exp.identifier)
-            this to variable.loadValue(this)
+            this to variable.loadValue(exp.position, this)
         }
         is Assignment -> {
             if (exp.target !is IdentifierExpression) TODO("other target types")
+
             val assignTarget = scope.find(exp.target.identifier)
                                ?: throw IdNotFoundException(exp.target.position, exp.target.identifier)
             val (next, value) = appendExpression(scope, exp.value)
             requireTypeMatch(exp.position, assignTarget.type, value.type)
 
-            assignTarget.storeValue(next, value)
+            assignTarget.storeValue(exp.target.position, next, value)
             next to value
         }
         is BinaryOp -> {
@@ -318,8 +321,8 @@ class DuplicateDeclarationException(pos: SourcePosition, identifier: String)
 class IllegalTypeException(type: TypeAnnotation)
     : Exception("${type.position}: Illegal type '${type.str}'")
 
-class ParameterValueImmutableException(name: String)
-    : Exception("Can't mutate parameter '$name'")
+class VariableImmutableException(pos: SourcePosition, name: String)
+    : Exception("Can't mutate variable '$name' at $pos")
 
 class MissingReturnStatement(function: Function)
     : Exception("Function ${function.name} at ${function.position} missing return statement")

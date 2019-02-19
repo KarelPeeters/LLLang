@@ -207,11 +207,13 @@ class ContinueStatement(
 class Declaration(
         position: SourcePosition,
         val identifier: String,
+        val mutable: Boolean,
         val type: TypeAnnotation?,
         val value: Expression
 ) : Statement(position) {
     override fun ASTRenderer.render() {
-        print("var $identifier")
+        print(if (mutable) "var" else "val")
+        print(" $identifier")
         if (type != null) print(": ${type.str}")
         print(" = "); print(value)
     }

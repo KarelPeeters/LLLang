@@ -66,7 +66,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
             accept(Break) -> BreakStatement(currentPosition)
             accept(Continue) -> ContinueStatement(currentPosition)
             accept(Return) -> returnStatement()
-            at(Var) -> declaration()
+            at(Var) || at(Val) -> declaration()
             at(OpenC) -> return containedBlock()
             else -> expression()
         }.also { expect(Semi) }
@@ -74,13 +74,17 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
 
     private fun declaration(): Statement {
         val pos = currentPosition
-        expect(Var)
+        val mutable = when {
+            accept(Var) -> true
+            accept(Val) -> false
+            else -> unexpected()
+        }
         val identifier = expect(Id).text
         val type = if (accept(Colon)) type() else null
         expect(Assign)
         val value = expression()
 
-        return Declaration(pos, identifier, type, value)
+        return Declaration(pos, identifier, mutable, type, value)
     }
 
     private fun returnStatement(): Statement = when {
