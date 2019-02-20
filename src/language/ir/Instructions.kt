@@ -12,12 +12,9 @@ sealed class Instruction constructor(val name: String?, type: Type, val pure: Bo
         this._block = block
     }
 
-    /** Instructions don't contain any nested structures, so "shallow" is a confusing name */
-    fun delete() = shallowDelete()
-
     fun deleteFromBlock() {
         block.remove(this)
-        delete()
+        shallowDelete()
     }
 
     abstract fun clone(): Instruction
@@ -168,15 +165,20 @@ class Eat : Instruction(null, UnitType, false) {
     override fun verify() {}
 
     fun addOperand(value: Value) {
-        if (value !in _operands) {
-            _operands += value
+        _operands += value
+        value.users += this
+    }
+
+    fun addOperands(values: List<Value>) {
+        _operands.addAll(values)
+        for (value in values)
             value.users += this
-        }
     }
 
     fun removeOperand(value: Value) {
         _operands.remove(value)
-        value.users -= this
+        if (value !in _operands)
+            value.users -= this
     }
 
     override fun shallowDelete() {
@@ -208,8 +210,9 @@ class Blur(value: Value) : Instruction(null, value.type, false) {
     override fun fullStr(env: NameEnv) = "${str(env)} = blur ${value.str(env)}"
 }
 
-class Call(name: String?, function: Function, arguments: List<Value>) : Instruction(name, function.returnType, false) {
-    val function by operand<Function>(function)
+class Call(name: String?, target: Value, arguments: List<Value>)
+    : Instruction(name, (target.type as FunctionType).returnType, false) {
+    val target by operand(target)
     private val _arguments = arguments.toMutableList()
     val arguments: List<Value> = _arguments
 
@@ -219,17 +222,18 @@ class Call(name: String?, function: Function, arguments: List<Value>) : Instruct
         }
     }
 
-    override fun clone() = Call(name, function, arguments.toList())
+    override fun clone() = Call(name, target, arguments.toList())
 
     override fun verify() {
-        require(function.parameters.size == arguments.size)
-        require(function.parameters.zip(arguments).all { (x, y) -> x.type == y.type })
+        val funcType = target.type
+        require(funcType is FunctionType) { "target must be a function" }
+        require(funcType.paramTypes.size == arguments.size) { "parameter sizes must match" }
+        require(funcType.paramTypes.zip(arguments).all { (x, y) -> x == y.type }) { "parameter types must match" }
+        require(funcType.returnType == this.type) { "return type must match" }
     }
 
     fun setArgument(i: Int, value: Value) {
-        val prev = _arguments[i]
-        _arguments[i] = value
-
+        val prev = _arguments.set(i, value)
         value.users += this
         if (prev !in _arguments)
             prev.users -= this
@@ -243,11 +247,18 @@ class Call(name: String?, function: Function, arguments: List<Value>) : Instruct
         }
     }
 
+    override fun shallowDelete() {
+        super.shallowDelete()
+        for (arg in _arguments)
+            arg.users -= this
+        _arguments.clear()
+    }
+
     override val operands: List<Value>
         get() = super.operands + arguments
 
     override fun fullStr(env: NameEnv): String {
-        return "${str(env)} = call ${function.str(env)}(${_arguments.joinToString { it.str(env) }})"
+        return "${str(env)} = call ${target.str(env)}(${_arguments.joinToString { it.str(env) }})"
     }
 }
 

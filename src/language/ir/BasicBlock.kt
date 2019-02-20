@@ -64,7 +64,7 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     }
 
     fun deepDelete() {
-        instructions.forEach { it.delete() }
+        instructions.forEach { it.shallowDelete() }
         shallowDelete()
     }
 

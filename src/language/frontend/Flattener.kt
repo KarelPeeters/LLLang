@@ -6,6 +6,7 @@ import language.ir.Blur
 import language.ir.Branch
 import language.ir.Constant
 import language.ir.Eat
+import language.ir.FunctionType
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
 import language.ir.Jump
@@ -17,6 +18,7 @@ import language.ir.UnitType
 import language.ir.UnitValue
 import language.ir.Value
 import language.ir.unpoint
+import language.util.mapFold
 import java.util.*
 import language.ir.BinaryOp as IrBinaryOp
 import language.ir.Call as IrCall
@@ -24,26 +26,22 @@ import language.ir.Function as IrFunction
 import language.ir.Program as IrProgram
 import language.ir.UnaryOp as IrUnaryOp
 
-sealed class Variable(val name: String) {
-    abstract val type: Type
-    abstract fun loadValue(pos: SourcePosition, block: BasicBlock): Value
-    abstract fun storeValue(pos: SourcePosition, block: BasicBlock, value: Value)
+sealed class Variable(val name: String, val type: Type, val mutable: Boolean) {
+    abstract fun loadValue(block: BasicBlock): Value
+    abstract fun storeValue(block: BasicBlock, value: Value)
 
-    class Memory(name: String, val pointer: Value, val mutable: Boolean) : Variable(name) {
-        override val type = pointer.type.unpoint!!
-        override fun loadValue(pos: SourcePosition, block: BasicBlock) = Load(name, pointer).also { block.append(it) }
-        override fun storeValue(pos: SourcePosition, block: BasicBlock, value: Value) {
-            if (!mutable)
-                throw VariableImmutableException(pos, name)
+    class Memory(name: String, val pointer: Value, mutable: Boolean)
+        : Variable(name, pointer.type.unpoint!!, mutable) {
+        override fun loadValue(block: BasicBlock) = Load(name, pointer).also { block.append(it) }
+        override fun storeValue(block: BasicBlock, value: Value) {
             block.append(Store(pointer, value))
         }
     }
 
-    class Parameter(name: String, val value: Value) : Variable(name) {
-        override val type = value.type
-        override fun loadValue(pos: SourcePosition, block: BasicBlock) = value
-        override fun storeValue(pos: SourcePosition, block: BasicBlock, value: Value) =
-                throw VariableImmutableException(pos, name)
+    class FixedValue(name: String, val value: Value)
+        : Variable(name, value.type, false) {
+        override fun loadValue(block: BasicBlock) = value
+        override fun storeValue(block: BasicBlock, value: Value) = throw IllegalStateException()
     }
 }
 
@@ -66,7 +64,6 @@ private class LoopBlocks(val header: BasicBlock, val end: BasicBlock)
 class Flattener {
     val program = IrProgram()
 
-    var functions = mutableMapOf<String, IrFunction>()
     private lateinit var currentFunction: IrFunction
     private val allocs = mutableListOf<Alloc>()
     private val loopBlockStack = ArrayDeque<LoopBlocks>()
@@ -74,32 +71,33 @@ class Flattener {
     fun newBlock(name: String? = null) = BasicBlock(name).also { currentFunction.append(it) }
 
     fun flatten(astProgram: Program) {
-        //build function map
-        functions.clear()
-        for (toplevel in astProgram.toplevels) {
-            when (toplevel) {
+        val programScope = Scope(null)
+        val functions = mutableListOf<Pair<Function, IrFunction>>()
+
+        //register top levels
+        for (topLevel in astProgram.toplevels) {
+            when (topLevel) {
                 is Function -> {
-                    if (toplevel.name in functions)
-                        throw DuplicateDeclarationException(toplevel.position, toplevel.name)
+                    val name = topLevel.name
                     val irFunction = IrFunction(
-                            toplevel.name,
-                            toplevel.parameters.map { it.name to resolveType(it.type) },
-                            resolveType(toplevel.retType, UnitType)
+                            name,
+                            topLevel.parameters.map { it.name to resolveType(it.type) },
+                            resolveType(topLevel.retType, UnitType)
                     )
-                    functions[toplevel.name] = irFunction
+
+                    programScope.register(topLevel.position, Variable.FixedValue(name, irFunction))
+                    functions.add(topLevel to irFunction)
+
                     program.addFunction(irFunction)
-                    if (irFunction.name == "main")
+                    if (name == "main")
                         program.entry = irFunction
                 }
             }
         }
 
         //generate code
-        val scope = Scope(null)
-        for (toplevel in astProgram.toplevels) {
-            when (toplevel) {
-                is Function -> appendFunction(scope, toplevel, functions.getValue(toplevel.name))
-            }
+        for ((function, irFunction) in functions) {
+            appendFunction(programScope, function, irFunction)
         }
     }
 
@@ -110,7 +108,7 @@ class Flattener {
 
         val bodyScope = Scope(scope)
         for ((param, value) in function.parameters.zip(irFunction.parameters)) {
-            bodyScope.register(param.position, Variable.Parameter(param.name, value))
+            bodyScope.register(param.position, Variable.FixedValue(param.name, value))
         }
 
         val entry = newBlock("entry")
@@ -155,7 +153,7 @@ class Flattener {
 
             val (next, value) = appendExpression(scope, stmt.value)
             requireTypeMatch(stmt.position, type, value.type)
-            variable.storeValue(stmt.position, next, value)
+            variable.storeValue(next, value)
             next
         }
         is CodeBlock -> appendNestedBlock(scope, stmt)
@@ -230,7 +228,7 @@ class Flattener {
         is IdentifierExpression -> {
             val variable = scope.find(exp.identifier)
                            ?: throw IdNotFoundException(exp.position, exp.identifier)
-            this to variable.loadValue(exp.position, this)
+            this to variable.loadValue(this)
         }
         is Assignment -> {
             if (exp.target !is IdentifierExpression) TODO("other target types")
@@ -240,7 +238,9 @@ class Flattener {
             val (next, value) = appendExpression(scope, exp.value)
             requireTypeMatch(exp.position, assignTarget.type, value.type)
 
-            assignTarget.storeValue(exp.target.position, next, value)
+            if (!assignTarget.mutable)
+                throw VariableImmutableException(exp.position, exp.target.identifier)
+            assignTarget.storeValue(next, value)
             next to value
         }
         is BinaryOp -> {
@@ -257,17 +257,16 @@ class Flattener {
             afterValue to result
         }
         is Call -> {
-            if (exp.target is IdentifierExpression) {
+            val ret = if (exp.target is IdentifierExpression) {
                 when (exp.target.identifier) {
                     "eat" -> {
-                        val result = Eat()
-                        val after = exp.arguments.fold(this) { before, operand ->
-                            val (after, value) = before.appendExpression(scope, operand)
-                            result.addOperand(value)
-                            after
+                        val eat = Eat()
+                        val (after, operands) = exp.arguments.mapFold(this) { block, operand ->
+                            block.appendExpression(scope, operand)
                         }
-                        after.append(result)
-                        after to result
+                        eat.addOperands(operands)
+                        after.append(eat)
+                        after to eat
                     }
                     "blur" -> {
                         require(exp.arguments.size == 1) { "blur takes a single argument" }
@@ -276,23 +275,24 @@ class Flattener {
                         after.append(result)
                         after to result
                     }
-                    else -> {
-                        var next = this
-                        val arguments = exp.arguments.map {
-                            val (after, value) = next.appendExpression(scope, it)
-                            next = after
-                            value
-                        }
-
-                        val func = functions[exp.target.identifier]
-                                   ?: throw IdNotFoundException(exp.position, exp.target.identifier)
-                        val call = IrCall(null, func, arguments)
-                        next.append(call)
-                        next to call
-                    }
+                    else -> null
                 }
-            } else {
-                TODO("dynamic calls")
+            } else null
+
+            ret ?: run {
+                val (afterTarget, target) = appendExpression(scope, exp.target)
+                val (next, arguments) = exp.arguments.mapFold(afterTarget) { block, arg ->
+                    block.appendExpression(scope, arg)
+                }
+
+                val targetTypes = (target.type as FunctionType).paramTypes
+                val argTypes = arguments.map { it.type }
+                if (argTypes != targetTypes)
+                    throw ArgMismatchException(exp.position, targetTypes, argTypes)
+
+                val call = IrCall(null, target, arguments)
+                next.append(call)
+                next to call
             }
         }
         is Index -> TODO("index")
@@ -301,10 +301,18 @@ class Flattener {
     private fun resolveType(annotation: TypeAnnotation?, default: Type) =
             if (annotation == null) default else resolveType(annotation)
 
-    private fun resolveType(annotation: TypeAnnotation) = when (annotation.str) {
-        "bool" -> bool
-        "i32" -> i32
-        else -> throw IllegalTypeException(annotation)
+    private fun resolveType(annotation: TypeAnnotation): Type = when (annotation) {
+        is TypeAnnotation.Simple -> when (annotation.str) {
+            "bool" -> bool
+            "i32" -> i32
+            else -> throw IllegalTypeException(annotation)
+        }
+        is TypeAnnotation.Function -> {
+            FunctionType(
+                    annotation.paramTypes.map { resolveType(it) },
+                    resolveType(annotation.returnType)
+            )
+        }
     }
 }
 
@@ -319,7 +327,7 @@ class DuplicateDeclarationException(pos: SourcePosition, identifier: String)
     : Exception("$pos: '$identifier' was already declared")
 
 class IllegalTypeException(type: TypeAnnotation)
-    : Exception("${type.position}: Illegal type '${type.str}'")
+    : Exception("${type.position}: Illegal type '$type'")
 
 class VariableImmutableException(pos: SourcePosition, name: String)
     : Exception("Can't mutate variable '$name' at $pos")
@@ -329,3 +337,6 @@ class MissingReturnStatement(function: Function)
 
 class TypeMismatchException(pos: SourcePosition, expected: Type, actual: Type)
     : Exception("Expected type was $expected, actual $actual at $pos")
+
+class ArgMismatchException(pos: SourcePosition, expected: List<Type>, actual: List<Type>)
+    : Exception("Argument mismatch: expected $expected, got $actual at $pos")

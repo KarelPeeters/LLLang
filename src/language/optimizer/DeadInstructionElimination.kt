@@ -14,7 +14,7 @@ object DeadInstructionElimination : FunctionPass {
             val iter = block.instructions.iterator()
             for (instr in iter) {
                 if (instr !in used) {
-                    instr.delete()
+                    instr.shallowDelete()
                     iter.remove()
                     instrChanged()
                 }

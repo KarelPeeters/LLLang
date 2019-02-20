@@ -1,6 +1,10 @@
 package language.ir
 
-class Function(val name: String, parameters: List<Pair<String?, Type>>, val returnType: Type) : Value(FunctionType) {
+class Function(
+        val name: String,
+        parameters: List<Pair<String?, Type>>,
+        val returnType: Type
+) : Value(FunctionType(parameters.map { it.second }, returnType)) {
     var entry by operand<BasicBlock>(null)
     val parameters = parameters.map { (name, type) -> ParameterValue(name, type) }
     val blocks = mutableListOf<BasicBlock>()
@@ -91,4 +95,6 @@ class ParameterValue(val name: String?, type: Type) : Value(type) {
     override fun str(env: NameEnv) = "%${env.value(this)} $type"
 }
 
-object FunctionType : Type()
+data class FunctionType(val paramTypes: List<Type>, val returnType: Type) : Type() {
+    override fun toString() = "(" + paramTypes.joinToString { it.toString() } + ") -> $returnType"
+}

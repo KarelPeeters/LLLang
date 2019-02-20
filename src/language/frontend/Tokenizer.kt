@@ -15,6 +15,7 @@ enum class TokenType(val string: String? = null) {
     OpenC("{"), CloseC("}"),
 
     //symbols
+    Arrow("->"),
     Inc("++"),
     Dec("--"),
     Power("**"),

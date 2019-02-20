@@ -65,7 +65,7 @@ object ConstantFolding : FunctionPass {
 
                 if (target != null) {
                     instr.block.terminator = Jump(target)
-                    instr.delete()
+                    instr.shallowDelete()
 
                     graphChanged()
                 }

@@ -33,7 +33,7 @@ object SimplifyBlocks : FunctionPass {
                     for (instr in block.instructions.dropLast(1)) {
                         pred.append(instr)
                     }
-                    pred.terminator.delete()
+                    pred.terminator.shallowDelete()
                     pred.terminator = block.terminator
 
                     block.users.toList().forEach {

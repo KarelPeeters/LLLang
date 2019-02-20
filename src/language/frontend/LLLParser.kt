@@ -273,5 +273,16 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         }
     }
 
-    private fun type() = TypeAnnotation(currentPosition, expect(Id).text)
+    private fun type(): TypeAnnotation = when {
+        at(Id) -> TypeAnnotation.Simple(currentPosition, pop().text)
+        at(OpenB) -> {
+            val pos = currentPosition
+            pop()
+            val params = list(CloseB) { type() }
+            expect(Arrow)
+            val returnType = type()
+            TypeAnnotation.Function(pos, params, returnType)
+        }
+        else -> unexpected()
+    }
 }

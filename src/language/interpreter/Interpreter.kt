@@ -144,9 +144,10 @@ class Interpreter(val program: Program) {
                         values.getInst(instr.value)
                     }
                     is Call -> {
-                        val callArgs = instr.arguments.map { values.getInst(it) }
+                        TODO("call")
+                        /*val callArgs = instr.arguments.map { values.getInst(it) }
                         callFunction(instr.function, callArgs, stack + frame)
-                        ?: return null //propagate exit
+                        ?: return null //propagate exit*/
                     }
                     is Terminator -> {
                         require(i == currBlock.instructions.lastIndex) { "Terminators can only appear at the end of a BasicBlock" }

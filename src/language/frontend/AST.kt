@@ -30,9 +30,10 @@ class Function(
         val body: FunctionBody
 ) : TopLevel(position) {
     override fun ASTRenderer.render() {
-        print("fun $name(${parameters.joinToString { it.toString() }})")
-        if (retType != null)
-            print(": $retType")
+        print("fun $name("); printList(parameters); print(")")
+        if (retType != null) {
+            print(": "); print(retType)
+        }
         print(" ")
         when (body) {
             is FunctionBody.Block -> print(body.block)
@@ -54,10 +55,8 @@ class Parameter(
         val name: String,
         val type: TypeAnnotation
 ) : ASTNode(position) {
-    override fun toString() = "$name: $type"
-
     override fun ASTRenderer.render() {
-        print("$name: $type")
+        print("$name: "); print(type)
     }
 }
 
@@ -214,17 +213,38 @@ class Declaration(
     override fun ASTRenderer.render() {
         print(if (mutable) "var" else "val")
         print(" $identifier")
-        if (type != null) print(": ${type.str}")
+        if (type != null) {
+            print(": ")
+            print(type)
+        }
         print(" = "); print(value)
     }
 }
 
-class TypeAnnotation(
-        position: SourcePosition,
-        val str: String
+sealed class TypeAnnotation(
+        position: SourcePosition
 ) : ASTNode(position) {
-    override fun ASTRenderer.render() = print(str)
-    override fun toString() = str
+    class Simple(
+            position: SourcePosition,
+            val str: String
+    ) : TypeAnnotation(position) {
+        override fun ASTRenderer.render() = print(str)
+
+        override fun toString() = str
+    }
+
+    class Function(
+            position: SourcePosition,
+            val paramTypes: List<TypeAnnotation>,
+            val returnType: TypeAnnotation
+    ) : TypeAnnotation(position) {
+        override fun ASTRenderer.render() {
+            print("("); printList(paramTypes); print(") -> "); print(returnType)
+        }
+
+        override fun toString() =
+                "(" + paramTypes.joinToString { it.toString() } + ") -> " + returnType
+    }
 }
 
 class ASTRenderer(private val builder: StringBuilder, private val indent: Int) {
@@ -239,6 +259,13 @@ class ASTRenderer(private val builder: StringBuilder, private val indent: Int) {
 
     fun print(astNode: ASTNode) {
         astNode.apply { render() }
+    }
+
+    fun printList(list: List<ASTNode>) {
+        for ((i, node) in list.withIndex()) {
+            if (i != 0) print(", ")
+            print(node)
+        }
     }
 
     fun println(str: String) {

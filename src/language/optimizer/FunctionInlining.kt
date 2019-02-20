@@ -13,7 +13,7 @@ object FunctionInlining : ProgramPass {
     override fun ProgramContext.optimize(program: Program) {
         val iter = program.functions.iterator()
         for (func in iter) {
-            //only used by calls
+            //only used by calls, also guaratees all Calls have an immediate Function target
             if (func.users.any { it !is Call })
                 continue
             val calls = func.users.map { it as Call }
@@ -22,6 +22,7 @@ object FunctionInlining : ProgramPass {
             if (calls.any { it.block.function == func })
                 continue
 
+            //inline heuristic
             val instrCount = func.blocks.sumBy { it.instructions.size }
             if (calls.size == 1 || instrCount < 10) {
                 for (call in calls) {
@@ -38,7 +39,8 @@ object FunctionInlining : ProgramPass {
     }
 
     private fun inline(call: Call) {
-        val targetClone = call.function.deepClone()
+        val target = call.target as Function
+        val targetClone = target.deepClone()
         val containingFunction = call.block.function
         val beforeBlock = call.block
         val afterBlock = BasicBlock(null)
