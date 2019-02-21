@@ -104,7 +104,7 @@ class Flattener {
     private fun appendFunction(scope: Scope, function: Function, irFunction: IrFunction) {
         currentFunction = irFunction
         allocs.clear()
-        require(loopBlockStack.isEmpty())
+        check(loopBlockStack.isEmpty())
 
         val bodyScope = Scope(scope)
         for ((param, value) in function.parameters.zip(irFunction.parameters)) {
@@ -269,7 +269,8 @@ class Flattener {
                         after to eat
                     }
                     "blur" -> {
-                        require(exp.arguments.size == 1) { "blur takes a single argument" }
+                        if (exp.arguments.size != 1)
+                            throw ArgMismatchException(exp.position, 1, exp.arguments.size)
                         val (after, value) = appendExpression(scope, exp.arguments.first())
                         val result = Blur(value)
                         after.append(result)
@@ -338,5 +339,10 @@ class MissingReturnStatement(function: Function)
 class TypeMismatchException(pos: SourcePosition, expected: Type, actual: Type)
     : Exception("Expected type was $expected, actual $actual at $pos")
 
-class ArgMismatchException(pos: SourcePosition, expected: List<Type>, actual: List<Type>)
-    : Exception("Argument mismatch: expected $expected, got $actual at $pos")
+class ArgMismatchException : Exception {
+    constructor(pos: SourcePosition, expected: List<Type>, actual: List<Type>) :
+            super("Argument mismatch: expected $expected, got $actual at $pos")
+
+    constructor(pos: SourcePosition, expectedCount: Int, actualCount: Int) :
+            super("Argument mismatch: expected $expectedCount arguments, got $actualCount at $pos")
+}

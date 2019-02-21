@@ -10,7 +10,7 @@ abstract class Node {
     open val operands: List<Value>
         get() {
             operandList?.operands?.let { list ->
-                require(list.all { it != null })
+                check(list.all { it != null })
                 @Suppress("UNCHECKED_CAST")
                 return list as List<Value>
             }

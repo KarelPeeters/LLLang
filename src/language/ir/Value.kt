@@ -14,7 +14,7 @@ abstract class Value(val type: Type) : Node() {
         for (user in this.users.toSet())
             user.replaceOperand(this, to)
 
-        require(users.isEmpty()) { "value should have no users left after replacement" }
+        check(users.isEmpty()) { "value should have no users left after replacement" }
     }
 
     abstract fun str(env: NameEnv): String

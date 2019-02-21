@@ -1,5 +1,7 @@
 package language.ir
 
+import language.util.hasDuplicates
+
 class Program : Node() {
     var entry by operand<Function>(null)
     val functions = mutableListOf<Function>()
@@ -15,11 +17,15 @@ class Program : Node() {
     }
 
     override fun verify() {
-        require(entry in functions) { "entry must be one of the functions" }
-        require(entry.parameters.isEmpty()) { "entry must be a parameterless function" }
+        check(entry in functions) { "entry must be one of the functions" }
+        check(entry.parameters.isEmpty()) { "entry must be a parameterless function" }
+        val blocks = functions.flatMap { it.blocks }
+        val instructions = functions.flatMap { f -> f.blocks.flatMap { b -> b.instructions } }
+        check(!blocks.hasDuplicates()) { "no duplicate blocks" }
+        check(!instructions.hasDuplicates()) { "no duplicate instructions" }
 
         functions.forEach {
-            require(it.program == this)
+            check(it.program == this) { "functions must refer to this program" }
             it.verify()
         }
     }

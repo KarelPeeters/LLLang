@@ -39,7 +39,7 @@ class Store(pointer: Value, value: Value) : Instruction(null, UnitType, false) {
     override fun clone() = Store(pointer, value)
 
     override fun verify() {
-        require(pointer.type.unpoint == value.type) { "pointer type must be pointer to value type" }
+        check(pointer.type.unpoint == value.type) { "pointer type must be pointer to value type" }
     }
 
     override fun fullStr(env: NameEnv) = "store ${value.str(env)} -> ${pointer.str(env)}"
@@ -51,7 +51,7 @@ class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoi
     override fun clone() = Load(name, pointer)
 
     override fun verify() {
-        require(pointer.type.unpoint == this.type) { "pointer type must be pointer to load type" }
+        check(pointer.type.unpoint == this.type) { "pointer type must be pointer to load type" }
     }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = load ${pointer.str(env)}"
@@ -65,7 +65,7 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
     override fun clone() = BinaryOp(name, opType, left, right)
 
     override fun verify() {
-        require(opType.returnType(left.type, right.type) == this.type) { "left and right types must result in binaryOp type" }
+        check(opType.returnType(left.type, right.type) == this.type) { "left and right types must result in binaryOp type" }
     }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${left.str(env)}, ${right.str(env)}"
@@ -78,7 +78,7 @@ class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
     override fun clone() = UnaryOp(name, opType, value)
 
     override fun verify() {
-        require(value.type == this.type) { "value type must be unaryOp type" }
+        check(value.type == this.type) { "value type must be unaryOp type" }
     }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${value.str(env)}"
@@ -99,8 +99,8 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
     }
 
     override fun verify() {
-        require(sources.keys == block.predecessors().toSet()) { "must have source for every block predecessor" }
-        require(sources.values.all { it.type == this.type }) { "source types must all equal phi type" }
+        check(sources.keys == block.predecessors().toSet()) { "must have source for every block predecessor" }
+        check(sources.values.all { it.type == this.type }) { "source types must all equal phi type" }
     }
 
     fun set(block: BasicBlock, value: Value) {
@@ -129,12 +129,12 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
         var changed = _sources.replaceValues(from, to)
 
         if (from is BasicBlock) {
-            require(to is BasicBlock)
+            check(to is BasicBlock)
 
             if (_sources.containsKey(from)) {
                 //if to is already a source assert they're the same value
                 if (_sources.containsKey(to))
-                    require(_sources[to] == sources[from])
+                    check(_sources[to] == sources[from])
 
                 _sources[to] = _sources.getValue(from)
                 _sources.remove(from)
@@ -204,7 +204,7 @@ class Blur(value: Value) : Instruction(null, value.type, false) {
     override fun clone() = Blur(value)
 
     override fun verify() {
-        require(value.type == this.type) { "value type must be blur type" }
+        check(value.type == this.type) { "value type must be blur type" }
     }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = blur ${value.str(env)}"
@@ -226,10 +226,10 @@ class Call(name: String?, target: Value, arguments: List<Value>)
 
     override fun verify() {
         val funcType = target.type
-        require(funcType is FunctionType) { "target must be a function" }
-        require(funcType.paramTypes.size == arguments.size) { "parameter sizes must match" }
-        require(funcType.paramTypes.zip(arguments).all { (x, y) -> x == y.type }) { "parameter types must match" }
-        require(funcType.returnType == this.type) { "return type must match" }
+        check(funcType is FunctionType) { "target must be a function" }
+        check(funcType.paramTypes.size == arguments.size) { "parameter sizes must match" }
+        check(funcType.paramTypes.zip(arguments).all { (x, y) -> x == y.type }) { "parameter types must match" }
+        check(funcType.returnType == this.type) { "return type must match" }
     }
 
     fun setArgument(i: Int, value: Value) {
@@ -274,7 +274,7 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
     override fun clone() = Branch(value, ifTrue, ifFalse)
 
     override fun verify() {
-        require(value.type == bool) { "branch conditional must be a boolean" }
+        check(value.type == bool) { "branch conditional must be a boolean" }
     }
 
     override fun targets() = setOf(ifTrue, ifFalse)

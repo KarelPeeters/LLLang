@@ -33,3 +33,5 @@ fun <T, F, R> Iterable<T>.mapFold(initial: F, block: (F, T) -> Pair<F, R>): Pair
     }
     return acc to list
 }
+
+fun <T> Collection<T>.hasDuplicates() = toHashSet().size != size

@@ -47,12 +47,14 @@ class Function(
     }
 
     override fun verify() {
-        require(entry in blocks) { "entry must be one of the blocks" }
-        require(blocks.all { it.function == this }) { "block.function must be this function" }
+        check(entry in blocks) { "entry must be one of the blocks" }
+
         for (block in blocks) {
             val term = block.terminator
             if (term is Return)
-                require(term.value.type == returnType) { "return type must match, ${term.value.type} != $returnType" }
+                check(term.value.type == returnType) { "return type must match, ${term.value.type} != $returnType" }
+
+            check(block.function == this) { "blocks must refer to this function" }
             block.verify()
         }
     }
