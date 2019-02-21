@@ -22,8 +22,8 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     private var _function: Function? = null
     val function get() = _function!!
 
-    fun setFunction(block: Function?) {
-        this._function = block
+    fun setFunction(function: Function?) {
+        this._function = function
     }
 
     override fun verify() {

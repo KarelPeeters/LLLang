@@ -50,9 +50,10 @@ object FunctionInlining : ProgramPass {
             param.replaceWith(arg)
 
         //insert new blocks
+        var nextI = containingFunction.blocks.indexOf(beforeBlock)
         for (block in targetClone.blocks)
-            containingFunction.append(block)
-        containingFunction.append(afterBlock)
+            containingFunction.add(++nextI, block)
+        containingFunction.add(++nextI, afterBlock)
 
         //aggregate returns
         val returnPhi = Phi(null, targetClone.returnType)

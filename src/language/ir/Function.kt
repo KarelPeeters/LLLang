@@ -41,7 +41,7 @@ class Function(
 
         //finish new function
         for (block in blockMap.values)
-            newFunc.append(block)
+            newFunc.add(block)
         newFunc.entry = blockMap.getValue(this.entry)
         return newFunc
     }
@@ -57,8 +57,13 @@ class Function(
         }
     }
 
-    fun append(block: BasicBlock) {
+    fun add(block: BasicBlock) {
         this.blocks += block
+        block.setFunction(this)
+    }
+
+    fun add(index: Int, block: BasicBlock) {
+        this.blocks.add(index, block)
         block.setFunction(this)
     }
 

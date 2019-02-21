@@ -68,7 +68,7 @@ class Flattener {
     private val allocs = mutableListOf<Alloc>()
     private val loopBlockStack = ArrayDeque<LoopBlocks>()
 
-    fun newBlock(name: String? = null) = BasicBlock(name).also { currentFunction.append(it) }
+    fun newBlock(name: String? = null) = BasicBlock(name).also { currentFunction.add(it) }
 
     fun flatten(astProgram: Program) {
         val programScope = Scope(null)
@@ -192,7 +192,7 @@ class Flattener {
             val bodyEnd = bodyBlock.appendNestedBlock(scope, stmt.block)
             loopBlockStack.pop()
 
-            currentFunction.append(endBlock)
+            currentFunction.add(endBlock)
 
             this.terminator = Jump(condBlock)
             afterCond.terminator = Branch(condValue, bodyBlock, endBlock)
