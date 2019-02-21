@@ -178,8 +178,13 @@ class Interpreter(val program: Program) {
                     }
                 }
 
-                if (result != null)
+                if (result == null) {
+                    if (instr.users.isNotEmpty())
+                        values[instr] = UnitInst
+                } else {
                     values[instr] = result
+                }
+
                 steps++
             }
         }
