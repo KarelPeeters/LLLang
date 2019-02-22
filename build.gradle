@@ -26,15 +26,15 @@ dependencies {
 
 sourceSets {
     main {
-        kotlin.srcDirs = ["src"]
-        java.srcDirs = ["src"]
-        resources.srcDirs = ["src"]
+        kotlin.srcDirs = ["src/main"]
+        java.srcDirs = ["src/main"]
+        resources.srcDirs = ["src/main"]
     }
 
     test {
-        kotlin.srcDirs = []
-        java.srcDirs = []
-        resources.srcDirs = []
+        kotlin.srcDirs = ["src/test"]
+        java.srcDirs = ["src/test"]
+        resources.srcDirs = ["src/test"]
     }
 }
 
