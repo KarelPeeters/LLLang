@@ -1,8 +1,6 @@
 package language.ir
 
 import language.ir.IntegerType.Companion.bool
-import language.util.replace
-import language.util.replaceValues
 
 sealed class Instruction constructor(val name: String?, type: Type, val pure: Boolean) : Value(type) {
     private var _block: BasicBlock? = null
@@ -29,7 +27,7 @@ class Alloc(name: String?, val inner: Type) : Instruction(name, inner.pointer, t
 
     override fun clone() = Alloc(name, inner)
 
-    override fun verify() {}
+    override fun doVerify() {}
 }
 
 class Store(pointer: Value, value: Value) : Instruction(null, UnitType, false) {
@@ -38,7 +36,7 @@ class Store(pointer: Value, value: Value) : Instruction(null, UnitType, false) {
 
     override fun clone() = Store(pointer, value)
 
-    override fun verify() {
+    override fun doVerify() {
         check(pointer.type.unpoint == value.type) { "pointer type must be pointer to value type" }
     }
 
@@ -50,7 +48,7 @@ class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoi
 
     override fun clone() = Load(name, pointer)
 
-    override fun verify() {
+    override fun doVerify() {
         check(pointer.type.unpoint == this.type) { "pointer type must be pointer to load type" }
     }
 
@@ -64,7 +62,7 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
 
     override fun clone() = BinaryOp(name, opType, left, right)
 
-    override fun verify() {
+    override fun doVerify() {
         check(opType.returnType(left.type, right.type) == this.type) { "left and right types must result in binaryOp type" }
     }
 
@@ -77,7 +75,7 @@ class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
 
     override fun clone() = UnaryOp(name, opType, value)
 
-    override fun verify() {
+    override fun doVerify() {
         check(value.type == this.type) { "value type must be unaryOp type" }
     }
 
@@ -85,67 +83,18 @@ class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
 }
 
 class Phi(name: String?, type: Type) : Instruction(name, type, true) {
-    private val _sources = mutableMapOf<BasicBlock, Value>()
-    val sources: Map<BasicBlock, Value> get() = _sources
-
-    override val operands: List<Value>
-        get() = sources.values.toList()
+    val sources = operandMap<BasicBlock, Value>()
 
     override fun clone(): Phi {
         val new = Phi(name, type)
         for ((block, value) in this.sources)
-            new.set(block, value)
+            new.sources[block] = value
         return new
     }
 
-    override fun verify() {
+    override fun doVerify() {
         check(sources.keys == block.predecessors().toSet()) { "must have source for every block predecessor" }
         check(sources.values.all { it.type == this.type }) { "source types must all equal phi type" }
-    }
-
-    fun set(block: BasicBlock, value: Value) {
-        val prev = _sources[block]
-        _sources[block] = value
-
-        block.users += this
-        value.users += this
-        if (prev != null && prev !in _sources.values)
-            prev.users -= this
-    }
-
-    fun remove(block: BasicBlock) {
-        block.users -= this
-        val prev = _sources.remove(block)
-        if (prev != null && prev !in _sources.values)
-            prev.users -= this
-    }
-
-    override fun shallowDelete() {
-        super.shallowDelete()
-        (sources.keys + sources.values).forEach { it.users -= this }
-    }
-
-    override fun replaceOperand(from: Value, to: Value) {
-        var changed = _sources.replaceValues(from, to)
-
-        if (from is BasicBlock) {
-            check(to is BasicBlock)
-
-            if (_sources.containsKey(from)) {
-                //if to is already a source assert they're the same value
-                if (_sources.containsKey(to))
-                    check(_sources[to] == sources[from])
-
-                _sources[to] = _sources.getValue(from)
-                _sources.remove(from)
-                changed = true
-            }
-        }
-
-        if (changed) {
-            from.users -= this
-            to.users += this
-        }
     }
 
     override fun fullStr(env: NameEnv): String {
@@ -157,45 +106,17 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
 }
 
 class Eat : Instruction(null, UnitType, false) {
-    private val _operands = mutableListOf<Value>()
-    override val operands: List<Value> = _operands
+    val arguments = operandList<Value>()
 
-    override fun clone() = Eat()
-
-    override fun verify() {}
-
-    fun addOperand(value: Value) {
-        _operands += value
-        value.users += this
+    override fun clone(): Eat {
+        val new = Eat()
+        new.arguments.addAll(this.arguments)
+        return new
     }
 
-    fun addOperands(values: List<Value>) {
-        _operands.addAll(values)
-        for (value in values)
-            value.users += this
-    }
+    override fun doVerify() {}
 
-    fun removeOperand(value: Value) {
-        _operands.remove(value)
-        if (value !in _operands)
-            value.users -= this
-    }
-
-    override fun shallowDelete() {
-        super.shallowDelete()
-        operands.forEach { it.users -= this }
-        _operands.clear()
-    }
-
-    override fun replaceOperand(from: Value, to: Value) {
-        super.replaceOperand(from, to)
-        if (_operands.replace(from, to)) {
-            from.users -= this
-            to.users += this
-        }
-    }
-
-    override fun fullStr(env: NameEnv) = "eat " + operands.joinToString { it.str(env) }
+    override fun fullStr(env: NameEnv) = "eat " + arguments.joinToString { it.str(env) }
 }
 
 class Blur(value: Value) : Instruction(null, value.type, false) {
@@ -203,7 +124,7 @@ class Blur(value: Value) : Instruction(null, value.type, false) {
 
     override fun clone() = Blur(value)
 
-    override fun verify() {
+    override fun doVerify() {
         check(value.type == this.type) { "value type must be blur type" }
     }
 
@@ -213,18 +134,11 @@ class Blur(value: Value) : Instruction(null, value.type, false) {
 class Call(name: String?, target: Value, arguments: List<Value>)
     : Instruction(name, (target.type as FunctionType).returnType, false) {
     val target by operand(target)
-    private val _arguments = arguments.toMutableList()
-    val arguments: List<Value> = _arguments
-
-    init {
-        for (arg in arguments) {
-            arg.users += this
-        }
-    }
+    val arguments = operandList(arguments)
 
     override fun clone() = Call(name, target, arguments.toList())
 
-    override fun verify() {
+    override fun doVerify() {
         val funcType = target.type
         check(funcType is FunctionType) { "target must be a function" }
         check(funcType.paramTypes.size == arguments.size) { "parameter sizes must match" }
@@ -232,33 +146,8 @@ class Call(name: String?, target: Value, arguments: List<Value>)
         check(funcType.returnType == this.type) { "return type must match" }
     }
 
-    fun setArgument(i: Int, value: Value) {
-        val prev = _arguments.set(i, value)
-        value.users += this
-        if (prev !in _arguments)
-            prev.users -= this
-    }
-
-    override fun replaceOperand(from: Value, to: Value) {
-        super.replaceOperand(from, to)
-        if (_arguments.replace(from, to)) {
-            from.users -= this
-            to.users += this
-        }
-    }
-
-    override fun shallowDelete() {
-        super.shallowDelete()
-        for (arg in _arguments)
-            arg.users -= this
-        _arguments.clear()
-    }
-
-    override val operands: List<Value>
-        get() = super.operands + arguments
-
     override fun fullStr(env: NameEnv): String {
-        return "${str(env)} = call ${target.str(env)}(${_arguments.joinToString { it.str(env) }})"
+        return "${str(env)} = call ${target.str(env)}(${arguments.joinToString { it.str(env) }})"
     }
 }
 
@@ -268,12 +157,12 @@ sealed class Terminator : Instruction(null, UnitType, false) {
 
 class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator() {
     var value by operand(value)
-    var ifTrue by operand<BasicBlock>(ifTrue)
-    var ifFalse by operand<BasicBlock>(ifFalse)
+    var ifTrue by operand(ifTrue)
+    var ifFalse by operand(ifFalse)
 
     override fun clone() = Branch(value, ifTrue, ifFalse)
 
-    override fun verify() {
+    override fun doVerify() {
         check(value.type == bool) { "branch conditional must be a boolean" }
     }
 
@@ -282,11 +171,11 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
 }
 
 class Jump(target: BasicBlock?) : Terminator() {
-    var target by operand<BasicBlock>(target)
+    var target by operand(target)
 
     override fun clone() = Jump(target)
 
-    override fun verify() {}
+    override fun doVerify() {}
 
     override fun targets() = setOf(target)
     override fun fullStr(env: NameEnv) = "jump ${target.str(env)}"
@@ -295,7 +184,7 @@ class Jump(target: BasicBlock?) : Terminator() {
 class Exit : Terminator() {
     override fun clone() = Exit()
 
-    override fun verify() {}
+    override fun doVerify() {}
 
     override fun targets() = setOf<BasicBlock>()
     override fun fullStr(env: NameEnv) = "exit"
@@ -306,7 +195,7 @@ class Return(value: Value) : Terminator() {
 
     override fun clone() = Return(value)
 
-    override fun verify() {}
+    override fun doVerify() {}
 
     override fun targets() = emptySet<BasicBlock>()
     override fun fullStr(env: NameEnv) = "return ${value.str(env)}"

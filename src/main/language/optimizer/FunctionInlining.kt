@@ -61,7 +61,7 @@ object FunctionInlining : ProgramPass {
         for (block in targetClone.blocks) {
             val term = block.terminator
             if (term is Return) {
-                returnPhi.set(block, term.value)
+                returnPhi.sources[block] = term.value
                 term.deleteFromBlock()
                 block.terminator = Jump(afterBlock)
             }

@@ -16,7 +16,7 @@ class Program : Node() {
         function.setProgram(null)
     }
 
-    override fun verify() {
+    override fun doVerify() {
         check(entry in functions) { "entry must be one of the functions" }
         check(entry.parameters.isEmpty()) { "entry must be a parameterless function" }
         val blocks = functions.flatMap { it.blocks }

@@ -46,7 +46,7 @@ class Function(
         return newFunc
     }
 
-    override fun verify() {
+    override fun doVerify() {
         check(entry in blocks) { "entry must be one of the blocks" }
 
         for (block in blocks) {
@@ -98,7 +98,7 @@ class Function(
 }
 
 class ParameterValue(val name: String?, type: Type) : Value(type) {
-    override fun verify() {}
+    override fun doVerify() {}
     override fun str(env: NameEnv) = "%${env.value(this)} $type"
 }
 

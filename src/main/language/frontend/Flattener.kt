@@ -261,10 +261,10 @@ class Flattener {
                 when (exp.target.identifier) {
                     "eat" -> {
                         val eat = Eat()
-                        val (after, operands) = exp.arguments.mapFold(this) { block, operand ->
+                        val (after, arguments) = exp.arguments.mapFold(this) { block, operand ->
                             block.appendExpression(scope, operand)
                         }
-                        eat.addOperands(operands)
+                        eat.arguments.addAll(arguments)
                         after.append(eat)
                         after to eat
                     }

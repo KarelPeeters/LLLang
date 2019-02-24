@@ -19,7 +19,7 @@ object DeadBlockElimination : FunctionPass {
                 for (user in block.users) {
                     //dead blocks can only be used in phi nodes or in terminators of other dead blocks
                     if (user is Phi)
-                        user.remove(block)
+                        user.sources.remove(block)
                     else
                         require(user is Terminator && user.block !in used)
                 }

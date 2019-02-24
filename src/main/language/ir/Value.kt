@@ -17,6 +17,12 @@ abstract class Value(val type: Type) : Node() {
         check(users.isEmpty()) { "value should have no users left after replacement" }
     }
 
+    override fun verify() {
+        super.verify()
+        for (user in users)
+            check(!user.deleted) { "users can't be deleted" }
+    }
+
     abstract fun str(env: NameEnv): String
 }
 
@@ -28,7 +34,7 @@ class Constant constructor(type: Type, val value: Int) : Value(type) {
     override val replaceAble = false
     override fun str(env: NameEnv) = "$value $type"
 
-    override fun verify() {}
+    override fun doVerify() {}
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -50,6 +56,6 @@ class Constant constructor(type: Type, val value: Int) : Value(type) {
 }
 
 object UnitValue : Value(UnitType) {
-    override fun verify() {}
+    override fun doVerify() {}
     override fun str(env: NameEnv) = "unit"
 }

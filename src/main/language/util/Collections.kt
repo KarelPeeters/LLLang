@@ -1,28 +1,45 @@
 package language.util
 
-fun <T> MutableList<T>.replace(from: T, to: T): Boolean {
-    val iter = listIterator()
-    var replaced = false
-    for (e in iter) {
-        if (e == from) {
-            iter.set(to)
-            replaced = true
-        }
+class Bag<K> {
+    val map: MutableMap<K, Int>
+
+    constructor() {
+        map = mutableMapOf()
     }
-    return replaced
+
+    constructor(map: Map<K, Int>) {
+        this.map = map.toMutableMap()
+    }
+
+    val size get() = map.size
+
+    val keys get(): Set<K> = map.keys
+
+    fun get(key: K): Int = map[key] ?: 0
+
+    fun add(key: K, delta: Int = 1): Int {
+        val new = (map[key] ?: 0) + delta
+
+        when {
+            new < 0 -> throw IllegalStateException("$key went below 0")
+            new > 0 -> map[key] = new
+            else -> map.remove(key)
+        }
+
+        return new
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        other as Bag<*>
+        return map == other.map
+    }
+
+    override fun hashCode(): Int = map.hashCode()
 }
 
-fun <K, V> MutableMap<K, V>.replaceValues(from: V, to: V): Boolean {
-    val iter = iterator()
-    var replaced = false
-    for (entry in iter) {
-        if (entry.value == from) {
-            entry.setValue(to)
-            replaced = true
-        }
-    }
-    return replaced
-}
+fun <T> Map<T, Int>.toBag() = Bag(this)
 
 fun <T, F, R> Iterable<T>.mapFold(initial: F, block: (F, T) -> Pair<F, R>): Pair<F, List<R>> {
     var acc = initial

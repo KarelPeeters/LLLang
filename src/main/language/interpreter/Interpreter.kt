@@ -136,7 +136,7 @@ class Interpreter(val program: Program) {
                         values.getInst(instr.sources.getValue(prevBlock!!))
                     }
                     is Eat -> {
-                        for (operand in instr.operands)
+                        for (operand in instr.arguments)
                             values.getInst(operand)
                         null
                     }

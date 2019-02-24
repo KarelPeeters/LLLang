@@ -85,7 +85,7 @@ object AllocToPhi : FunctionPass {
                     if (value == null)
                         problemPhis += phi
                     else
-                        phi.set(pred, value)
+                        phi.sources[pred] = value
                 }
             }
 

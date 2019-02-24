@@ -26,7 +26,7 @@ class BasicBlock(val name: String?) : Value(BlockType) {
         this._function = function
     }
 
-    override fun verify() {
+    override fun doVerify() {
         check(instructions.lastOrNull() is Terminator) { "block must end with Terminator" }
         check(instructions.dropLast(1).all { it !is Terminator }) { "only the last instruction is a Terminator" }
         check(instructions.all { it.block == this }) { "instruction.block must be this block" }

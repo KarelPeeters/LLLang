@@ -7,7 +7,7 @@ object DeadInstructionElimination : FunctionPass {
     override fun FunctionContext.optimize(function: Function) {
         val used = object : Graph<Instruction> {
             override val roots = function.blocks.flatMap { it.instructions }.filter { !it.pure }
-            override fun children(node: Instruction) = node.operands.filterIsInstance<Instruction>()
+            override fun children(node: Instruction) = node.operands.filterIsInstance<Instruction>().toList()
         }.reached()
 
         for (block in function.blocks) {
