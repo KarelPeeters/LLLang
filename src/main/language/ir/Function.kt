@@ -86,12 +86,10 @@ class Function(
         val nameStr = env.function(this)
         val paramStr = parameters.joinToString { it.str(env) }
         val returnStr = if (returnType == UnitType) "" else ": $returnType"
+        val entryStr = if (entry != blocks.first()) "entry: ${entry.str(env)}" else ""
 
-        return """
-            fun $nameStr($paramStr): $returnStr {
-                entry: ${entry.str(env)}
-
-        """.trimIndent() + blocks.joinToString("\n\n    ", prefix = "    ") { it.fullStr(env).replace("\n", "\n    ") } + "\n}\n"
+        return "fun $nameStr($paramStr)$returnStr { $entryStr\n" +
+               blocks.joinToString("\n\n    ", prefix = "    ") { it.fullStr(env).replace("\n", "\n    ") } + "\n}\n"
     }
 
     override fun str(env: NameEnv) = env.function(this)
