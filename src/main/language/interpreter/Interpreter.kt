@@ -10,6 +10,8 @@ import language.ir.Constant
 import language.ir.Eat
 import language.ir.Exit
 import language.ir.Function
+import language.ir.GetPointer
+import language.ir.GetValue
 import language.ir.Instruction
 import language.ir.IntegerType
 import language.ir.IntegerType.Companion.bool
@@ -149,6 +151,8 @@ class Interpreter(val program: Program) {
                         callFunction(instr.function, callArgs, stack + frame)
                         ?: return null //propagate exit*/
                     }
+                    is GetValue -> TODO("get")
+                    is GetPointer -> TODO("getptr")
                     is Terminator -> {
                         require(i == currBlock.instructions.lastIndex) { "Terminators can only appear at the end of a BasicBlock" }
                         prevBlock = currBlock

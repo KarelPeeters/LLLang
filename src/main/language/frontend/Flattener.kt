@@ -7,18 +7,21 @@ import language.ir.Branch
 import language.ir.Constant
 import language.ir.Eat
 import language.ir.FunctionType
+import language.ir.GetValue
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
 import language.ir.Jump
 import language.ir.Load
 import language.ir.Return
 import language.ir.Store
+import language.ir.StructType
+import language.ir.StructValue
 import language.ir.Type
 import language.ir.UnitType
 import language.ir.UnitValue
 import language.ir.Value
 import language.ir.unpoint
-import language.util.mapFold
+import language.util.foldMap
 import java.util.*
 import language.ir.BinaryOp as IrBinaryOp
 import language.ir.Call as IrCall
@@ -67,11 +70,14 @@ class Flattener {
     private lateinit var currentFunction: IrFunction
     private val allocs = mutableListOf<Alloc>()
     private val loopBlockStack = ArrayDeque<LoopBlocks>()
+    val structs = mutableMapOf<String, Pair<Struct, StructType>>()
 
     fun newBlock(name: String? = null) = BasicBlock(name).also { currentFunction.add(it) }
 
     fun flatten(astProgram: Program) {
         val programScope = Scope(null)
+        structs.clear()
+
         val functions = mutableListOf<Pair<Function, IrFunction>>()
 
         //register top levels
@@ -91,8 +97,16 @@ class Flattener {
                     program.addFunction(irFunction)
                     if (name == "main")
                         program.entry = irFunction
+                    Unit
                 }
-            }
+                is Struct -> {
+                    val name = topLevel.name
+                    val properties = topLevel.properties.map { resolveType(it.type) }
+                    val structType = StructType(name, properties)
+                    structs[name] = topLevel to structType
+
+                }
+            }.also {}
         }
 
         //generate code
@@ -261,8 +275,8 @@ class Flattener {
                 when (exp.target.identifier) {
                     "eat" -> {
                         val eat = Eat()
-                        val (after, arguments) = exp.arguments.mapFold(this) { block, operand ->
-                            block.appendExpression(scope, operand)
+                        val (after, arguments) = exp.arguments.foldMap(this) { block, arg ->
+                            block.appendExpression(scope, arg)
                         }
                         eat.arguments.addAll(arguments)
                         after.append(eat)
@@ -276,17 +290,29 @@ class Flattener {
                         after.append(result)
                         after to result
                     }
+                    in structs -> {
+                        val (_, type) = structs.getValue(exp.target.identifier)
+
+                        val (after, arguments) = exp.arguments.foldMap(this) { block, arg ->
+                            block.appendExpression(scope, arg)
+                        }
+
+                        val value = StructValue(type, arguments)
+                        after to value
+                    }
                     else -> null
                 }
             } else null
 
             ret ?: run {
                 val (afterTarget, target) = appendExpression(scope, exp.target)
-                val (next, arguments) = exp.arguments.mapFold(afterTarget) { block, arg ->
+                val (next, arguments) = exp.arguments.foldMap(afterTarget) { block, arg ->
                     block.appendExpression(scope, arg)
                 }
 
-                val targetTypes = (target.type as FunctionType).paramTypes
+                if (target.type !is FunctionType)
+                    throw IllegalCallTarget(exp.position, target.type)
+                val targetTypes = target.type.paramTypes
                 val argTypes = arguments.map { it.type }
                 if (argTypes != targetTypes)
                     throw ArgMismatchException(exp.position, targetTypes, argTypes)
@@ -296,17 +322,35 @@ class Flattener {
                 next to call
             }
         }
-        is Index -> TODO("index")
+        is DotIndex -> {
+            val (after, target) = appendExpression(scope, exp.target)
+            if (target.type !is StructType)
+                throw IllegalDotIndexTarget(exp.position, target.type)
+
+            val index = structs.getValue(target.type.name).first.properties.indexOfFirst { it.name == exp.index }
+            if (index == -1)
+                throw IdNotFoundException(exp.position, exp.index)
+
+            val result = GetValue(null, target, index)
+            after.append(result)
+            after to result
+        }
+        is ArrayIndex -> TODO("arrayIndex")
     }
 
     private fun resolveType(annotation: TypeAnnotation?, default: Type) =
             if (annotation == null) default else resolveType(annotation)
 
     private fun resolveType(annotation: TypeAnnotation): Type = when (annotation) {
-        is TypeAnnotation.Simple -> when (annotation.str) {
-            "bool" -> bool
-            "i32" -> i32
-            else -> throw IllegalTypeException(annotation)
+        is TypeAnnotation.Simple -> {
+            val str = annotation.str
+            when (str) {
+                "bool" -> bool
+                "i32" -> i32
+                in structs -> structs.getValue(str).second
+
+                else -> throw IllegalTypeException(annotation)
+            }
         }
         is TypeAnnotation.Function -> {
             FunctionType(
@@ -328,7 +372,7 @@ class DuplicateDeclarationException(pos: SourcePosition, identifier: String)
     : Exception("$pos: '$identifier' was already declared")
 
 class IllegalTypeException(type: TypeAnnotation)
-    : Exception("${type.position}: Illegal type '$type'")
+    : Exception("Illegal type '$type' at ${type.position}")
 
 class VariableImmutableException(pos: SourcePosition, name: String)
     : Exception("Can't mutate variable '$name' at $pos")
@@ -346,3 +390,9 @@ class ArgMismatchException : Exception {
     constructor(pos: SourcePosition, expectedCount: Int, actualCount: Int) :
             super("Argument mismatch: expected $expectedCount arguments, got $actualCount at $pos")
 }
+
+class IllegalCallTarget(pos: SourcePosition, type: Type)
+    : Exception("Can't call type $type at $pos")
+
+class IllegalDotIndexTarget(pos: SourcePosition, type: Type)
+    : Exception("Can't dot index type $type at $pos")

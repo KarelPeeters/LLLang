@@ -41,7 +41,7 @@ class Bag<K> {
 
 fun <T> Map<T, Int>.toBag() = Bag(this)
 
-fun <T, F, R> Iterable<T>.mapFold(initial: F, block: (F, T) -> Pair<F, R>): Pair<F, List<R>> {
+fun <T, F, R> Iterable<T>.foldMap(initial: F, block: (F, T) -> Pair<F, R>): Pair<F, List<R>> {
     var acc = initial
     val list = this.map {
         val (na, nt) = block(acc, it)

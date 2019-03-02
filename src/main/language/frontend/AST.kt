@@ -22,6 +22,16 @@ sealed class TopLevel(
         position: SourcePosition
 ) : ASTNode(position)
 
+class Struct(
+        position: SourcePosition,
+        val name: String,
+        val properties: List<Parameter>
+) : TopLevel(position) {
+    override fun ASTRenderer.render() {
+        print("struct $name("); printList(properties); print(")")
+    }
+}
+
 class Function(
         position: SourcePosition,
         val name: String,
@@ -160,13 +170,23 @@ class Call(
     }
 }
 
-class Index(
+class ArrayIndex(
         position: SourcePosition,
         val target: Expression,
         val index: Expression
 ) : Expression(position) {
     override fun ASTRenderer.render() {
-        print(target); print("["); print(index); print("]")
+        safePrint(target); print("["); print(index); print("]")
+    }
+}
+
+class DotIndex(
+        position: SourcePosition,
+        val target: Expression,
+        val index: String
+) : Expression(position) {
+    override fun ASTRenderer.render() {
+        safePrint(target); print("."); print(index)
     }
 }
 

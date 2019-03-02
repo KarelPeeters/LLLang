@@ -3,10 +3,12 @@ package language.frontend
 import language.frontend.TokenType.*
 import language.frontend.TokenType.Boolean
 import language.frontend.TokenType.Number
+import language.frontend.TokenType.Struct
 import language.ir.ArithmeticOpType
 import language.ir.ComparisonOpType
 import language.ir.UnaryOpType
 import java.util.*
+import language.frontend.Struct as ASTStruct
 
 class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     fun parse() = program()
@@ -19,9 +21,19 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
 
     private fun topLevel(): TopLevel {
         return when {
+            at(Struct) -> struct()
             at(Fun) -> function()
             else -> unexpected()
         }
+    }
+
+    private fun struct(): ASTStruct {
+        val pos = currentPosition
+        expect(Struct)
+        val name = expect(Id).text
+        expect(OpenB)
+        val properties = list(CloseB, ::parameter)
+        return ASTStruct(pos, name, properties)
     }
 
     private fun function(): Function {
@@ -29,12 +41,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         expect(Fun)
         val name = expect(Id).text
         expect(OpenB)
-        val parameters = list(CloseB) {
-            val pPos = currentPosition
-            val pName = expect(Id).text
-            expect(Colon)
-            Parameter(pPos, pName, type())
-        }
+        val parameters = list(CloseB, ::parameter)
         val ret = if (accept(Colon)) type() else null
 
         val content = when {
@@ -44,6 +51,13 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         }
 
         return Function(pos, name, parameters, ret, content)
+    }
+
+    private fun parameter(): Parameter {
+        val pPos = currentPosition
+        val pName = expect(Id).text
+        expect(Colon)
+        return Parameter(pPos, pName, type())
     }
 
     private fun block(end: TokenType) = CodeBlock(currentPosition, sequence {
@@ -257,7 +271,8 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
                 accept(Inc) -> TODO()
                 accept(Dec) -> TODO()
                 accept(OpenB) -> Call(pos, expr, expressionList(CloseB))
-                accept(OpenS) -> Index(pos, expr, expression())
+                accept(OpenS) -> ArrayIndex(pos, expr, expression())
+                accept(Dot) -> DotIndex(currentPosition, expr, expect(Id).text)
                 else -> return expr
             }
         }

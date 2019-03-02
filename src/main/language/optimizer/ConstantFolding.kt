@@ -4,9 +4,11 @@ import language.ir.BinaryOp
 import language.ir.Branch
 import language.ir.Constant
 import language.ir.Function
+import language.ir.GetValue
 import language.ir.Instruction
 import language.ir.Jump
 import language.ir.Phi
+import language.ir.StructValue
 import language.ir.UnaryOp
 import java.util.*
 
@@ -73,6 +75,17 @@ object ConstantFolding : FunctionPass {
             is Phi -> {
                 if (instr.sources.size == 1 || instr.sources.values.distinct().size == 1) {
                     val value = instr.sources.values.iterator().next()
+                    instr.replaceWith(value)
+                    instr.deleteFromBlock()
+
+                    instrChanged()
+                    return true
+                }
+            }
+            is GetValue -> {
+                val target = instr.target
+                if (target is StructValue) {
+                    val value = target.values[instr.index]
                     instr.replaceWith(value)
                     instr.deleteFromBlock()
 

@@ -151,6 +151,40 @@ class Call(name: String?, target: Value, arguments: List<Value>)
     }
 }
 
+class GetValue(name: String?, target: Value, val index: Int)
+    : Instruction(name, (target.type as StructType).properties[index], true) {
+    val target by operand(target)
+
+    override fun clone() = GetValue(name, target, index)
+
+    override fun doVerify() {
+        val structType = target.type
+        check(structType is StructType) { "target is a struct" }
+        check(index in structType.properties.indices) { "valid index" }
+        check(structType.properties[index] == this.type) { "type match" }
+    }
+
+    override fun fullStr(env: NameEnv) = "${str(env)} = get ${target.str(env)} $index"
+
+}
+
+class GetPointer(name: String?, target: Value, val index: Int)
+    : Instruction(name, (target.type.unpoint as StructType).properties[index].pointer, true) {
+
+    val target by operand(target)
+
+    override fun clone() = GetPointer(name, target, index)
+
+    override fun doVerify() {
+        val structType = target.type.unpoint
+        check(structType is StructType) { "target is a struct pointer" }
+        check(index in structType.properties.indices) { "valid index" }
+        check(structType.properties[index] == this.type) { "type match" }
+    }
+
+    override fun fullStr(env: NameEnv) = "${str(env)} = getptr ${target.str(env)} $index"
+}
+
 sealed class Terminator : Instruction(null, UnitType, false) {
     abstract fun targets(): Set<BasicBlock>
 }

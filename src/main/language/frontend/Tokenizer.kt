@@ -16,20 +16,19 @@ enum class TokenType(val string: String? = null) {
 
     //symbols
     Arrow("->"),
-    Inc("++"),
-    Dec("--"),
-    Power("**"),
+    Inc("++"), Dec("--"), Power("**"),
     Plus("+"), Minus("-"), Times("*"), Divide("/"), Percent("%"),
     DoubleAmper("&&"), DoublePipe("||"),
     Amper("&"), Pipe("|"), Caret("^"),
     LTE("<="), GTE(">="),
     LT("<"), GT(">"), EQ("=="), NEQ("!="),
     Bang("!"), Tilde("~"),
-    Assign("="), Semi(";"), EndLn("\n"), Colon(":"), Comma(","),
+    Assign("="), Semi(";"), EndLn("\n"),
+    Colon(":"), Comma(","), Dot("."),
 
     //keywords
-    If("if"),
-    Else("else"),
+    Struct("struct"),
+    If("if"), Else("else"),
     While("while"), For("for"),
     Break("break"), Continue("continue"),
     Fun("fun"), Return("return"),
