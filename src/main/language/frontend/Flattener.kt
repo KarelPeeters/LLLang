@@ -157,15 +157,15 @@ class Flattener {
     private fun BasicBlock.appendStatement(scope: Scope, stmt: Statement): BasicBlock? = when (stmt) {
         is Expression -> appendExpression(scope, stmt).first
         is Declaration -> {
-            val type = resolveType(stmt.type, i32)
+            val (next, value) = appendExpression(scope, stmt.value)
+
+            val type = resolveType(stmt.type, value.type)
+            requireTypeMatch(stmt.position, type, value.type)
+
             val alloc = Alloc(stmt.identifier, type)
             allocs += alloc
-
             val variable = Variable.Memory(stmt.identifier, alloc, stmt.mutable)
             scope.register(stmt.position, variable)
-
-            val (next, value) = appendExpression(scope, stmt.value)
-            requireTypeMatch(stmt.position, type, value.type)
 
             next.append(Store(alloc, value))
             next
