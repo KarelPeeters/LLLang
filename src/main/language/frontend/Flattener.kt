@@ -7,6 +7,7 @@ import language.ir.Branch
 import language.ir.Constant
 import language.ir.Eat
 import language.ir.FunctionType
+import language.ir.GetPointer
 import language.ir.GetValue
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
@@ -31,20 +32,18 @@ import language.ir.UnaryOp as IrUnaryOp
 
 sealed class Variable(val name: String, val type: Type, val mutable: Boolean) {
     abstract fun loadValue(block: BasicBlock): Value
-    abstract fun storeValue(block: BasicBlock, value: Value)
+    abstract fun pointer(): Value?
 
     class Memory(name: String, val pointer: Value, mutable: Boolean)
         : Variable(name, pointer.type.unpoint!!, mutable) {
         override fun loadValue(block: BasicBlock) = Load(name, pointer).also { block.append(it) }
-        override fun storeValue(block: BasicBlock, value: Value) {
-            block.append(Store(pointer, value))
-        }
+        override fun pointer(): Value = pointer
     }
 
     class FixedValue(name: String, val value: Value)
         : Variable(name, value.type, false) {
         override fun loadValue(block: BasicBlock) = value
-        override fun storeValue(block: BasicBlock, value: Value) = throw IllegalStateException()
+        override fun pointer(): Nothing? = null
     }
 }
 
@@ -167,7 +166,8 @@ class Flattener {
 
             val (next, value) = appendExpression(scope, stmt.value)
             requireTypeMatch(stmt.position, type, value.type)
-            variable.storeValue(next, value)
+
+            next.append(Store(alloc, value))
             next
         }
         is CodeBlock -> appendNestedBlock(scope, stmt)
@@ -222,17 +222,38 @@ class Flattener {
             null
         }
         is ReturnStatement -> {
-            val (afterValue, value) = appendExpression(scope, stmt.value)
+            val (afterValue, value) = stmt.value?.let { value ->
+                appendExpression(scope, value)
+            } ?: (this to UnitValue)
+
             requireTypeMatch(stmt.position, function.returnType, value.type)
             afterValue.terminator = Return(value)
             null
         }
     }
 
-    private fun BasicBlock.appendExpression(scope: Scope, exp: Expression?): Pair<BasicBlock, Value> = when (exp) {
-        null -> {
-            this to UnitValue
+    private fun BasicBlock.appendTargetExpression(scope: Scope, exp: Expression, immediate: Boolean): Pair<BasicBlock, Value> = when (exp) {
+        is IdentifierExpression -> {
+            val variable = scope.find(exp.identifier)
+                           ?: throw IdNotFoundException(exp.position, exp.identifier)
+            if (variable !is Variable.Memory || (immediate && !variable.mutable))
+                throw VariableImmutableException(exp.position, exp.identifier)
+
+            this to variable.pointer
         }
+        is DotIndex -> {
+            val (afterTarget, target) = this.appendTargetExpression(scope, exp.target, false)
+            val index = resolveStructIndex(exp.position, target.type.unpoint!!, exp.index)
+
+            val pointer = GetPointer(null, target, index)
+            afterTarget.append(pointer)
+            afterTarget to pointer
+        }
+        is ArrayIndex -> TODO("array indexing")
+        else -> throw IllegalAssignTarget(exp.position)
+    }
+
+    private fun BasicBlock.appendExpression(scope: Scope, exp: Expression): Pair<BasicBlock, Value> = when (exp) {
         is NumberLiteral -> {
             this to Constant(i32, exp.value.toInt())
         }
@@ -245,17 +266,12 @@ class Flattener {
             this to variable.loadValue(this)
         }
         is Assignment -> {
-            if (exp.target !is IdentifierExpression) TODO("other target types")
+            val (afterTarget, target) = appendTargetExpression(scope, exp.target, true)
+            val (afterValue, value) = afterTarget.appendExpression(scope, exp.value)
+            requireTypeMatch(exp.position, target.type.unpoint!!, value.type)
 
-            val assignTarget = scope.find(exp.target.identifier)
-                               ?: throw IdNotFoundException(exp.target.position, exp.target.identifier)
-            val (next, value) = appendExpression(scope, exp.value)
-            requireTypeMatch(exp.position, assignTarget.type, value.type)
-
-            if (!assignTarget.mutable)
-                throw VariableImmutableException(exp.position, exp.target.identifier)
-            assignTarget.storeValue(next, value)
-            next to value
+            afterValue.append(Store(target, value))
+            afterTarget to value
         }
         is BinaryOp -> {
             val (afterLeft, leftValue) = appendExpression(scope, exp.left)
@@ -324,18 +340,25 @@ class Flattener {
         }
         is DotIndex -> {
             val (after, target) = appendExpression(scope, exp.target)
-            if (target.type !is StructType)
-                throw IllegalDotIndexTarget(exp.position, target.type)
 
-            val index = structs.getValue(target.type.name).first.properties.indexOfFirst { it.name == exp.index }
-            if (index == -1)
-                throw IdNotFoundException(exp.position, exp.index)
-
+            val index = resolveStructIndex(exp.position, target.type, exp.index)
             val result = GetValue(null, target, index)
             after.append(result)
+
             after to result
         }
         is ArrayIndex -> TODO("arrayIndex")
+    }
+
+    private fun resolveStructIndex(pos: SourcePosition, type: Type, index: String): Int {
+        if (type !is StructType)
+            throw IllegalDotIndexTarget(pos, type)
+
+        val i = structs.getValue(type.name).first.properties.indexOfFirst { it.name == index }
+        if (i == -1)
+            throw IdNotFoundException(pos, index)
+
+        return i
     }
 
     private fun resolveType(annotation: TypeAnnotation?, default: Type) =
@@ -376,6 +399,9 @@ class IllegalTypeException(type: TypeAnnotation)
 
 class VariableImmutableException(pos: SourcePosition, name: String)
     : Exception("Can't mutate variable '$name' at $pos")
+
+class IllegalAssignTarget(pos: SourcePosition)
+    : Exception("Illegal assign target at $pos")
 
 class MissingReturnStatement(function: Function)
     : Exception("Function ${function.name} at ${function.position} missing return statement")

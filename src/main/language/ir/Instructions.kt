@@ -179,7 +179,7 @@ class GetPointer(name: String?, target: Value, val index: Int)
         val structType = target.type.unpoint
         check(structType is StructType) { "target is a struct pointer" }
         check(index in structType.properties.indices) { "valid index" }
-        check(structType.properties[index] == this.type) { "type match" }
+        check(structType.properties[index].pointer == this.type) { "type match" }
     }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = getptr ${target.str(env)} $index"
