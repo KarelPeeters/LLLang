@@ -318,6 +318,11 @@ class Flattener {
                     in structs -> {
                         val (after, arguments) = this.appendExpressionList(scope, exp.arguments)
                         val (_, type) = structs.getValue(exp.target.identifier)
+
+                        val argTypes = arguments.map { it.type }
+                        if (type.propertyTypes != argTypes)
+                            throw ArgMismatchException(exp.position, type.propertyTypes, argTypes)
+
                         val value = StructValue(type, arguments)
                         after to value
                     }
