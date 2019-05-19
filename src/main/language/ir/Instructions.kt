@@ -152,7 +152,7 @@ class Call(name: String?, target: Value, arguments: List<Value>)
 }
 
 class GetValue(name: String?, target: Value, val index: Int)
-    : Instruction(name, (target.type as StructType).properties[index], true) {
+    : Instruction(name, (target.type as StructType).propertyTypes[index], true) {
     val target by operand(target)
 
     override fun clone() = GetValue(name, target, index)
@@ -160,29 +160,47 @@ class GetValue(name: String?, target: Value, val index: Int)
     override fun doVerify() {
         val structType = target.type
         check(structType is StructType) { "target is a struct" }
-        check(index in structType.properties.indices) { "valid index" }
-        check(structType.properties[index] == this.type) { "type match" }
+        check(index in structType.propertyTypes.indices) { "valid index" }
+        check(structType.propertyTypes[index] == this.type) { "type match" }
     }
 
     override fun fullStr(env: NameEnv) = "${str(env)} = get ${target.str(env)} $index"
 
 }
 
-class GetPointer(name: String?, target: Value, val index: Int)
-    : Instruction(name, (target.type.unpoint as StructType).properties[index].pointer, true) {
+class GetArrayValuePointer(name: String?, target: Value, index: Value)
+    : Instruction(name, (target.type.unpoint as ArrayType).inner.pointer, true) {
+
+    val target by operand(target)
+    val index by operand(index)
+
+    override fun clone() = GetArrayValuePointer(name, target, index)
+
+    override fun doVerify() {
+        val arrType = target.type.unpoint
+        check(arrType is ArrayType) { "target is a struct pointer" }
+        check(index.type is IntegerType) { "index is integer" }
+        check(arrType.inner.pointer == this.type) { "type match" }
+    }
+
+    override fun fullStr(env: NameEnv) = "${str(env)} = aptr ${target.str(env)} ${index.str(env)}"
+}
+
+class GetStructPropertyPointer(name: String?, target: Value, val index: Int)
+    : Instruction(name, (target.type.unpoint as StructType).propertyTypes[index].pointer, true) {
 
     val target by operand(target)
 
-    override fun clone() = GetPointer(name, target, index)
+    override fun clone() = GetStructPropertyPointer(name, target, index)
 
     override fun doVerify() {
         val structType = target.type.unpoint
         check(structType is StructType) { "target is a struct pointer" }
-        check(index in structType.properties.indices) { "valid index" }
-        check(structType.properties[index].pointer == this.type) { "type match" }
+        check(index in structType.propertyTypes.indices) { "valid index" }
+        check(structType.propertyTypes[index].pointer == this.type) { "type match" }
     }
 
-    override fun fullStr(env: NameEnv) = "${str(env)} = getptr ${target.str(env)} $index"
+    override fun fullStr(env: NameEnv) = "${str(env)} = sptr ${target.str(env)} $index"
 }
 
 sealed class Terminator : Instruction(null, UnitType, false) {

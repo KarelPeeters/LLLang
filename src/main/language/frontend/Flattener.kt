@@ -1,13 +1,16 @@
 package language.frontend
 
 import language.ir.Alloc
+import language.ir.ArrayType
+import language.ir.ArrayValue
 import language.ir.BasicBlock
 import language.ir.Blur
 import language.ir.Branch
 import language.ir.Constant
 import language.ir.Eat
 import language.ir.FunctionType
-import language.ir.GetPointer
+import language.ir.GetArrayValuePointer
+import language.ir.GetStructPropertyPointer
 import language.ir.GetValue
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
@@ -22,7 +25,6 @@ import language.ir.UnitType
 import language.ir.UnitValue
 import language.ir.Value
 import language.ir.unpoint
-import language.util.foldMap
 import java.util.*
 import language.ir.BinaryOp as IrBinaryOp
 import language.ir.Call as IrCall
@@ -232,6 +234,7 @@ class Flattener {
         }
     }
 
+    //immediate: whether this is the first store into a new variable, ie. whether mutably should be respected
     private fun BasicBlock.appendTargetExpression(scope: Scope, exp: Expression, immediate: Boolean): Pair<BasicBlock, Value> = when (exp) {
         is IdentifierExpression -> {
             val variable = scope.find(exp.identifier)
@@ -245,11 +248,19 @@ class Flattener {
             val (afterTarget, target) = this.appendTargetExpression(scope, exp.target, false)
             val index = resolveStructIndex(exp.position, target.type.unpoint!!, exp.index)
 
-            val pointer = GetPointer(null, target, index)
+            val pointer = GetStructPropertyPointer(null, target, index)
             afterTarget.append(pointer)
             afterTarget to pointer
         }
-        is ArrayIndex -> TODO("array indexing")
+        is ArrayIndex -> {
+            val (afterTarget, target) = appendTargetExpression(scope, exp.target, false)
+            val (afterIndex, index) = afterTarget.appendExpression(scope, exp.index)
+
+            val pointer = GetArrayValuePointer(null, target, index)
+            afterIndex.append(pointer)
+
+            afterIndex to pointer
+        }
         else -> throw IllegalAssignTarget(exp.position)
     }
 
@@ -291,9 +302,7 @@ class Flattener {
                 when (exp.target.identifier) {
                     "eat" -> {
                         val eat = Eat()
-                        val (after, arguments) = exp.arguments.foldMap(this) { block, arg ->
-                            block.appendExpression(scope, arg)
-                        }
+                        val (after, arguments) = this.appendExpressionList(scope, exp.arguments)
                         eat.arguments.addAll(arguments)
                         after.append(eat)
                         after to eat
@@ -307,12 +316,8 @@ class Flattener {
                         after to result
                     }
                     in structs -> {
+                        val (after, arguments) = this.appendExpressionList(scope, exp.arguments)
                         val (_, type) = structs.getValue(exp.target.identifier)
-
-                        val (after, arguments) = exp.arguments.foldMap(this) { block, arg ->
-                            block.appendExpression(scope, arg)
-                        }
-
                         val value = StructValue(type, arguments)
                         after to value
                     }
@@ -322,9 +327,7 @@ class Flattener {
 
             ret ?: run {
                 val (afterTarget, target) = appendExpression(scope, exp.target)
-                val (next, arguments) = exp.arguments.foldMap(afterTarget) { block, arg ->
-                    block.appendExpression(scope, arg)
-                }
+                val (next, arguments) = afterTarget.appendExpressionList(scope, exp.arguments)
 
                 if (target.type !is FunctionType)
                     throw IllegalCallTarget(exp.position, target.type)
@@ -347,7 +350,42 @@ class Flattener {
 
             after to result
         }
-        is ArrayIndex -> TODO("arrayIndex")
+        is ArrayInitializer -> {
+            val (after, values) = appendExpressionList(scope, exp.values)
+
+            val innerType = values.firstOrNull()?.type
+                            ?: TODO("proper initializer type inference -> support empty arrays")
+            for (value in values)
+                requireTypeMatch(exp.position, innerType, value.type)
+
+            val arrType = ArrayType(innerType, values.size)
+            after to ArrayValue(arrType, values)
+        }
+        is ArrayIndex -> {
+            val (afterTarget, target) = appendTargetExpression(scope, exp.target, false)
+            val (afterIndex, index) = afterTarget.appendExpression(scope, exp.index)
+
+            val pointer = GetArrayValuePointer(null, target, index)
+            val load = Load(null, pointer)
+
+            afterIndex.append(pointer)
+            afterIndex.append(load)
+
+            afterIndex to load
+        }
+    }
+
+    private fun BasicBlock.appendExpressionList(scope: Scope, list: List<Expression>): Pair<BasicBlock, List<Value>> {
+        var current = this
+        val result = mutableListOf<Value>()
+
+        for (exp in list) {
+            val (next, value) = current.appendExpression(scope, exp)
+            current = next
+            result += value
+        }
+
+        return current to result
     }
 
     private fun resolveStructIndex(pos: SourcePosition, type: Type, index: String): Int {
@@ -379,6 +417,12 @@ class Flattener {
             FunctionType(
                     annotation.paramTypes.map { resolveType(it) },
                     resolveType(annotation.returnType)
+            )
+        }
+        is TypeAnnotation.Array -> {
+            ArrayType(
+                    resolveType(annotation.innerType),
+                    annotation.size
             )
         }
     }

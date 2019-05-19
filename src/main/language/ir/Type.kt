@@ -22,9 +22,19 @@ class PointerType private constructor(val inner: Type) : Type() {
     override fun toString() = "$inner*"
 
     companion object {
+
         private val map = mutableMapOf<Type, PointerType>()
         fun pointTo(type: Type) = map.getOrPut(type) { PointerType(type) }
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        other as PointerType
+        return inner == other.inner
+    }
+
+    override fun hashCode() = inner.hashCode()
 }
 
 val Type.pointer get() = PointerType.pointTo(this)

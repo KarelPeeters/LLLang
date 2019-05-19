@@ -180,6 +180,15 @@ class ArrayIndex(
     }
 }
 
+class ArrayInitializer(
+        position: SourcePosition,
+        val values: List<Expression>
+) : Expression(position) {
+    override fun ASTRenderer.render() {
+        println("["); printList(values); print("]")
+    }
+}
+
 class DotIndex(
         position: SourcePosition,
         val target: Expression,
@@ -264,6 +273,17 @@ sealed class TypeAnnotation(
 
         override fun toString() =
                 "(" + paramTypes.joinToString { it.toString() } + ") -> " + returnType
+    }
+
+    class Array(
+            position: SourcePosition,
+            val innerType: TypeAnnotation,
+            val size: Int
+    ) : TypeAnnotation(position) {
+        override fun ASTRenderer.render() {
+            print("["); print(innerType); print(", "); print(size.toString()); print("]")
+        }
+
     }
 }
 

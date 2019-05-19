@@ -28,8 +28,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     }
 
     private fun struct(): ASTStruct {
-        val pos = currentPosition
-        expect(Struct)
+        val pos = expect(Struct).position
         val name = expect(Id).text
         expect(OpenB)
         val properties = list(CloseB, ::parameter)
@@ -37,8 +36,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     }
 
     private fun function(): Function {
-        val pos = currentPosition
-        expect(Fun)
+        val pos = expect(Fun).position
         val name = expect(Id).text
         expect(OpenB)
         val parameters = list(CloseB, ::parameter)
@@ -271,7 +269,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
                 accept(Inc) -> TODO()
                 accept(Dec) -> TODO()
                 accept(OpenB) -> Call(pos, expr, expressionList(CloseB))
-                accept(OpenS) -> ArrayIndex(pos, expr, expression())
+                accept(OpenS) -> ArrayIndex(pos, expr, expression()).also { expect(CloseS) }
                 accept(Dot) -> DotIndex(currentPosition, expr, expect(Id).text)
                 else -> return expr
             }
@@ -281,6 +279,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     private fun atomic(): Expression {
         return when {
             accept(OpenB) -> expression().also { expect(CloseB) }
+            at(OpenC) -> arrayInitializer()
             at(Boolean) -> BooleanLiteral(currentPosition, pop().text.toBoolean())
             at(Number) -> NumberLiteral(currentPosition, pop().text)
             at(Id) -> IdentifierExpression(currentPosition, pop().text)
@@ -288,15 +287,32 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         }
     }
 
+    private fun arrayInitializer(): Expression {
+        val pos = expect(OpenC).position
+        val values = expressionList(CloseC)
+        return ArrayInitializer(pos, values)
+    }
+
     private fun type(): TypeAnnotation = when {
+        //identifier
         at(Id) -> TypeAnnotation.Simple(currentPosition, pop().text)
+        //function
         at(OpenB) -> {
-            val pos = currentPosition
-            pop()
+            val pos = pop().position
             val params = list(CloseB) { type() }
             expect(Arrow)
             val returnType = type()
             TypeAnnotation.Function(pos, params, returnType)
+        }
+        //array
+        at(OpenS) -> {
+            val pos = pop().position
+            val innerType = type()
+            expect(Comma)
+            val size = expect(Number).text.toInt()
+            expect(CloseS)
+
+            TypeAnnotation.Array(pos, innerType, size)
         }
         else -> unexpected()
     }
