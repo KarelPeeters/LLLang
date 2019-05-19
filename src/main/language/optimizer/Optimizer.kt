@@ -58,6 +58,7 @@ class Optimizer(var doVerify: Boolean = true) {
     )
 
     private val functionPasses: List<FunctionPass> = listOf(
+            SplitAggregate,
             AllocToPhi,
             ConstantFolding,
             DeadInstructionElimination,

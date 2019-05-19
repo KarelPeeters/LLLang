@@ -37,7 +37,7 @@ object AllocToPhi : FunctionPass {
                         toVisit.push(block)
 
                         val phi = Phi(variable.name, variable.inner)
-                        block.insertAt(0, phi)
+                        block.add(0, phi)
                         phis[block] = phi
                     }
                 }
@@ -53,7 +53,7 @@ object AllocToPhi : FunctionPass {
                 while (true) {
                     //drop the instructions after the use instruction
                     val instructions = if (curr == block && use != null)
-                        curr.instructions.subList(0, curr.instructions.indexOf(use))
+                        curr.instructions.subList(0, use.indexInBlock())
                     else
                         curr.instructions
 

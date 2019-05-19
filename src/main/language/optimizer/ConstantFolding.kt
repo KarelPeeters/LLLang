@@ -1,5 +1,6 @@
 package language.optimizer
 
+import language.ir.AggregateValue
 import language.ir.BinaryOp
 import language.ir.Branch
 import language.ir.Constant
@@ -8,7 +9,6 @@ import language.ir.GetValue
 import language.ir.Instruction
 import language.ir.Jump
 import language.ir.Phi
-import language.ir.StructValue
 import language.ir.UnaryOp
 import java.util.*
 
@@ -84,7 +84,7 @@ object ConstantFolding : FunctionPass {
             }
             is GetValue -> {
                 val target = instr.target
-                if (target is StructValue) {
+                if (target is AggregateValue) {
                     val value = target.values[instr.index]
                     instr.replaceWith(value)
                     instr.deleteFromBlock()

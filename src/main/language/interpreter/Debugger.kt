@@ -162,7 +162,7 @@ class Debugger(
     private fun renderStack(env: NameEnv): List<String> = state.stack.map {
         val func = it.currFunction.str(env)
         val block = it.currBlock.str(env)
-        val instr = it.currBlock.instructions.indexOf(it.current)
+        val instr = it.current.indexInBlock()
         "$func:$block:$instr"
     }
 

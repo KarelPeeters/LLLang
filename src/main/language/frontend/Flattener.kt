@@ -1,16 +1,15 @@
 package language.frontend
 
+import language.ir.AggregateValue
 import language.ir.Alloc
 import language.ir.ArrayType
-import language.ir.ArrayValue
 import language.ir.BasicBlock
 import language.ir.Blur
 import language.ir.Branch
 import language.ir.Constant
 import language.ir.Eat
 import language.ir.FunctionType
-import language.ir.GetArrayValuePointer
-import language.ir.GetStructPropertyPointer
+import language.ir.GetSubPointer
 import language.ir.GetValue
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
@@ -19,7 +18,6 @@ import language.ir.Load
 import language.ir.Return
 import language.ir.Store
 import language.ir.StructType
-import language.ir.StructValue
 import language.ir.Type
 import language.ir.UnitType
 import language.ir.UnitValue
@@ -146,7 +144,7 @@ class Flattener {
             }
         }
 
-        allocs.asReversed().forEach { entry.insertAt(0, it) }
+        entry.addAll(0, allocs)
     }
 
     private fun BasicBlock.appendNestedBlock(scope: Scope, block: CodeBlock): BasicBlock? {
@@ -248,7 +246,7 @@ class Flattener {
             val (afterTarget, target) = this.appendTargetExpression(scope, exp.target, false)
             val index = resolveStructIndex(exp.position, target.type.unpoint!!, exp.index)
 
-            val pointer = GetStructPropertyPointer(null, target, index)
+            val pointer = GetSubPointer.Struct(null, target, index)
             afterTarget.append(pointer)
             afterTarget to pointer
         }
@@ -256,7 +254,7 @@ class Flattener {
             val (afterTarget, target) = appendTargetExpression(scope, exp.target, false)
             val (afterIndex, index) = afterTarget.appendExpression(scope, exp.index)
 
-            val pointer = GetArrayValuePointer(null, target, index)
+            val pointer = GetSubPointer.Array(null, target, index)
             afterIndex.append(pointer)
 
             afterIndex to pointer
@@ -320,10 +318,11 @@ class Flattener {
                         val (_, type) = structs.getValue(exp.target.identifier)
 
                         val argTypes = arguments.map { it.type }
-                        if (type.propertyTypes != argTypes)
-                            throw ArgMismatchException(exp.position, type.propertyTypes, argTypes)
+                        if (type.properties != argTypes)
+                            throw ArgMismatchException(exp.position, type.properties, argTypes)
 
-                        val value = StructValue(type, arguments)
+                        val value = AggregateValue(null, type, arguments)
+                        after.append(value)
                         after to value
                     }
                     else -> null
@@ -364,13 +363,15 @@ class Flattener {
                 requireTypeMatch(exp.position, innerType, value.type)
 
             val arrType = ArrayType(innerType, values.size)
-            after to ArrayValue(arrType, values)
+            val arrValue = AggregateValue(null, arrType, values)
+            after.append(arrValue)
+            after to arrValue
         }
         is ArrayIndex -> {
             val (afterTarget, target) = appendTargetExpression(scope, exp.target, false)
             val (afterIndex, index) = afterTarget.appendExpression(scope, exp.index)
 
-            val pointer = GetArrayValuePointer(null, target, index)
+            val pointer = GetSubPointer.Array(null, target, index)
             val load = Load(null, pointer)
 
             afterIndex.append(pointer)

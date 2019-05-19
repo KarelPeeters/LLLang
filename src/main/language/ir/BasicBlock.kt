@@ -21,10 +21,12 @@ class BasicBlock(val name: String?) : Value(BlockType) {
 
     private var _function: Function? = null
     val function get() = _function!!
-
     fun setFunction(function: Function?) {
         this._function = function
     }
+
+    fun indexInFunction() = function.blocks.indexOf(this)
+            .also { require(it >= 0) }
 
     override fun doVerify() {
         check(instructions.lastOrNull() is Terminator) { "block must end with Terminator" }
@@ -36,11 +38,6 @@ class BasicBlock(val name: String?) : Value(BlockType) {
             check(instr.block == this) { "instructions must refer to this block" }
             instr.verify()
         }
-    }
-
-    fun insertAt(index: Int, instruction: Instruction) {
-        this.instructions.add(index, instruction)
-        instruction.setBlock(this)
     }
 
     fun appendOrReplaceTerminator(instruction: Instruction) {
@@ -59,6 +56,17 @@ class BasicBlock(val name: String?) : Value(BlockType) {
             this.instructions.add(instruction)
 
         instruction.setBlock(this)
+    }
+
+    fun add(index: Int, instruction: Instruction) {
+        this.instructions.add(index, instruction)
+        instruction.setBlock(this)
+    }
+
+    fun addAll(index: Int, instructions: List<Instruction>) {
+        this.instructions.addAll(index, instructions)
+        for (instr in instructions)
+            instr.setBlock(this)
     }
 
     fun remove(instruction: Instruction) {

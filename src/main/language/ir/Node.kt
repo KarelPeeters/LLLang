@@ -35,7 +35,7 @@ abstract class Node {
         }
     }
 
-    /** Shallow delete this Node: _only_ remove this Node as user of its operand */
+    /** Shallow delete this Node: _only_ remove this Node as user of its operands */
     fun shallowDelete() {
         for (operand in operands)
             check(operand.users.remove(this))
@@ -59,7 +59,7 @@ abstract class Node {
         check(counts == useCounts) { "counts must be correct" }
 
         for (operand in operands) {
-            check(!operand.deleted) { "operands can't be deleted" }
+            check(!operand.deleted) { "operand was deleted" }
             check(this in operand.users) { "operand $operand must know it's used by $this" }
         }
 

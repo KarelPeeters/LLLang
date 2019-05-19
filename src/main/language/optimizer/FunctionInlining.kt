@@ -50,10 +50,9 @@ object FunctionInlining : ProgramPass {
             param.replaceWith(arg)
 
         //insert new blocks
-        var nextI = containingFunction.blocks.indexOf(beforeBlock)
-        for (block in targetClone.blocks)
-            containingFunction.add(++nextI, block)
-        containingFunction.add(++nextI, afterBlock)
+        val nextI = beforeBlock.indexInFunction()
+        containingFunction.add(nextI + 1, targetClone.blocks)
+        containingFunction.add(nextI + 1 + targetClone.blocks.size, afterBlock)
 
         //aggregate returns
         val returnPhi = Phi(null, targetClone.returnType)
@@ -69,7 +68,7 @@ object FunctionInlining : ProgramPass {
         call.replaceWith(returnPhi)
 
         //split code before and after call
-        val callIndex = beforeBlock.instructions.indexOf(call)
+        val callIndex = call.indexInBlock()
         beforeBlock.remove(call)
         val iter = beforeBlock.instructions.subList(callIndex, beforeBlock.instructions.size).iterator()
         for (instr in iter) {

@@ -1,5 +1,7 @@
 package language.ir
 
+import language.util.takeWhileIsInstance
+
 class Function(
         val name: String,
         parameters: List<Pair<String?, Type>>,
@@ -48,13 +50,19 @@ class Function(
 
     override fun doVerify() {
         check(entry in blocks) { "entry must be one of the blocks" }
+        check(entry.predecessors().isEmpty()) { "entry can't have other predecessors" }
+        check(entry.instructions.dropWhile { it is Alloc }.none { it is Alloc }) { "allocs must appear first in entry" }
 
         for (block in blocks) {
+            check(block.function == this) { "blocks must refer to this function" }
+
             val term = block.terminator
             if (term is Return)
                 check(term.value.type == returnType) { "return type must match, ${term.value.type} != $returnType" }
 
-            check(block.function == this) { "blocks must refer to this function" }
+            if (block != entry)
+                check(block.instructions.none { it is Alloc }) { "only entry block can contain allocs" }
+
             block.verify()
         }
     }
@@ -69,6 +77,12 @@ class Function(
         block.setFunction(this)
     }
 
+    fun add(index: Int, blocks: List<BasicBlock>) {
+        this.blocks.addAll(index, blocks)
+        for (block in blocks)
+            block.setFunction(this)
+    }
+
     fun remove(block: BasicBlock) {
         require(this.blocks.remove(block))
         block.setFunction(null)
@@ -79,6 +93,8 @@ class Function(
             block.deepDelete()
         shallowDelete()
     }
+
+    fun allocs() = entry.instructions.takeWhileIsInstance<Alloc>()
 
     fun fullStr(env: NameEnv): String {
         blocks.forEach { env.block(it) } //preset names to keep them ordered
