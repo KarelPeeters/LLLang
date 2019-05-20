@@ -12,7 +12,7 @@ import language.ir.Eat
 import language.ir.Exit
 import language.ir.Function
 import language.ir.GetSubPointer
-import language.ir.GetValue
+import language.ir.GetSubValue
 import language.ir.Instruction
 import language.ir.IntegerType
 import language.ir.IntegerType.Companion.bool
@@ -152,7 +152,8 @@ class Interpreter(val program: Program) {
                         callFunction(instr.function, callArgs, stack + frame)
                         ?: return null //propagate exit*/
                     }
-                    is GetValue -> TODO("get")
+                    is GetSubValue.GetStructValue -> TODO("get")
+                    is GetSubValue.GetArrayValue -> TODO("get")
                     is GetSubPointer.Array -> TODO("aptr")
                     is GetSubPointer.Struct -> TODO("sptr")
                     is AggregateValue -> TODO("aggregate value")

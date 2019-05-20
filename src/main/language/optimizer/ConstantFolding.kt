@@ -5,7 +5,7 @@ import language.ir.BinaryOp
 import language.ir.Branch
 import language.ir.Constant
 import language.ir.Function
-import language.ir.GetValue
+import language.ir.GetSubValue
 import language.ir.Instruction
 import language.ir.Jump
 import language.ir.Phi
@@ -82,15 +82,22 @@ object ConstantFolding : FunctionPass {
                     return true
                 }
             }
-            is GetValue -> {
+            is GetSubValue -> {
                 val target = instr.target
                 if (target is AggregateValue) {
-                    val value = target.values[instr.index]
-                    instr.replaceWith(value)
-                    instr.deleteFromBlock()
+                    when (instr) {
+                        is GetSubValue.GetStructValue -> instr.index
+                        is GetSubValue.GetArrayValue -> (instr.index as? Constant)?.value
+                    }?.let { index ->
+                        val value = target.values[index]
+                        instr.replaceWith(value)
+                        instr.deleteFromBlock()
 
-                    instrChanged()
-                    return true
+                        instrChanged()
+                        return true
+                    }
+                    return false
+
                 }
             }
             else -> Unit

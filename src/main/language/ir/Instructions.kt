@@ -1,6 +1,7 @@
 package language.ir
 
 import language.ir.IntegerType.Companion.bool
+import language.ir.IntegerType.Companion.i32
 
 sealed class Instruction constructor(val name: String?, type: Type, val pure: Boolean) : Value(type) {
     private var _block: BasicBlock? = null
@@ -154,30 +155,62 @@ class Call(name: String?, target: Value, arguments: List<Value>)
     }
 }
 
-class GetValue(name: String?, target: Value, val index: Int)
-    : Instruction(name, (target.type as StructType).properties[index], true) {
-    val target by operand(target)
+sealed class GetSubValue(name: String?, type: Type)
+    : Instruction(name, type, true) {
 
-    override fun clone() = GetValue(name, target, index)
+    abstract val target: Value
 
-    override fun doVerify() {
-        val structType = target.type
-        check(structType is StructType) { "target is a struct" }
-        check(index in structType.properties.indices) { "valid index" }
-        check(structType.properties[index] == this.type) { "type match" }
+    class GetStructValue(name: String?, target: Value, val index: Int)
+        : GetSubValue(name, (target.type as StructType).properties[index]) {
+
+        override val target by operand(target)
+
+        override fun clone() = GetStructValue(name, target, index)
+
+        override fun doVerify() {
+            val structType = target.type
+            check(structType is StructType) { "target is a struct" }
+            check(index in structType.properties.indices) { "valid index" }
+            check(structType.properties[index] == this.type) { "type match" }
+        }
+
+        override fun fullStr(env: NameEnv) = "${str(env)} = get ${target.str(env)} $index"
     }
 
-    override fun fullStr(env: NameEnv) = "${str(env)} = get ${target.str(env)} $index"
+    class GetArrayValue(name: String?, target: Value, index: Value)
+        : GetSubValue(name, (target.type as ArrayType).inner) {
+
+        override val target by operand(target)
+        val index by operand(index)
+
+        override fun clone() = GetArrayValue(name, target, index)
+
+        override fun doVerify() {
+            val structType = target.type
+            check(structType is ArrayType) { "target is a struct" }
+            check(index.type is IntegerType) { "valid index" }
+            check(structType.inner == this.type) { "type match" }
+        }
+
+        override fun fullStr(env: NameEnv) = "${str(env)} = get ${target.str(env)} $index"
+    }
+
+    companion object {
+        fun getFixedIndex(target: Value, index: Int) = when (target.type as AggregateType) {
+            is StructType -> GetStructValue(null, target, index)
+            is ArrayType -> GetArrayValue(null, target, Constant(i32, index))
+        }
+    }
 }
 
 sealed class GetSubPointer(name: String?, type: Type)
     : Instruction(name, type, true) {
-    abstract val target: Value
+    abstract var target: Value
 
     class Array(name: String?, target: Value, index: Value)
         : GetSubPointer(name, (target.type.unpoint as ArrayType).inner.pointer) {
 
-        override val target by operand(target)
+        override var target by operand(target)
         val index by operand(index)
 
         override fun clone() = Array(name, target, index)
@@ -195,7 +228,7 @@ sealed class GetSubPointer(name: String?, type: Type)
     class Struct(name: String?, target: Value, val index: Int)
         : GetSubPointer(name, (target.type.unpoint as StructType).properties[index].pointer) {
 
-        override val target by operand(target)
+        override var target by operand(target)
 
         override fun clone() = Struct(name, target, index)
 

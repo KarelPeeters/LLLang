@@ -10,7 +10,7 @@ import language.ir.Constant
 import language.ir.Eat
 import language.ir.FunctionType
 import language.ir.GetSubPointer
-import language.ir.GetValue
+import language.ir.GetSubValue
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
 import language.ir.Jump
@@ -127,8 +127,7 @@ class Flattener {
         val entry = newBlock("entry")
         irFunction.entry = entry
 
-        val body = function.body
-        when (body) {
+        when (val body = function.body) {
             is Function.FunctionBody.Block -> {
                 val end = entry.appendNestedBlock(bodyScope, body.block)
                 if (end != null) {
@@ -173,6 +172,7 @@ class Flattener {
         is CodeBlock -> appendNestedBlock(scope, stmt)
         is IfStatement -> {
             val (afterCond, condValue) = this.appendExpression(scope, stmt.condition)
+            requireTypeMatch(stmt.condition.position, bool, condValue.type)
 
             val thenBlock = newBlock("if.then")
             val thenEnd = thenBlock.appendNestedBlock(scope, stmt.thenBlock)
@@ -349,7 +349,7 @@ class Flattener {
             val (after, target) = appendExpression(scope, exp.target)
 
             val index = resolveStructIndex(exp.position, target.type, exp.index)
-            val result = GetValue(null, target, index)
+            val result = GetSubValue.GetStructValue(null, target, index)
             after.append(result)
 
             after to result
@@ -410,8 +410,7 @@ class Flattener {
 
     private fun resolveType(annotation: TypeAnnotation): Type = when (annotation) {
         is TypeAnnotation.Simple -> {
-            val str = annotation.str
-            when (str) {
+            when (val str = annotation.str) {
                 "bool" -> bool
                 "i32" -> i32
                 in structs -> structs.getValue(str).second

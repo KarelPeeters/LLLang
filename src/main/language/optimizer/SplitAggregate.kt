@@ -6,6 +6,8 @@ import language.ir.Alloc
 import language.ir.Constant
 import language.ir.Function
 import language.ir.GetSubPointer
+import language.ir.GetSubValue
+import language.ir.Instruction
 import language.ir.Load
 import language.ir.Store
 
@@ -32,12 +34,15 @@ object SplitAggregate : FunctionPass {
                         user.deleteFromBlock()
                     }
                     is Store -> {
-                        val aValue = user.value as AggregateValue
-                        val stores = (replacements zip aValue.values).map { (repl, value) ->
-                            Store(repl, value)
+                        val instructions = mutableListOf<Instruction>()
+
+                        for ((i, repl) in replacements.withIndex()) {
+                            val value = GetSubValue.getFixedIndex(user.value, i)
+                            instructions += value
+                            instructions += Store(repl, value)
                         }
 
-                        user.block.addAll(user.indexInBlock(), stores)
+                        user.block.addAll(user.indexInBlock(), instructions)
                         user.deleteFromBlock()
                     }
                     is GetSubPointer.Struct -> {
