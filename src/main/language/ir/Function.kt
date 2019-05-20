@@ -50,8 +50,6 @@ class Function(
 
     override fun doVerify() {
         check(entry in blocks) { "entry must be one of the blocks" }
-        check(entry.predecessors().isEmpty()) { "entry can't have other predecessors" }
-        check(entry.instructions.dropWhile { it is Alloc }.none { it is Alloc }) { "allocs must appear first in entry" }
 
         for (block in blocks) {
             check(block.function == this) { "blocks must refer to this function" }
@@ -59,9 +57,6 @@ class Function(
             val term = block.terminator
             if (term is Return)
                 check(term.value.type == returnType) { "return type must match, ${term.value.type} != $returnType" }
-
-            if (block != entry)
-                check(block.instructions.none { it is Alloc }) { "only entry block can contain allocs" }
 
             block.verify()
         }
