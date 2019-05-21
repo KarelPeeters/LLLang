@@ -94,19 +94,17 @@ class Flattener {
                     functions.add(topLevel to irFunction)
 
                     program.addFunction(irFunction)
-                    if (name == "main")
-                        program.entry = irFunction
-                    Unit
                 }
                 is Struct -> {
                     val name = topLevel.name
                     val properties = topLevel.properties.map { resolveType(it.type) }
                     val structType = StructType(name, properties)
                     structs[name] = topLevel to structType
-
                 }
             }.also {}
         }
+
+        program.entry = functions.find { it.first.name == "main" }?.second ?: error("No main function in program")
 
         //generate code
         for ((function, irFunction) in functions) {
