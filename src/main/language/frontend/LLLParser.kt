@@ -134,8 +134,11 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
             list += element()
 
             while (!accept(end)) {
-                if (separator != null)
+                if (separator != null) {
                     expect(separator)
+                    if (accept(end))
+                        break
+                }
                 list += element()
             }
         }
