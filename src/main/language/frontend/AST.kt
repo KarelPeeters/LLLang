@@ -25,10 +25,18 @@ sealed class TopLevel(
 class Struct(
         position: SourcePosition,
         val name: String,
-        val properties: List<Parameter>
+        val properties: List<Parameter>,
+        val functions: List<Function>
 ) : TopLevel(position) {
     override fun ASTRenderer.render() {
         print("struct $name("); printList(properties); print(")")
+        if (functions.isNotEmpty()) {
+            println(" {")
+            nest().printList(functions, "\n\n")
+            println()
+            print("}")
+        }
+        println()
     }
 }
 
@@ -185,7 +193,7 @@ class ArrayInitializer(
         val values: List<Expression>
 ) : Expression(position) {
     override fun ASTRenderer.render() {
-        println("["); printList(values); print("]")
+        print("["); printList(values); print("]")
     }
 }
 
@@ -204,6 +212,12 @@ class IdentifierExpression(
         val identifier: String
 ) : Expression(position) {
     override fun ASTRenderer.render() = print(identifier)
+}
+
+class ThisExpression(
+        position: SourcePosition
+) : Expression(position) {
+    override fun ASTRenderer.render() = print("this")
 }
 
 class BooleanLiteral(
@@ -287,25 +301,32 @@ sealed class TypeAnnotation(
     }
 }
 
-class ASTRenderer(private val builder: StringBuilder, private val indent: Int) {
+class ASTRenderer(private val builder: StringBuilder, private val indent: String = "") {
     private var inLine = false
 
     fun print(str: String) {
+        val cleaned = str.replace("\n", "\n$indent")
+
         if (!inLine)
-            builder.append(" ".repeat((4 * indent)))
+            builder.append(indent)
         inLine = true
-        builder.append(str)
+        builder.append(cleaned)
     }
 
     fun print(astNode: ASTNode) {
         astNode.apply { render() }
     }
 
-    fun printList(list: List<ASTNode>) {
+    fun printList(list: List<ASTNode>, separator: String = ", ") {
         for ((i, node) in list.withIndex()) {
-            if (i != 0) print(", ")
+            if (i != 0) print(separator)
             print(node)
         }
+    }
+
+    fun println() {
+        builder.append('\n')
+        inLine = false
     }
 
     fun println(str: String) {
@@ -320,5 +341,5 @@ class ASTRenderer(private val builder: StringBuilder, private val indent: Int) {
         inLine = false
     }
 
-    fun nest() = ASTRenderer(builder, indent + 1)
+    fun nest() = ASTRenderer(builder, "$indent    ")
 }

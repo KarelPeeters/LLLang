@@ -10,11 +10,11 @@ import language.ir.Constant
 import language.ir.Eat
 import language.ir.FunctionType
 import language.ir.GetSubPointer
-import language.ir.GetSubValue
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
 import language.ir.Jump
 import language.ir.Load
+import language.ir.PointerType
 import language.ir.Return
 import language.ir.Store
 import language.ir.StructType
@@ -22,6 +22,7 @@ import language.ir.Type
 import language.ir.UnitType
 import language.ir.UnitValue
 import language.ir.Value
+import language.ir.pointer
 import language.ir.unpoint
 import java.util.*
 import language.ir.BinaryOp as IrBinaryOp
@@ -30,38 +31,59 @@ import language.ir.Function as IrFunction
 import language.ir.Program as IrProgram
 import language.ir.UnaryOp as IrUnaryOp
 
-sealed class Variable(val name: String, val type: Type, val mutable: Boolean) {
-    abstract fun loadValue(block: BasicBlock): Value
-    abstract fun pointer(): Value?
+interface LValue : RValue {
+    val pointer: Value
+}
 
-    class Memory(name: String, val pointer: Value, mutable: Boolean)
-        : Variable(name, pointer.type.unpoint!!, mutable) {
-        override fun loadValue(block: BasicBlock) = Load(name, pointer).also { block.append(it) }
-        override fun pointer(): Value = pointer
-    }
-
-    class FixedValue(name: String, val value: Value)
-        : Variable(name, value.type, false) {
-        override fun loadValue(block: BasicBlock) = value
-        override fun pointer(): Nothing? = null
+@Suppress("FunctionName")
+fun LValue(pointer: Value): LValue {
+    check(pointer.type is PointerType)
+    return object : LValue {
+        override val pointer = pointer
+        override fun loadValue(block: BasicBlock): Value {
+            val load = Load(null, pointer)
+            block.append(load)
+            return load
+        }
     }
 }
 
-private class Scope(val parent: Scope?) {
-    private val vars = mutableMapOf<String, Variable>()
+interface RValue {
+    fun loadValue(block: BasicBlock): Value
+}
 
-    fun register(pos: SourcePosition, variable: Variable) {
-        val name = variable.name
-        if (find(name) != null) throw DuplicateDeclarationException(pos, name)
+@Suppress("FunctionName")
+fun RValue(value: Value) = object : RValue {
+    override fun loadValue(block: BasicBlock) = value
+}
+
+private class Scope(val parent: Scope?) {
+    private val vars = mutableMapOf<String, RValue>()
+    private val immutables = mutableSetOf<Value>()
+
+    fun register(pos: SourcePosition, name: String, variable: RValue) {
+        if (name in vars) throw DuplicateDeclarationException(pos, name)
         vars[name] = variable
     }
 
-    fun find(name: String): Variable? = vars[name] ?: parent?.find(name)
+    fun registerImmutableVal(pointer: Value) {
+        immutables += pointer
+    }
+
+    fun find(name: String): RValue? = vars[name] ?: parent?.find(name)
+
+    fun isImmutableVal(value: Value): Boolean = (value in immutables) || (parent?.isImmutableVal(value) ?: false)
 
     fun nest() = Scope(this)
 }
 
 private class LoopBlocks(val header: BasicBlock, val end: BasicBlock)
+
+private data class StructInfo(
+        val struct: Struct,
+        val type: StructType,
+        val methods: Map<String, Pair<Function, IrFunction>>
+)
 
 class Flattener {
     val program = IrProgram()
@@ -69,7 +91,7 @@ class Flattener {
     private lateinit var currentFunction: IrFunction
     private val allocs = mutableListOf<Alloc>()
     private val loopBlockStack = ArrayDeque<LoopBlocks>()
-    val structs = mutableMapOf<String, Pair<Struct, StructType>>()
+    private val structs = mutableMapOf<String, StructInfo>()
 
     fun newBlock(name: String? = null) = BasicBlock(name).also { currentFunction.add(it) }
 
@@ -90,7 +112,7 @@ class Flattener {
                             resolveType(topLevel.retType, UnitType)
                     )
 
-                    programScope.register(topLevel.position, Variable.FixedValue(name, irFunction))
+                    programScope.register(topLevel.position, name, RValue(irFunction))
                     functions.add(topLevel to irFunction)
 
                     program.addFunction(irFunction)
@@ -99,7 +121,17 @@ class Flattener {
                     val name = topLevel.name
                     val properties = topLevel.properties.map { resolveType(it.type) }
                     val structType = StructType(name, properties)
-                    structs[name] = topLevel to structType
+
+                    val methods = topLevel.functions.associate { method ->
+                        val irFunction = IrFunction(
+                                method.name,
+                                listOf("this" to structType.pointer) + method.parameters.map { it.name to resolveType(it.type) },
+                                resolveType(method.retType, UnitType)
+                        )
+                        program.addFunction(irFunction)
+                        method.name to (method to irFunction)
+                    }
+                    structs[name] = StructInfo(topLevel, structType, methods)
                 }
             }.also {}
         }
@@ -107,23 +139,34 @@ class Flattener {
         program.entry = functions.find { it.first.name == "main" }?.second ?: error("No main function in program")
 
         //generate code
-        for ((function, irFunction) in functions) {
-            appendFunction(programScope, function, irFunction)
-        }
+        for ((function, irFunction) in structs.values.flatMap { it.methods.values })
+            appendFunction(programScope.nest(), function, true, irFunction)
+        for ((function, irFunction) in functions)
+            appendFunction(programScope.nest(), function, false, irFunction)
     }
 
-    private fun appendFunction(scope: Scope, function: Function, irFunction: IrFunction) {
+    private fun appendFunction(bodyScope: Scope, function: Function, isMethod: Boolean, irFunction: IrFunction) {
         currentFunction = irFunction
         allocs.clear()
         check(loopBlockStack.isEmpty())
 
-        val bodyScope = Scope(scope)
-        for ((param, value) in function.parameters.zip(irFunction.parameters)) {
-            bodyScope.register(param.position, Variable.FixedValue(param.name, value))
-        }
-
         val entry = newBlock("entry")
         irFunction.entry = entry
+
+        for ((i, irParam) in irFunction.parameters.withIndex()) {
+            if (isMethod && i == 0) {
+                bodyScope.register(function.position, "this", LValue(irParam))
+            } else {
+                val astIndex = if (isMethod) i - 1 else i
+                val param = function.parameters[astIndex]
+
+                val alloc = Alloc(param.name, irParam.type)
+                entry.append(alloc)
+                entry.append(Store(alloc, irParam))
+
+                bodyScope.register(param.position, param.name, LValue(alloc))
+            }
+        }
 
         when (val body = function.body) {
             is Function.FunctionBody.Block -> {
@@ -135,7 +178,7 @@ class Flattener {
                 }
             }
             is Function.FunctionBody.Expr -> {
-                val (end, value) = entry.appendExpression(bodyScope, body.exp)
+                val (end, value) = entry.appendLoadedExpression(bodyScope, body.exp)
                 requireTypeMatch(body.exp.position, irFunction.returnType, value.type)
                 end.terminator = Return(value)
             }
@@ -152,24 +195,27 @@ class Flattener {
     }
 
     private fun BasicBlock.appendStatement(scope: Scope, stmt: Statement): BasicBlock? = when (stmt) {
-        is Expression -> appendExpression(scope, stmt).first
+        is Expression -> appendLoadedExpression(scope, stmt).first
         is Declaration -> {
-            val (next, value) = appendExpression(scope, stmt.value)
+            val (next, value) = appendLoadedExpression(scope, stmt.value)
 
             val type = resolveType(stmt.type, value.type)
             requireTypeMatch(stmt.position, type, value.type)
 
             val alloc = Alloc(stmt.identifier, type)
             allocs += alloc
-            val variable = Variable.Memory(stmt.identifier, alloc, stmt.mutable)
-            scope.register(stmt.position, variable)
+            val variable = LValue(alloc)
+
+            scope.register(stmt.position, stmt.identifier, variable)
+            if (!stmt.mutable)
+                scope.registerImmutableVal(alloc)
 
             next.append(Store(alloc, value))
             next
         }
         is CodeBlock -> appendNestedBlock(scope, stmt)
         is IfStatement -> {
-            val (afterCond, condValue) = this.appendExpression(scope, stmt.condition)
+            val (afterCond, condValue) = this.appendLoadedExpression(scope, stmt.condition)
             requireTypeMatch(stmt.condition.position, bool, condValue.type)
 
             val thenBlock = newBlock("if.then")
@@ -193,7 +239,7 @@ class Flattener {
         }
         is WhileStatement -> {
             val condBlock = newBlock("while.cond")
-            val (afterCond, condValue) = condBlock.appendExpression(scope, stmt.condition)
+            val (afterCond, condValue) = condBlock.appendLoadedExpression(scope, stmt.condition)
 
             val bodyBlock = newBlock("while.body")
             val endBlock = BasicBlock("while.end")
@@ -221,7 +267,7 @@ class Flattener {
         }
         is ReturnStatement -> {
             val (afterValue, value) = stmt.value?.let { value ->
-                appendExpression(scope, value)
+                appendLoadedExpression(scope, value)
             } ?: (this to UnitValue)
 
             requireTypeMatch(stmt.position, function.returnType, value.type)
@@ -230,130 +276,58 @@ class Flattener {
         }
     }
 
-    //immediate: whether this is the first store into a new variable, ie. whether mutably should be respected
-    private fun BasicBlock.appendTargetExpression(scope: Scope, exp: Expression, immediate: Boolean): Pair<BasicBlock, Value> = when (exp) {
-        is IdentifierExpression -> {
-            val variable = scope.find(exp.identifier)
-                           ?: throw IdNotFoundException(exp.position, exp.identifier)
-            if (variable !is Variable.Memory || (immediate && !variable.mutable))
-                throw VariableImmutableException(exp.position, exp.identifier)
-
-            this to variable.pointer
-        }
-        is DotIndex -> {
-            val (afterTarget, target) = this.appendTargetExpression(scope, exp.target, false)
-            val index = resolveStructIndex(exp.position, target.type.unpoint!!, exp.index)
-
-            val pointer = GetSubPointer.Struct(null, target, index)
-            afterTarget.append(pointer)
-            afterTarget to pointer
-        }
-        is ArrayIndex -> {
-            val (afterTarget, target) = appendTargetExpression(scope, exp.target, false)
-            val (afterIndex, index) = afterTarget.appendExpression(scope, exp.index)
-
-            val pointer = GetSubPointer.Array(null, target, index)
-            afterIndex.append(pointer)
-
-            afterIndex to pointer
-        }
-        else -> throw IllegalAssignTarget(exp.position)
-    }
-
-    private fun BasicBlock.appendExpression(scope: Scope, exp: Expression): Pair<BasicBlock, Value> = when (exp) {
+    private fun BasicBlock.appendExpression(scope: Scope, exp: Expression): Pair<BasicBlock, RValue> = when (exp) {
         is NumberLiteral -> {
-            this to Constant(i32, exp.value.toInt())
+            this to RValue(Constant(i32, exp.value.toInt()))
         }
         is BooleanLiteral -> {
-            this to Constant(bool, if (exp.value) 1 else 0)
+            this to RValue(Constant(bool, if (exp.value) 1 else 0))
         }
         is IdentifierExpression -> {
             val variable = scope.find(exp.identifier)
                            ?: throw IdNotFoundException(exp.position, exp.identifier)
-            this to variable.loadValue(this)
+            this to variable
+        }
+        is ThisExpression -> {
+            val variable = scope.find("this") ?: throw NotInObjectScope(exp.position)
+            this to variable
         }
         is Assignment -> {
-            val (afterTarget, target) = appendTargetExpression(scope, exp.target, true)
-            val (afterValue, value) = afterTarget.appendExpression(scope, exp.value)
+            val (afterTarget, target) = appendPointerExpression(scope, exp.target)
+            if (scope.isImmutableVal(target))
+                throw VariableImmutableException(exp.position, (exp.target as IdentifierExpression).identifier)
+
+            val (afterValue, value) = afterTarget.appendLoadedExpression(scope, exp.value)
             requireTypeMatch(exp.position, target.type.unpoint!!, value.type)
 
             afterValue.append(Store(target, value))
-            afterTarget to value
+            afterTarget to RValue(value)
         }
         is BinaryOp -> {
-            val (afterLeft, leftValue) = appendExpression(scope, exp.left)
-            val (afterRight, rightValue) = afterLeft.appendExpression(scope, exp.right)
+            val (afterLeft, leftValue) = appendLoadedExpression(scope, exp.left)
+            val (afterRight, rightValue) = afterLeft.appendLoadedExpression(scope, exp.right)
             val result = IrBinaryOp(null, exp.type, leftValue, rightValue)
             afterRight.append(result)
-            afterRight to result
+            afterRight to RValue(result)
         }
         is UnaryOp -> {
-            val (afterValue, value) = appendExpression(scope, exp.value)
+            val (afterValue, value) = appendLoadedExpression(scope, exp.value)
             val result = IrUnaryOp(null, exp.type, value)
             afterValue.append(result)
-            afterValue to result
+            afterValue to RValue(result)
         }
-        is Call -> {
-            val ret = if (exp.target is IdentifierExpression) {
-                when (exp.target.identifier) {
-                    "eat" -> {
-                        val eat = Eat()
-                        val (after, arguments) = this.appendExpressionList(scope, exp.arguments)
-                        eat.arguments.addAll(arguments)
-                        after.append(eat)
-                        after to eat
-                    }
-                    "blur" -> {
-                        if (exp.arguments.size != 1)
-                            throw ArgMismatchException(exp.position, 1, exp.arguments.size)
-                        val (after, value) = appendExpression(scope, exp.arguments.first())
-                        val result = Blur(value)
-                        after.append(result)
-                        after to result
-                    }
-                    in structs -> {
-                        val (after, arguments) = this.appendExpressionList(scope, exp.arguments)
-                        val (_, type) = structs.getValue(exp.target.identifier)
-
-                        val argTypes = arguments.map { it.type }
-                        if (type.properties != argTypes)
-                            throw ArgMismatchException(exp.position, type.properties, argTypes)
-
-                        val value = AggregateValue(null, type, arguments)
-                        after.append(value)
-                        after to value
-                    }
-                    else -> null
-                }
-            } else null
-
-            ret ?: run {
-                val (afterTarget, target) = appendExpression(scope, exp.target)
-                val (next, arguments) = afterTarget.appendExpressionList(scope, exp.arguments)
-
-                if (target.type !is FunctionType)
-                    throw IllegalCallTarget(exp.position, target.type)
-                val targetTypes = target.type.paramTypes
-                val argTypes = arguments.map { it.type }
-                if (argTypes != targetTypes)
-                    throw ArgMismatchException(exp.position, targetTypes, argTypes)
-
-                val call = IrCall(null, target, arguments)
-                next.append(call)
-                next to call
-            }
-        }
+        is Call -> appendCallExpression(scope, exp)
         is DotIndex -> {
-            val (after, target) = appendExpression(scope, exp.target)
+            val (after, target) = appendPointerExpression(scope, exp.target)
 
-            val index = resolveStructIndex(exp.position, target.type, exp.index)
-            val result = GetSubValue.GetStructValue(null, target, index)
+            val index = resolveStructIndex(exp.position, target.type.unpoint!!, exp.index)
+            val result = GetSubPointer.Struct(null, target, index)
             after.append(result)
 
-            after to result
+            after to LValue(result)
         }
         is ArrayInitializer -> {
-            val (after, values) = appendExpressionList(scope, exp.values)
+            val (after, values) = appendLoadedExpressionList(scope, exp.values)
 
             val innerType = values.firstOrNull()?.type
                             ?: TODO("proper initializer type inference -> support empty arrays")
@@ -363,28 +337,102 @@ class Flattener {
             val arrType = ArrayType(innerType, values.size)
             val arrValue = AggregateValue(null, arrType, values)
             after.append(arrValue)
-            after to arrValue
+
+            after to RValue(arrValue)
         }
         is ArrayIndex -> {
-            val (afterTarget, target) = appendTargetExpression(scope, exp.target, false)
-            val (afterIndex, index) = afterTarget.appendExpression(scope, exp.index)
+            val (afterTarget, target) = appendPointerExpression(scope, exp.target)
+            val (afterIndex, index) = afterTarget.appendLoadedExpression(scope, exp.index)
 
-            val pointer = GetSubPointer.Array(null, target, index)
-            val load = Load(null, pointer)
+            val result = GetSubPointer.Array(null, target, index)
+            afterIndex.append(result)
 
-            afterIndex.append(pointer)
-            afterIndex.append(load)
-
-            afterIndex to load
+            afterIndex to LValue(result)
         }
     }
 
-    private fun BasicBlock.appendExpressionList(scope: Scope, list: List<Expression>): Pair<BasicBlock, List<Value>> {
+    private fun BasicBlock.appendCallExpression(scope: Scope, exp: Call): Pair<BasicBlock, RValue> {
+        if (exp.target is IdentifierExpression) {
+            when (exp.target.identifier) {
+                "eat" -> {
+                    val eat = Eat()
+                    val (after, arguments) = this.appendLoadedExpressionList(scope, exp.arguments)
+                    eat.arguments.addAll(arguments)
+                    after.append(eat)
+                    return after to RValue(eat)
+                }
+                "blur" -> {
+                    if (exp.arguments.size != 1)
+                        throw ArgMismatchException(exp.position, 1, exp.arguments.size)
+                    val (after, value) = appendLoadedExpression(scope, exp.arguments.first())
+                    val result = Blur(value)
+                    after.append(result)
+                    return after to RValue(result)
+                }
+                in structs -> {
+                    val (after, arguments) = this.appendLoadedExpressionList(scope, exp.arguments)
+                    val structInfo = structs.getValue(exp.target.identifier)
+                    val type = structInfo.type
+
+                    val argTypes = arguments.map { it.type }
+                    if (type.properties != argTypes)
+                        throw ArgMismatchException(exp.position, type.properties, argTypes)
+
+                    val value = AggregateValue(null, type, arguments)
+                    after.append(value)
+                    return after to RValue(value)
+                }
+            }
+        }
+
+        if (exp.target is DotIndex) {
+            val (afterThis, thisPtr) = appendPointerExpression(scope, exp.target.target)
+            val structInfo = structs.values.first { it.type == thisPtr.type.unpoint!! }
+            val target = structInfo.methods[exp.target.index]?.second
+                         ?: throw IdNotFoundException(exp.target.position, exp.target.index)
+
+            val (afterArgs, arguments) = afterThis.appendLoadedExpressionList(scope, exp.arguments)
+
+            val call = IrCall(null, target, listOf(thisPtr) + arguments)
+            afterArgs.append(call)
+
+            return afterArgs to RValue(call)
+        }
+
+        val (afterTarget, target) = appendLoadedExpression(scope, exp.target)
+        val (next, arguments) = afterTarget.appendLoadedExpressionList(scope, exp.arguments)
+
+        if (target.type !is FunctionType)
+            throw IllegalCallTarget(exp.position, target.type)
+        val targetTypes = target.type.paramTypes
+        val argTypes = arguments.map { it.type }
+        if (argTypes != targetTypes)
+            throw ArgMismatchException(exp.position, targetTypes, argTypes)
+
+        val call = IrCall(null, target, arguments)
+        next.append(call)
+        return next to RValue(call)
+    }
+
+    private fun BasicBlock.appendLoadedExpression(scope: Scope, exp: Expression): Pair<BasicBlock, Value> {
+        val (after, value) = appendExpression(scope, exp)
+        val loaded = value.loadValue(after)
+        return after to loaded
+    }
+
+    private fun BasicBlock.appendPointerExpression(scope: Scope, exp: Expression): Pair<BasicBlock, Value> {
+        val (after, value) = appendExpression(scope, exp)
+        if (value !is LValue)
+            throw ExptectedLValue(exp.position)
+        return after to value.pointer
+    }
+
+    private fun BasicBlock.appendLoadedExpressionList(scope: Scope, list: List<Expression>): Pair<BasicBlock, List<Value>> {
         var current = this
         val result = mutableListOf<Value>()
 
         for (exp in list) {
-            val (next, value) = current.appendExpression(scope, exp)
+            val (next, value) = current.appendLoadedExpression(scope, exp)
             current = next
             result += value
         }
@@ -396,7 +444,7 @@ class Flattener {
         if (type !is StructType)
             throw IllegalDotIndexTarget(pos, type)
 
-        val i = structs.getValue(type.name).first.properties.indexOfFirst { it.name == index }
+        val i = structs.getValue(type.name).struct.properties.indexOfFirst { it.name == index }
         if (i == -1)
             throw IdNotFoundException(pos, index)
 
@@ -411,7 +459,7 @@ class Flattener {
             when (val str = annotation.str) {
                 "bool" -> bool
                 "i32" -> i32
-                in structs -> structs.getValue(str).second
+                in structs -> structs.getValue(str).type
 
                 else -> throw IllegalTypeException(annotation)
             }
@@ -438,8 +486,11 @@ fun requireTypeMatch(pos: SourcePosition, expected: Type, actual: Type) {
 class IdNotFoundException(pos: SourcePosition, identifier: String)
     : Exception("$pos: '$identifier' not found")
 
+class NotInObjectScope(pos: SourcePosition)
+    : Exception("$pos: not in an object scope, 'this' not defined")
+
 class DuplicateDeclarationException(pos: SourcePosition, identifier: String)
-    : Exception("$pos: '$identifier' was already declared")
+    : Exception("$pos: '$identifier' was already declared in this scope")
 
 class IllegalTypeException(type: TypeAnnotation)
     : Exception("Illegal type '$type' at ${type.position}")
@@ -447,8 +498,8 @@ class IllegalTypeException(type: TypeAnnotation)
 class VariableImmutableException(pos: SourcePosition, name: String)
     : Exception("Can't mutate variable '$name' at $pos")
 
-class IllegalAssignTarget(pos: SourcePosition)
-    : Exception("Illegal assign target at $pos")
+class ExptectedLValue(pos: SourcePosition)
+    : Exception("Expected LValue at $pos")
 
 class MissingReturnStatement(function: Function)
     : Exception("Function ${function.name} at ${function.position} missing return statement")

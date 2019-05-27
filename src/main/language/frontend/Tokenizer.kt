@@ -23,11 +23,12 @@ enum class TokenType(val string: String? = null) {
     LTE("<="), GTE(">="),
     LT("<"), GT(">"), EQ("=="), NEQ("!="),
     Bang("!"), Tilde("~"),
-    Assign("="), Semi(";"), EndLn("\n"),
+    Assign("="), Semi(";"),
     Colon(":"), Comma(","), Dot("."),
 
     //keywords
     Struct("struct"),
+    This("this"),
     If("if"), Else("else"),
     While("while"), For("for"),
     Break("break"), Continue("continue"),
@@ -35,12 +36,12 @@ enum class TokenType(val string: String? = null) {
     Val("val"), Var("var"),
 
     //values
-    Boolean(),
-    Number(),
-    Id(),
+    Boolean,
+    Number,
+    Id,
 
-    //elseBlock
-    Eof(),
+    //signals
+    Eof,
     ;
 }
 

@@ -32,7 +32,9 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         val name = expect(Id).text
         expect(OpenB)
         val properties = list(CloseB, ::parameter)
-        return ASTStruct(pos, name, properties)
+        val functions = if (accept(OpenC)) list(CloseC, null, ::function) else emptyList()
+
+        return ASTStruct(pos, name, properties, functions)
     }
 
     private fun function(): Function {
@@ -52,10 +54,9 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     }
 
     private fun parameter(): Parameter {
-        val pPos = currentPosition
-        val pName = expect(Id).text
+        val id = expect(Id)
         expect(Colon)
-        return Parameter(pPos, pName, type())
+        return Parameter(id.position, id.text, type())
     }
 
     private fun block(end: TokenType) = CodeBlock(currentPosition, sequence {
@@ -125,13 +126,16 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
 
     private fun expressionList(end: TokenType) = list(end) { expression() }
 
-    private inline fun <T> list(end: TokenType, element: () -> T): List<T> {
+    private inline fun <T> list(end: TokenType, element: () -> T) = list(end, Comma, element)
+
+    private inline fun <T> list(end: TokenType, separator: TokenType?, element: () -> T): List<T> {
         val list = mutableListOf<T>()
         if (!accept(end)) {
             list += element()
 
             while (!accept(end)) {
-                expect(Comma)
+                if (separator != null)
+                    expect(separator)
                 list += element()
             }
         }
@@ -283,6 +287,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
             at(Boolean) -> BooleanLiteral(currentPosition, pop().text.toBoolean())
             at(Number) -> NumberLiteral(currentPosition, pop().text)
             at(Id) -> IdentifierExpression(currentPosition, pop().text)
+            accept(This) -> ThisExpression(currentPosition)
             else -> unexpected()
         }
     }
