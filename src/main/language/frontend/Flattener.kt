@@ -179,7 +179,7 @@ class Flattener {
             }
             is Function.FunctionBody.Expr -> {
                 val (end, value) = entry.appendLoadedExpression(bodyScope, body.exp)
-                requireTypeMatch(body.exp.position, irFunction.returnType, value.type)
+                requireTypeMatch(body.position, irFunction.returnType, value.type)
                 end.terminator = Return(value)
             }
         }

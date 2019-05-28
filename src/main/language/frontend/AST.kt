@@ -3,7 +3,7 @@ package language.frontend
 import language.ir.BinaryOpType
 import language.ir.UnaryOpType
 
-sealed class ASTNode(val position: SourcePosition) {
+abstract class ASTNode(val position: SourcePosition) {
     abstract fun ASTRenderer.render()
 }
 
@@ -52,19 +52,22 @@ class Function(
         if (retType != null) {
             print(": "); print(retType)
         }
-        print(" ")
-        when (body) {
-            is FunctionBody.Block -> print(body.block)
-            is FunctionBody.Expr -> {
-                print("= ")
-                print(body.exp)
-            }
-        }
+        print(" "); print(body)
     }
 
-    sealed class FunctionBody {
-        class Block(val block: CodeBlock) : FunctionBody()
-        class Expr(val exp: Expression) : FunctionBody()
+    sealed class FunctionBody(position: SourcePosition) : ASTNode(position) {
+        class Block(position: SourcePosition, val block: CodeBlock) : FunctionBody(position) {
+            override fun ASTRenderer.render() {
+                print(block)
+            }
+        }
+
+        class Expr(position: SourcePosition, val exp: Expression) : FunctionBody(position) {
+            override fun ASTRenderer.render() {
+                print("= ")
+                print(exp)
+            }
+        }
     }
 }
 
