@@ -7,10 +7,6 @@ class Bag<K> {
         map = mutableMapOf()
     }
 
-    constructor(map: Map<K, Int>) {
-        this.map = map.toMutableMap()
-    }
-
     val size get() = map.size
 
     val keys get(): Set<K> = map.keys
@@ -39,4 +35,9 @@ class Bag<K> {
     override fun hashCode(): Int = map.hashCode()
 }
 
-fun <T> Map<T, Int>.toBag() = Bag(this)
+fun <T> Sequence<T>.toBag(): Bag<T> {
+    val bag = Bag<T>()
+    for (item in this)
+        bag.add(item, 1)
+    return bag
+}

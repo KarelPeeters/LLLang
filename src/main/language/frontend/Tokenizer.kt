@@ -36,13 +36,18 @@ enum class TokenType(val string: String? = null) {
     Val("val"), Var("var"),
 
     //values
-    Boolean,
+    True("true"),
+    False("false"),
     Number,
     Id,
 
     //signals
     Eof,
     ;
+
+    val startOfIdentifier = string?.let { str ->
+        str[0] in ID_START_CHARS && str.substring(1).all { it in ID_CHARS }
+    } ?: false
 }
 
 data class Token(
@@ -68,16 +73,14 @@ class Tokenizer(private val source: String) {
         //trivial match
         for (type in TokenType.values()) {
             val str = type.string ?: continue
+
             if (at(str)) {
+                if (type.startOfIdentifier && getOrNull(str.length) in ID_CHARS)
+                    continue
+
                 eat(str.length)
                 return Token(type, str, position)
             }
-        }
-
-        //boolean
-        when {
-            accept("true") -> return Token(TokenType.Boolean, "true", position)
-            accept("false") -> return Token(TokenType.Boolean, "false", position)
         }
 
         //number
@@ -127,9 +130,9 @@ class Tokenizer(private val source: String) {
         eat(str.length)
     }
 
-    private fun first(): Char? {
-        return source.getOrNull(index)
-    }
+    private fun first(): Char? = source.getOrNull(index)
+
+    private fun getOrNull(at: Int): Char? = source.getOrNull(index + at)
 
     private fun eat(): Char {
         noEOF()

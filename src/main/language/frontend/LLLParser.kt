@@ -1,7 +1,6 @@
 package language.frontend
 
 import language.frontend.TokenType.*
-import language.frontend.TokenType.Boolean
 import language.frontend.TokenType.Number
 import language.frontend.TokenType.Struct
 import language.ir.ArithmeticOpType
@@ -46,7 +45,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
 
         val content = when {
             accept(OpenC) -> Function.FunctionBody.Block(block(CloseC))
-            accept(Assign) -> Function.FunctionBody.Expr(expression())
+            accept(Assign) -> Function.FunctionBody.Expr(expression()).also { expect(Semi) }
             else -> unexpected()
         }
 
@@ -76,9 +75,9 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         return when {
             at(If) -> return ifStatement()
             at(While) -> return whileStatement()
-            accept(Break) -> BreakStatement(currentPosition)
-            accept(Continue) -> ContinueStatement(currentPosition)
-            accept(Return) -> returnStatement()
+            at(Break) -> BreakStatement(pop().position)
+            at(Continue) -> ContinueStatement(pop().position)
+            at(Return) -> returnStatement()
             at(Var) || at(Val) -> declaration()
             at(OpenC) -> return containedBlock()
             else -> expression()
@@ -100,9 +99,12 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         return Declaration(pos, identifier, mutable, type, value)
     }
 
-    private fun returnStatement(): Statement = when {
-        at(Semi) -> ReturnStatement(currentPosition, null)
-        else -> ReturnStatement(currentPosition, expression())
+    private fun returnStatement(): Statement {
+        val pos = expect(Return).position
+        return when {
+            at(Semi) -> ReturnStatement(pos, null)
+            else -> ReturnStatement(pos, expression())
+        }
     }
 
     private fun ifStatement(): Statement {
@@ -287,10 +289,11 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         return when {
             accept(OpenB) -> expression().also { expect(CloseB) }
             at(OpenC) -> arrayInitializer()
-            at(Boolean) -> BooleanLiteral(currentPosition, pop().text.toBoolean())
+            at(True) -> BooleanLiteral(pop().position, true)
+            at(False) -> BooleanLiteral(pop().position, false)
             at(Number) -> NumberLiteral(currentPosition, pop().text)
             at(Id) -> IdentifierExpression(currentPosition, pop().text)
-            accept(This) -> ThisExpression(currentPosition)
+            at(This) -> ThisExpression(pop().position)
             else -> unexpected()
         }
     }

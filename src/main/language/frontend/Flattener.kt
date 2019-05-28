@@ -195,7 +195,7 @@ class Flattener {
     }
 
     private fun BasicBlock.appendStatement(scope: Scope, stmt: Statement): BasicBlock? = when (stmt) {
-        is Expression -> appendLoadedExpression(scope, stmt).first
+        is Expression -> appendExpression(scope, stmt).first
         is Declaration -> {
             val (next, value) = appendLoadedExpression(scope, stmt.value)
 

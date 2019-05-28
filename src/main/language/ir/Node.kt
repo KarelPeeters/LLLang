@@ -55,7 +55,7 @@ abstract class Node {
     /** Check this and operand deletion, then call [doVerify] */
     open fun verify() {
         check(!this.deleted) { "$this can't be deleted" }
-        val counts = holders.asSequence().flatMap { it.operands() }.groupingBy { it }.eachCount().toBag()
+        val counts = holders.asSequence().flatMap { it.operands() }.toBag()
         check(counts == useCounts) { "counts must be correct" }
 
         for (operand in operands) {
