@@ -19,14 +19,15 @@ class Program : Node() {
     override fun doVerify() {
         check(entry in functions) { "entry must be one of the functions" }
         check(entry.parameters.isEmpty()) { "entry must be a parameterless function" }
+
         val blocks = functions.flatMap { it.blocks }
         val instructions = functions.flatMap { f -> f.blocks.flatMap { b -> b.instructions } }
         check(!blocks.hasDuplicates()) { "no duplicate blocks" }
         check(!instructions.hasDuplicates()) { "no duplicate instructions" }
 
-        functions.forEach {
-            check(it.program == this) { "functions must refer to this program" }
-            it.verify()
+        for (function in functions) {
+            check(function.program == this) { "functions must refer to this program" }
+            function.verify()
         }
     }
 

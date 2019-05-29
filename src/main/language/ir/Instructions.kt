@@ -137,7 +137,7 @@ class Blur(value: Value) : Instruction(null, value.type, false) {
 
 class Call(name: String?, target: Value, arguments: List<Value>)
     : Instruction(name, (target.type as FunctionType).returnType, false) {
-    val target by operand(target)
+    var target by operand(target)
     val arguments = operandList(arguments)
 
     override fun clone() = Call(name, target, arguments.toList())

@@ -12,3 +12,7 @@ inline fun <reified T> Iterable<*>.takeWhileIsInstance(): List<T> {
     }
     return result
 }
+
+@Suppress("UNCHECKED_CAST")
+inline fun <reified T> Collection<*>.castIfAllInstance(): Collection<T>? =
+        if (this.all { it is T }) this as Collection<T> else null

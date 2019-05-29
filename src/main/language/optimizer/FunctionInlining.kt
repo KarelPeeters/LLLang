@@ -51,7 +51,7 @@ object FunctionInlining : ProgramPass {
 
         //insert new blocks
         val nextI = beforeBlock.indexInFunction()
-        containingFunction.add(nextI + 1, targetClone.blocks)
+        containingFunction.addAll(nextI + 1, targetClone.blocks)
         containingFunction.add(nextI + 1 + targetClone.blocks.size, afterBlock)
 
         //aggregate returns

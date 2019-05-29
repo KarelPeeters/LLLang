@@ -24,7 +24,7 @@ private fun calcDominatedBy(function: Function): Map<BasicBlock, Set<BasicBlock>
 class DominatorInfo(val function: Function) {
     private val dominatedBy: Map<BasicBlock, Set<BasicBlock>> = calcDominatedBy(function)
 
-    private val domParent = function.blocks.associate { block ->
+    private val domParent: Map<BasicBlock, BasicBlock?> = function.blocks.associate { block ->
         val blockDoms = dominatedBy.getValue(block).filter { it != block }
         block to blockDoms.find { cand ->
             val candDoms = dominatedBy.getValue(cand)

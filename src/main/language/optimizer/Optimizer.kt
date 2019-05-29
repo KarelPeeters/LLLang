@@ -54,7 +54,8 @@ private class FunctionContextImpl(val function: Function) : FunctionContext {
 class Optimizer(var doVerify: Boolean = true) {
     private val programPasses: List<ProgramPass> = listOf(
             DeadFunctionElimination,
-            FunctionInlining
+            DeadSignatureElimination
+//            FunctionInlining
     )
 
     private val functionPasses: List<FunctionPass> = listOf(
@@ -79,31 +80,29 @@ class Optimizer(var doVerify: Boolean = true) {
 
         verify(null, null)
 
-        val programContext = ProgramContextImpl(program)
-        val functionContexts = program.functions.associate { it to FunctionContextImpl(it) }
-
         do {
+            var changed = false
             //program passes
             for (pass in programPasses) {
+                val programContext = ProgramContextImpl(program)
                 pass.apply { programContext.optimize(program) }
                 verify(program, pass)
+
+                changed = changed || programContext.hasChanged
+                programContext.hasChanged = false
             }
 
             //function passes
             for (function in program.functions) {
-                val context = functionContexts.getValue(function)
+                //val context = functionContexts.getValue(function)
                 for (pass in functionPasses) {
+                    val context = FunctionContextImpl(function)
                     pass.apply { context.optimize(function) }
                     verify(function, pass)
-                }
-            }
 
-            //changed
-            var changed = programContext.hasChanged
-            programContext.hasChanged = false
-            for (context in functionContexts.values) {
-                changed = changed || context.hasChanged
-                context.hasChanged = false
+                    changed = changed || context.hasChanged
+                    context.hasChanged = false
+                }
             }
         } while (changed)
     }

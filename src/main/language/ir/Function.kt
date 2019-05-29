@@ -2,20 +2,33 @@ package language.ir
 
 import language.util.takeWhileIsInstance
 
-class Function(
-        val name: String,
-        parameters: List<Pair<String?, Type>>,
-        val returnType: Type
-) : Value(FunctionType(parameters.map { it.second }, returnType)) {
+class Function(val name: String?, parameters: List<Pair<String?, Type>>, val returnType: Type) :
+        Value(FunctionType(parameters.map { it.second }, returnType)) {
+
     var entry by operand<BasicBlock>(null)
-    val parameters = parameters.map { (name, type) -> ParameterValue(name, type) }
+    val parameters = parameters.map { ParameterValue(it.first, it.second) }
     val blocks = mutableListOf<BasicBlock>()
 
     private var _program: Program? = null
-    val program get() = _program!!
 
+    val program get() = _program!!
     fun setProgram(program: Program?) {
         this._program = program
+    }
+
+    /**
+     * Create a new function with the same content but with a different signature.
+     * As this creates a shallow copy, the current function is shallowDeleted.
+     */
+    fun changedSignature(parameters: List<ParameterValue>, returnType: Type): Function {
+        val newFunc = Function(this.name, parameters.map { it.name to it.type }, returnType)
+
+        newFunc.addAll(this.blocks)
+        newFunc.entry = this.entry
+        newFunc._program = this._program
+
+        this.shallowDelete()
+        return newFunc
     }
 
     fun deepClone(): Function {
@@ -72,7 +85,13 @@ class Function(
         block.setFunction(this)
     }
 
-    fun add(index: Int, blocks: List<BasicBlock>) {
+    fun addAll(blocks: List<BasicBlock>) {
+        this.blocks.addAll(blocks)
+        for (block in blocks)
+            block.setFunction(this)
+    }
+
+    fun addAll(index: Int, blocks: List<BasicBlock>) {
         this.blocks.addAll(index, blocks)
         for (block in blocks)
             block.setFunction(this)
