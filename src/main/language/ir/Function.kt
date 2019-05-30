@@ -1,7 +1,5 @@
 package language.ir
 
-import language.util.takeWhileIsInstance
-
 class Function private constructor(
         val name: String?,
         val parameters: List<ParameterValue>,
@@ -69,6 +67,7 @@ class Function private constructor(
 
     override fun doVerify() {
         check(entry in blocks) { "entry must be one of the blocks" }
+        check(entry.predecessors().isEmpty()) { "entry can't be jumped to" }
 
         for (block in blocks) {
             check(block.function == this) { "blocks must refer to this function" }
@@ -114,7 +113,7 @@ class Function private constructor(
         shallowDelete()
     }
 
-    fun allocs() = entry.instructions.takeWhileIsInstance<Alloc>()
+    fun entryAllocs() = entry.instructions.filterIsInstance<Alloc>()
 
     fun fullStr(env: NameEnv): String {
         blocks.forEach { env.block(it) } //preset names to keep them ordered

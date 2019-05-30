@@ -13,7 +13,7 @@ import language.ir.Store
 
 object SplitAggregate : FunctionPass {
     override fun FunctionContext.optimize(function: Function) {
-        for (alloc in function.allocs()) {
+        for (alloc in function.entryAllocs()) {
             val type = alloc.inner as? AggregateType ?: continue
 
             if (!alloc.users.all {

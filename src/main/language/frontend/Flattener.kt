@@ -161,7 +161,7 @@ class Flattener {
                 val param = function.parameters[astIndex]
 
                 val alloc = Alloc(param.name, irParam.type)
-                entry.append(alloc)
+                allocs += alloc
                 entry.append(Store(alloc, irParam))
 
                 bodyScope.register(param.position, param.name, LValue(alloc))

@@ -63,6 +63,12 @@ class BasicBlock(val name: String?) : Value(BlockType) {
         instruction.setBlock(this)
     }
 
+    fun addAll(instructions: List<Instruction>) {
+        this.instructions.addAll(instructions)
+        for (instr in instructions)
+            instr.setBlock(this)
+    }
+
     fun addAll(index: Int, instructions: List<Instruction>) {
         this.instructions.addAll(index, instructions)
         for (instr in instructions)

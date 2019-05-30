@@ -1,5 +1,6 @@
 package language.optimizer
 
+import language.ir.Alloc
 import language.ir.BasicBlock
 import language.ir.Call
 import language.ir.Function
@@ -49,6 +50,10 @@ object FunctionInlining : ProgramPass {
         for ((param, arg) in targetClone.parameters.zip(call.arguments))
             param.replaceWith(arg)
 
+        //move phi instructions to front
+        val targetCloneAllocs = targetClone.entry.takeAllocs()
+        containingFunction.entry.addAll(targetCloneAllocs)
+
         //insert new blocks
         val nextI = beforeBlock.indexInFunction()
         containingFunction.addAll(nextI + 1, targetClone.blocks)
@@ -91,5 +96,20 @@ object FunctionInlining : ProgramPass {
         require(targetClone.parameters.all { !it.isUsed() })
         call.shallowDelete()
         targetClone.shallowDelete()
+    }
+
+    private fun BasicBlock.takeAllocs(): List<Alloc> {
+        val result = mutableListOf<Alloc>()
+
+        val iter = instructions.iterator()
+        for (instr in iter) {
+            if (instr is Alloc) {
+                result.add(instr)
+                instr.setBlock(null)
+                iter.remove()
+            }
+        }
+
+        return result
     }
 }
