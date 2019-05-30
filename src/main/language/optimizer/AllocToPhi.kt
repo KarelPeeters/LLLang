@@ -91,7 +91,7 @@ object AllocToPhi : FunctionPass {
 
             //make sure problemPhis aren't used
             for (phi in problemPhis) {
-                if (phi.users.isEmpty())
+                if (!phi.isUsed())
                     phi.deleteFromBlock()
                 else
                     throw NoValueFoundException()

@@ -5,6 +5,8 @@ abstract class Value(val type: Type) : Node() {
 
     protected open val replaceAble = true
 
+    fun isUsed() = users.isNotEmpty()
+
     /**
      * Replace all uses of this [Value] with [to]
      */

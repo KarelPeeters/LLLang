@@ -31,7 +31,7 @@ object FunctionInlining : ProgramPass {
                 }
             }
 
-            if (func.users.isEmpty()) {
+            if (!func.isUsed()) {
                 func.deepDelete()
                 iter.remove()
             }
@@ -87,8 +87,8 @@ object FunctionInlining : ProgramPass {
         }
 
         //cleanup
-        require(call.users.isEmpty())
-        require(targetClone.parameters.all { it.users.isEmpty() })
+        require(!call.isUsed())
+        require(targetClone.parameters.all { !it.isUsed() })
         call.shallowDelete()
         targetClone.shallowDelete()
     }

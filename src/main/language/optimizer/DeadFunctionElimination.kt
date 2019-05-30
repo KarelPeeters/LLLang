@@ -15,7 +15,7 @@ object DeadFunctionElimination : ProgramPass {
         val iter = program.functions.iterator()
         for (func in iter) {
             if (func !in used) {
-                require(func.users.isEmpty())
+                require(!func.isUsed())
 
                 func.deepDelete()
                 iter.remove()

@@ -2,11 +2,12 @@ package language.ir
 
 import language.util.takeWhileIsInstance
 
-class Function(val name: String?, parameters: List<Pair<String?, Type>>, val returnType: Type) :
-        Value(FunctionType(parameters.map { it.second }, returnType)) {
-
+class Function private constructor(
+        val name: String?,
+        val parameters: List<ParameterValue>,
+        val returnType: Type
+) : Value(FunctionType(parameters.map(ParameterValue::type), returnType)) {
     var entry by operand<BasicBlock>(null)
-    val parameters = parameters.map { ParameterValue(it.first, it.second) }
     val blocks = mutableListOf<BasicBlock>()
 
     private var _program: Program? = null
@@ -16,12 +17,17 @@ class Function(val name: String?, parameters: List<Pair<String?, Type>>, val ret
         this._program = program
     }
 
+    companion object {
+        operator fun invoke(name: String?, parameters: List<Pair<String?, Type>>, returnType: Type) =
+                Function(name, parameters.map { ParameterValue(it.first, it.second) }, returnType)
+    }
+
     /**
      * Create a new function with the same content but with a different signature.
      * As this creates a shallow copy, the current function is shallowDeleted.
      */
     fun changedSignature(parameters: List<ParameterValue>, returnType: Type): Function {
-        val newFunc = Function(this.name, parameters.map { it.name to it.type }, returnType)
+        val newFunc = Function(this.name, parameters, returnType)
 
         newFunc.addAll(this.blocks)
         newFunc.entry = this.entry

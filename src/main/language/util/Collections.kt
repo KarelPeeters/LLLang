@@ -14,5 +14,11 @@ inline fun <reified T> Iterable<*>.takeWhileIsInstance(): List<T> {
 }
 
 @Suppress("UNCHECKED_CAST")
-inline fun <reified T> Collection<*>.castIfAllInstance(): Collection<T>? =
-        if (this.all { it is T }) this as Collection<T> else null
+inline fun <reified T> Iterable<*>.mapIfAllInstance(): List<T>? {
+    val result = mutableListOf<T>()
+    for (item in this) {
+        if (item is T) result += item
+        else return null
+    }
+    return result
+}

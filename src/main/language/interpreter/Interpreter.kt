@@ -187,7 +187,7 @@ class Interpreter(val program: Program) {
                 }
 
                 if (result == null) {
-                    if (instr.users.isNotEmpty())
+                    if (instr.isUsed())
                         values[instr] = UnitInst
                 } else {
                     values[instr] = result
