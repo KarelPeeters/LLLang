@@ -29,8 +29,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
     private fun struct(): ASTStruct {
         val pos = expect(Struct).position
         val name = expect(Id).text
-        expect(OpenB)
-        val properties = list(CloseB, ::parameter)
+        val properties = if (accept(OpenB)) list(CloseB, ::parameter) else emptyList()
         val functions = if (accept(OpenC)) list(CloseC, null, ::function) else emptyList()
 
         return ASTStruct(pos, name, properties, functions)
