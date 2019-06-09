@@ -28,16 +28,11 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     fun indexInFunction() = function.blocks.indexOf(this)
             .also { require(it >= 0) }
 
-    override fun doVerify() {
+    fun verify() {
         check(instructions.lastOrNull() is Terminator) { "block must end with Terminator" }
         check(instructions.dropLast(1).all { it !is Terminator }) { "only the last instruction is a Terminator" }
         check(instructions.all { it.block == this }) { "instruction.block must be this block" }
         check(instructions.dropWhile { it is Phi }.all { it !is Phi }) { "all phi instructions are at the start of a block" }
-
-        for (instr in instructions) {
-            check(instr.block == this) { "instructions must refer to this block" }
-            instr.verify()
-        }
     }
 
     fun appendOrReplaceTerminator(instruction: Instruction) {
@@ -81,8 +76,8 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     }
 
     fun deepDelete() {
-        instructions.forEach { it.shallowDelete() }
-        shallowDelete()
+        instructions.forEach { it.delete() }
+        delete()
     }
 
     fun successors() = terminator.targets()

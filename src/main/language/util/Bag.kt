@@ -1,13 +1,9 @@
 package language.util
 
 class Bag<K> {
-    val map: MutableMap<K, Int>
+    val map: MutableMap<K, Int> = mutableMapOf()
 
-    constructor() {
-        map = mutableMapOf()
-    }
-
-    val size get() = map.size
+    val size get(): Int = map.size
 
     val keys get(): Set<K> = map.keys
 
@@ -24,6 +20,12 @@ class Bag<K> {
 
         return new
     }
+
+    fun remove(key: K): Int = map.remove(key) ?: 0
+
+    fun clear() = map.clear()
+
+    operator fun contains(key: K): Boolean = key in map
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

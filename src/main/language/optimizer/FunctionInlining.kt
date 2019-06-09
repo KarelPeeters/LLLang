@@ -94,8 +94,8 @@ object FunctionInlining : ProgramPass {
         //cleanup
         require(!call.isUsed())
         require(targetClone.parameters.all { !it.isUsed() })
-        call.shallowDelete()
-        targetClone.shallowDelete()
+        call.delete()
+        targetClone.delete()
     }
 
     private fun BasicBlock.takeAllocs(): List<Alloc> {

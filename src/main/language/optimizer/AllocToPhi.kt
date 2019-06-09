@@ -12,10 +12,12 @@ import java.util.*
 
 object AllocToPhi : FunctionPass {
     override fun FunctionContext.optimize(function: Function) {
-        val dom = domInfo()
         val variables = function.blocks
                 .flatMap { it.instructions.filterIsInstance<Alloc>() }
                 .filter { variable -> variable.users.all { it is Store || it is Load } }
+        if (variables.isEmpty()) return
+
+        val dom = domInfo()
 
         for (variable in variables) {
             //remove alloc

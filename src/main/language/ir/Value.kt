@@ -1,7 +1,7 @@
 package language.ir
 
 abstract class Value(val type: Type) : Node() {
-    val users = mutableSetOf<Node>()
+    val users = mutableSetOf<User>()
 
     protected open val replaceAble = true
 
@@ -19,12 +19,6 @@ abstract class Value(val type: Type) : Node() {
         check(users.isEmpty()) { "value should have no users left after replacement" }
     }
 
-    override fun verify() {
-        super.verify()
-        for (user in users)
-            check(!user.deleted) { "users can't be deleted" }
-    }
-
     abstract fun str(env: NameEnv): String
 }
 
@@ -35,8 +29,6 @@ class Constant constructor(type: Type, val value: Int) : Value(type) {
 
     override val replaceAble = false
     override fun str(env: NameEnv) = "$value $type"
-
-    override fun doVerify() {}
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -58,6 +50,5 @@ class Constant constructor(type: Type, val value: Int) : Value(type) {
 }
 
 object UnitValue : Value(UnitType) {
-    override fun doVerify() {}
     override fun str(env: NameEnv) = "unit"
 }

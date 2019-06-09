@@ -2,7 +2,9 @@ package language.ir
 
 import language.util.hasDuplicates
 
-class Program : Node() {
+class Program : User {
+    override val handler = UserHandler(this)
+
     var entry by operand<Function>(null)
     val functions = mutableListOf<Function>()
 
@@ -16,7 +18,7 @@ class Program : Node() {
         function.setProgram(null)
     }
 
-    override fun doVerify() {
+    fun verify() {
         check(entry in functions) { "entry must be one of the functions" }
         check(entry.parameters.isEmpty()) { "entry must be a parameterless function" }
 
@@ -24,11 +26,6 @@ class Program : Node() {
         val instructions = functions.flatMap { f -> f.blocks.flatMap { b -> b.instructions } }
         check(!blocks.hasDuplicates()) { "no duplicate blocks" }
         check(!instructions.hasDuplicates()) { "no duplicate instructions" }
-
-        for (function in functions) {
-            check(function.program == this) { "functions must refer to this program" }
-            function.verify()
-        }
     }
 
     fun fullString(prgmEnv: ProgramNameEnv): String {

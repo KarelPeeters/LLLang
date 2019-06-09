@@ -4,8 +4,10 @@ class Function private constructor(
         val name: String?,
         val parameters: List<ParameterValue>,
         val returnType: Type
-) : Value(FunctionType(parameters.map(ParameterValue::type), returnType)) {
-    var entry by operand<BasicBlock>(null)
+) : Value(FunctionType(parameters.map(ParameterValue::type), returnType)), User {
+    override val handler = UserHandler(this)
+
+    var entry by handler.operand<BasicBlock>(null)
     val blocks = mutableListOf<BasicBlock>()
 
     private var _program: Program? = null
@@ -31,7 +33,7 @@ class Function private constructor(
         newFunc.entry = this.entry
         newFunc._program = this._program
 
-        this.shallowDelete()
+        this.delete()
         return newFunc
     }
 
@@ -53,7 +55,7 @@ class Function private constructor(
 
         //replace instructions and blocks
         val replaceMap = paramMap + instrMap + blockMap
-        for (node in instrMap.values + blockMap.values) {
+        for (node in instrMap.values) {
             for ((old, new) in replaceMap)
                 node.replaceOperand(old, new)
         }
@@ -65,7 +67,7 @@ class Function private constructor(
         return newFunc
     }
 
-    override fun doVerify() {
+    fun verify() {
         check(entry in blocks) { "entry must be one of the blocks" }
         check(entry.predecessors().isEmpty()) { "entry can't be jumped to" }
 
@@ -110,7 +112,7 @@ class Function private constructor(
     fun deepDelete() {
         for (block in blocks)
             block.deepDelete()
-        shallowDelete()
+        delete()
     }
 
     fun entryAllocs() = entry.instructions.filterIsInstance<Alloc>()
@@ -131,7 +133,6 @@ class Function private constructor(
 }
 
 class ParameterValue(val name: String?, type: Type) : Value(type) {
-    override fun doVerify() {}
     override fun str(env: NameEnv) = "%${env.value(this)} $type"
 }
 

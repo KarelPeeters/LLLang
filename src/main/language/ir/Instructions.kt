@@ -3,7 +3,9 @@ package language.ir
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
 
-sealed class Instruction constructor(val name: String?, type: Type, val pure: Boolean) : Value(type) {
+sealed class Instruction(val name: String?, type: Type, val pure: Boolean) : Value(type), User {
+    override val handler = UserHandler(this)
+
     private var _block: BasicBlock? = null
 
     val block get() = _block!!
@@ -13,11 +15,13 @@ sealed class Instruction constructor(val name: String?, type: Type, val pure: Bo
 
     fun deleteFromBlock() {
         block.remove(this)
-        shallowDelete()
+        delete()
     }
 
     fun indexInBlock() = block.instructions.indexOf(this)
             .also { require(it >= 0) }
+
+    abstract fun verify()
 
     abstract fun clone(): Instruction
 
@@ -31,7 +35,7 @@ class Alloc(name: String?, val inner: Type) : Instruction(name, inner.pointer, t
 
     override fun clone() = Alloc(name, inner)
 
-    override fun doVerify() {}
+    override fun verify() {}
 }
 
 class Store(pointer: Value, value: Value) : Instruction(null, UnitType, false) {
@@ -40,7 +44,7 @@ class Store(pointer: Value, value: Value) : Instruction(null, UnitType, false) {
 
     override fun clone() = Store(pointer, value)
 
-    override fun doVerify() {
+    override fun verify() {
         check(pointer.type.unpoint == value.type) { "pointer type must be pointer to value type" }
     }
 
@@ -52,7 +56,7 @@ class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoi
 
     override fun clone() = Load(name, pointer)
 
-    override fun doVerify() {
+    override fun verify() {
         check(pointer.type.unpoint == this.type) { "pointer type must be pointer to load type" }
     }
 
@@ -66,7 +70,7 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
 
     override fun clone() = BinaryOp(name, opType, left, right)
 
-    override fun doVerify() {
+    override fun verify() {
         check(opType.returnType(left.type, right.type) == this.type) { "left and right types must result in binaryOp type" }
     }
 
@@ -79,7 +83,7 @@ class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
 
     override fun clone() = UnaryOp(name, opType, value)
 
-    override fun doVerify() {
+    override fun verify() {
         check(value.type == this.type) { "value type must be unaryOp type" }
     }
 
@@ -87,7 +91,7 @@ class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
 }
 
 class Phi(name: String?, type: Type) : Instruction(name, type, true) {
-    val sources = operandMap<BasicBlock, Value>()
+    val sources by operandMap<BasicBlock, Value>()
 
     override fun clone(): Phi {
         val new = Phi(name, type)
@@ -96,7 +100,7 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
         return new
     }
 
-    override fun doVerify() {
+    override fun verify() {
         check(sources.keys == block.predecessors().toSet()) { "must have source for every block predecessor" }
         check(sources.values.all { it.type == this.type }) { "source types must all equal phi type" }
     }
@@ -110,7 +114,7 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
 }
 
 class Eat : Instruction(null, UnitType, false) {
-    val arguments = operandList<Value>()
+    val arguments by operandList<Value>()
 
     override fun clone(): Eat {
         val new = Eat()
@@ -118,7 +122,7 @@ class Eat : Instruction(null, UnitType, false) {
         return new
     }
 
-    override fun doVerify() {}
+    override fun verify() {}
 
     override fun fullStr(env: NameEnv) = "eat " + arguments.joinToString { it.str(env) }
 }
@@ -128,7 +132,7 @@ class Blur(value: Value) : Instruction(null, value.type, false) {
 
     override fun clone() = Blur(value)
 
-    override fun doVerify() {
+    override fun verify() {
         check(value.type == this.type) { "value type must be blur type" }
     }
 
@@ -138,11 +142,11 @@ class Blur(value: Value) : Instruction(null, value.type, false) {
 class Call(name: String?, target: Value, arguments: List<Value>)
     : Instruction(name, (target.type as FunctionType).returnType, false) {
     var target by operand(target)
-    val arguments = operandList(arguments)
+    val arguments by operandList(arguments)
 
     override fun clone() = Call(name, target, arguments.toList())
 
-    override fun doVerify() {
+    override fun verify() {
         val funcType = target.type
         check(funcType is FunctionType) { "target must be a function" }
         check(funcType.paramTypes.size == arguments.size) { "parameter sizes must match" }
@@ -167,7 +171,7 @@ sealed class GetSubValue(name: String?, type: Type)
 
         override fun clone() = GetStructValue(name, target, index)
 
-        override fun doVerify() {
+        override fun verify() {
             val structType = target.type
             check(structType is StructType) { "target is a struct" }
             check(index in structType.properties.indices) { "valid index" }
@@ -185,7 +189,7 @@ sealed class GetSubValue(name: String?, type: Type)
 
         override fun clone() = GetArrayValue(name, target, index)
 
-        override fun doVerify() {
+        override fun verify() {
             val structType = target.type
             check(structType is ArrayType) { "target is a struct" }
             check(index.type is IntegerType) { "valid index" }
@@ -215,7 +219,7 @@ sealed class GetSubPointer(name: String?, type: Type)
 
         override fun clone() = Array(name, target, index)
 
-        override fun doVerify() {
+        override fun verify() {
             val arrType = target.type.unpoint
             check(arrType is ArrayType) { "target is a struct pointer" }
             check(index.type is IntegerType) { "index is integer" }
@@ -232,7 +236,7 @@ sealed class GetSubPointer(name: String?, type: Type)
 
         override fun clone() = Struct(name, target, index)
 
-        override fun doVerify() {
+        override fun verify() {
             val structType = target.type.unpoint
             check(structType is StructType) { "target is a struct pointer" }
             check(index in structType.properties.indices) { "valid index" }
@@ -245,11 +249,11 @@ sealed class GetSubPointer(name: String?, type: Type)
 
 class AggregateValue(name: String?, val atype: AggregateType, values: List<Value>)
     : Instruction(name, atype, true) {
-    val values = operandList(values)
+    val values by operandList(values)
 
     override fun clone() = AggregateValue(name, atype, values)
 
-    override fun doVerify() {
+    override fun verify() {
         check(atype.size == values.size) { "sizes must match" }
         for ((t, v) in atype.innerTypes zip values)
             check(t == v.type) { "inner types must match" }
@@ -276,7 +280,7 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
 
     override fun clone() = Branch(value, ifTrue, ifFalse)
 
-    override fun doVerify() {
+    override fun verify() {
         check(value.type == bool) { "branch conditional must be a boolean" }
     }
 
@@ -289,7 +293,7 @@ class Jump(target: BasicBlock?) : Terminator() {
 
     override fun clone() = Jump(target)
 
-    override fun doVerify() {}
+    override fun verify() {}
 
     override fun targets() = setOf(target)
     override fun fullStr(env: NameEnv) = "jump ${target.str(env)}"
@@ -298,7 +302,7 @@ class Jump(target: BasicBlock?) : Terminator() {
 class Exit : Terminator() {
     override fun clone() = Exit()
 
-    override fun doVerify() {}
+    override fun verify() {}
 
     override fun targets() = setOf<BasicBlock>()
     override fun fullStr(env: NameEnv) = "exit"
@@ -309,7 +313,7 @@ class Return(value: Value) : Terminator() {
 
     override fun clone() = Return(value)
 
-    override fun doVerify() {}
+    override fun verify() {}
 
     override fun targets() = emptySet<BasicBlock>()
     override fun fullStr(env: NameEnv) = "return ${value.str(env)}"

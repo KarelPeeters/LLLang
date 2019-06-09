@@ -13,7 +13,7 @@ inline fun <reified T> Iterable<*>.takeWhileIsInstance(): List<T> {
     return result
 }
 
-@Suppress("UNCHECKED_CAST")
+@Suppress("unchecked_cast")
 inline fun <reified T> Iterable<*>.mapIfAllInstance(): List<T>? {
     val result = mutableListOf<T>()
     for (item in this) {
