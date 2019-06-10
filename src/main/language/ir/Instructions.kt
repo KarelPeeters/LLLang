@@ -3,9 +3,7 @@ package language.ir
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
 
-sealed class Instruction(val name: String?, type: Type, val pure: Boolean) : Value(type), User {
-    override val handler = UserHandler(this)
-
+sealed class Instruction(val name: String?, type: Type, val pure: Boolean) : Value(type), User by User() {
     private var _block: BasicBlock? = null
 
     val block get() = _block!!

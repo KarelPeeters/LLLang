@@ -6,44 +6,59 @@ import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 
 /**
- * A [User] is something that uses values. This interface and the associated [UserHandler] provide property delegates
- * that automaticcaly keep track of used values and update [Value.users] accrodingly.
+ * A [User] is something that uses values, and maintains a bidictional link between itself and the values it uses.
+ * An automatic implementation based on property and interface delegates is returned by the `User()` function, intended
+ * to be used like this:
+ *
+ *    class MyUser: User by User() {
+ *        val myOperand by operand<MyValue>()
+ *    }
  */
 interface User {
-    /** Stores the usage state for this User. This property is not intended to be used outside implmenting class.
-     *  Classes that implement [User] should override and use [handler] as follows:
-     *
-     * ````
-     * override val handler = UserHandler(this)
-     * val myOperand by handler.operand<Value>()
-     * ````
-     */
-    val handler: UserHandler
-
     /** The set of used values */
-    val operands: Set<Value> get() = handler.operands
+    val operands: Set<Value>
 
     /** Replace a value with another in this user */
-    fun replaceOperand(from: Value, to: Value) = handler.replaceOperand(from, to)
+    fun replaceOperand(from: Value, to: Value)
 
     /** Drop usages of all operands, this invalides the delegates:
-     * any further access to the delegates will throw an exception*/
-    fun dropOperands() = handler.dropOperands()
+     * any further access to the delegates will throw an exception */
+    fun dropOperands()
 
-    fun <T : Value> operand(value: T? = null) = handler.operand(value)
-    fun <T : Value> operandList(values: List<T>? = null) = handler.operandList(values)
-    fun <K : Value, V : Value> operandMap(values: Map<K, V>? = null) = handler.operandMap(values)
+    fun <T : Value> operand(value: T? = null): ReadWriteProvider<User, T>
+    fun <T : Value> operandList(values: List<T>? = null): ReadOnlyProvider<User, MutableList<T>>
+    fun <K : Value, V : Value> operandMap(values: Map<K, V>? = null): ReadOnlyProvider<User, MutableMap<K, V>>
 }
 
+interface ReadWriteProvider<in R, T> {
+    operator fun provideDelegate(thisRef: R, prop: KProperty<*>): ReadWriteProperty<R, T>
+}
+
+interface ReadOnlyProvider<in R, out T> {
+    operator fun provideDelegate(thisRef: R, prop: KProperty<*>): ReadOnlyProperty<R, T>
+}
+
+@Suppress("FunctionName")
+fun User(): User = UserImpl()
+
 @Suppress("unchecked_cast")
-class UserHandler(val user: User) {
+/**
+ * [UserImpl] is the automatic implementation of the [User] interface.
+ *
+ * Because interface delegates can't access the
+ * instance that delegates to them directly, this class gets a reference to it while instantiating the property
+ * delegates, this happens in [interceptUser] which is called by all delegate providers.
+ */
+private class UserImpl : User {
+    lateinit var user: User
+
     private var dropped = false
     private val holders = mutableListOf<OperandHolder>()
     private val useCounts = Bag<Value>()
 
-    val operands: Set<Value> get() = useCounts.keys
+    override val operands: Set<Value> get() = useCounts.keys
 
-    fun replaceOperand(from: Value, to: Value) {
+    override fun replaceOperand(from: Value, to: Value) {
         if (from in useCounts) {
             for (holder in holders)
                 holder.replaceOperand(from, to)
@@ -51,8 +66,8 @@ class UserHandler(val user: User) {
         }
     }
 
-    fun dropOperands() {
-        check(!dropped)
+    override fun dropOperands() {
+        checkNotDropped()
         this.dropped = true
 
         for (holder in holders)
@@ -79,14 +94,46 @@ class UserHandler(val user: User) {
         }
     }
 
-    fun <T : Value> operand(value: T?): ReadWriteProperty<User, T> =
-            OperandBox(value).also { holders += it }
+    private fun checkNotDropped() {
+        if (dropped) throw IllegalStateException("use of operand after dropping")
+    }
 
-    fun <T : Value> operandList(values: List<T>?): ReadOnlyProperty<User, MutableList<T>> =
-            BasicDelegate(OperandList(values).also { holders += it })
+    private fun interceptUser(user: User) {
+        if (dropped) throw IllegalStateException("creation of new delegate after dropping")
 
-    fun <K : Value, V : Value> operandMap(values: Map<K, V>?): ReadOnlyProperty<User, MutableMap<K, V>> =
-            BasicDelegate(OperandMap(values).also { holders += it })
+        if (this::user.isInitialized)
+            check(this.user === user) { "two different users, did a delegate leak?" }
+        else
+            this.user = user
+    }
+
+    override fun <T : Value> operand(value: T?): ReadWriteProvider<User, T> = object : ReadWriteProvider<User, T> {
+        override fun provideDelegate(thisRef: User, prop: KProperty<*>): ReadWriteProperty<User, T> {
+            interceptUser(thisRef)
+            return OperandBox(value).also { holders += it }
+        }
+    }
+
+    override fun <T : Value> operandList(values: List<T>?): ReadOnlyProvider<User, MutableList<T>> = object : ReadOnlyProvider<User, MutableList<T>> {
+        override fun provideDelegate(thisRef: User, prop: KProperty<*>): ReadOnlyProperty<User, MutableList<T>> {
+            interceptUser(thisRef)
+            return BasicDelegate(OperandList(values).also { holders += it })
+        }
+    }
+
+    override fun <K : Value, V : Value> operandMap(values: Map<K, V>?): ReadOnlyProvider<User, MutableMap<K, V>> = object : ReadOnlyProvider<User, MutableMap<K, V>> {
+        override fun provideDelegate(thisRef: User, prop: KProperty<*>): ReadOnlyProperty<User, MutableMap<K, V>> {
+            interceptUser(thisRef)
+            return BasicDelegate(OperandMap(values).also { holders += it })
+        }
+    }
+
+    private inner class BasicDelegate<out T>(val value: T) : ReadOnlyProperty<Any, T> {
+        override fun getValue(thisRef: Any, property: KProperty<*>): T {
+            checkNotDropped()
+            return value
+        }
+    }
 
     private inner class OperandBox<T : Value> : OperandHolder, ReadWriteProperty<User, T> {
         var value: T? = null
@@ -111,9 +158,13 @@ class UserHandler(val user: User) {
             value = null
         }
 
-        override fun getValue(thisRef: User, property: KProperty<*>): T = value!!
+        override fun getValue(thisRef: User, property: KProperty<*>): T {
+            checkNotDropped()
+            return value ?: throw IllegalStateException("propertu was never initialized")
+        }
 
         override fun setValue(thisRef: User, property: KProperty<*>, value: T) {
+            checkNotDropped()
             this.value?.let { prev -> changeUseCount(prev, -1) }
             changeUseCount(value, 1)
             this.value = value
@@ -352,10 +403,6 @@ class UserHandler(val user: User) {
             override fun contains(element: V): Boolean = map.containsValue(element)
         }
     }
-}
-
-private class BasicDelegate<out T>(val value: T) : ReadOnlyProperty<Any, T> {
-    override fun getValue(thisRef: Any, property: KProperty<*>) = value
 }
 
 private interface OperandHolder {

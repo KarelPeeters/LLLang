@@ -4,10 +4,8 @@ class Function private constructor(
         val name: String?,
         val parameters: List<ParameterValue>,
         val returnType: Type
-) : Value(FunctionType(parameters.map(ParameterValue::type), returnType)), User {
-    override val handler = UserHandler(this)
-
-    var entry by handler.operand<BasicBlock>(null)
+) : Value(FunctionType(parameters.map(ParameterValue::type), returnType)), User by User() {
+    var entry by operand<BasicBlock>(null)
     val blocks = mutableListOf<BasicBlock>()
 
     private var _program: Program? = null

@@ -2,9 +2,7 @@ package language.ir
 
 import language.util.hasDuplicates
 
-class Program : User {
-    override val handler = UserHandler(this)
-
+class Program : User by User() {
     var entry by operand<Function>(null)
     val functions = mutableListOf<Function>()
 
