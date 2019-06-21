@@ -62,7 +62,7 @@ val DEFAULT_PASSES = listOf(
 class Optimizer(
         private val passes: Iterable<OptimizerPass> = DEFAULT_PASSES,
         private val repeat: Boolean = true,
-        private val doVerify: Boolean = true
+        private val doVerify: Boolean
 ) {
     private val _runPasses = mutableListOf<OptimizerPass>()
     val runPasses: List<OptimizerPass> get() = _runPasses
@@ -97,5 +97,44 @@ class Optimizer(
 
             if (!repeat || !context.hasChanged) break
         }
+    }
+}
+
+/**
+ * Finds a minimal list of optimizer passes that causes a crash. [program] must supply independant instances of
+ * otherwise identical programs, this is a woraround until full program cloning is possible.
+ * Returns `null` if this optimisation doesn't crash at all.
+ */
+fun findMinimalErrorPasses(program: () -> Program): List<OptimizerPass>? {
+    val optimizer = Optimizer(doVerify = true)
+
+    try {
+        optimizer.optimize(program())
+
+        //didn't crash
+        return null
+    } catch (e: Exception) {
+    }
+
+    val passes = optimizer.runPasses.toMutableList()
+
+    outer@ while (true) {
+        for (i in passes.indices) {
+            val skippedPass = passes.removeAt(i)
+
+            try {
+                Optimizer(passes, doVerify = true).optimize(program())
+
+                //didn't crash, add back in and try the next index
+                passes.add(i, skippedPass)
+                continue
+            } catch (e: Exception) {
+                //crashed, keep pass removed and start looking for the next one
+                continue@outer
+            }
+        }
+
+        //for loop completed normally, no removable pass found
+        return passes
     }
 }
