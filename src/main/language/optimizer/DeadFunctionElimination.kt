@@ -3,8 +3,8 @@ package language.optimizer
 import language.ir.Function
 import language.ir.Program
 
-object DeadFunctionElimination : ProgramPass {
-    override fun ProgramContext.optimize(program: Program) {
+object DeadFunctionElimination : ProgramPass() {
+    override fun OptimizerContext.optimize(program: Program) {
         val used = object : Graph<Function> {
             override val roots = setOf(program.entry)
             override fun children(node: Function) = node.blocks

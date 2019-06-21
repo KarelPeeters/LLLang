@@ -10,8 +10,8 @@ import language.ir.Program
 import language.ir.Return
 import language.ir.Terminator
 
-object FunctionInlining : ProgramPass {
-    override fun ProgramContext.optimize(program: Program) {
+object FunctionInlining : ProgramPass() {
+    override fun OptimizerContext.optimize(program: Program) {
         val iter = program.functions.iterator()
         for (func in iter) {
             //only used by calls, also guaratees all Calls have an immediate Function target
@@ -41,8 +41,9 @@ object FunctionInlining : ProgramPass {
 
     private fun inline(call: Call) {
         val target = call.target as Function
-        val targetClone = target.deepClone()
         val containingFunction = call.block.function
+
+        val targetClone = target.deepClone()
         val beforeBlock = call.block
         val afterBlock = BasicBlock(null)
 

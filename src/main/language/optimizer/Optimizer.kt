@@ -3,107 +3,99 @@ package language.optimizer
 import language.ir.Function
 import language.ir.Program
 
-interface ProgramPass {
-    fun ProgramContext.optimize(program: Program)
+sealed class OptimizerPass {
+    abstract fun OptimizerContext.runOnProgram(program: Program, afterPass: (subject: Any?) -> Unit)
+
+    override fun toString(): String = this.javaClass.simpleName
 }
 
-interface ProgramContext {
+abstract class ProgramPass : OptimizerPass() {
+    abstract fun OptimizerContext.optimize(program: Program)
+
+    override fun OptimizerContext.runOnProgram(program: Program, afterPass: (subject: Any?) -> Unit) {
+        optimize(program)
+        afterPass(program)
+    }
+}
+
+abstract class FunctionPass : OptimizerPass() {
+    abstract fun OptimizerContext.optimize(function: Function)
+
+    override fun OptimizerContext.runOnProgram(program: Program, afterPass: (subject: Any?) -> Unit) {
+        for (function in program.functions) {
+            optimize(function)
+            afterPass(function)
+        }
+    }
+}
+
+interface OptimizerContext {
     fun changed()
+    fun domInfo(function: Function): DominatorInfo
 }
 
-interface FunctionPass {
-    fun FunctionContext.optimize(function: Function)
-}
-
-interface FunctionContext {
-    fun instrChanged()
-    fun graphChanged()
-    fun domInfo(): DominatorInfo
-}
-
-private class ProgramContextImpl(val program: Program) : ProgramContext {
+private class OptimizerContextImpl : OptimizerContext {
     var hasChanged = false
 
     override fun changed() {
         hasChanged = true
     }
+
+    override fun domInfo(function: Function) = DominatorInfo(function)
 }
 
-private class FunctionContextImpl(val function: Function) : FunctionContext {
-    var hasChanged = false
-    var domInfo: DominatorInfo? = null
+val DEFAULT_PASSES = listOf(
+        //program passes
+        DeadFunctionElimination,
+        DeadSignatureElimination,
+        FunctionInlining,
 
-    override fun instrChanged() {
-        hasChanged = true
-    }
+        //function passes
+        SplitAggregate,
+        AllocToPhi,
+        ConstantFolding,
+        DeadInstructionElimination,
+        SimplifyBlocks,
+        DeadBlockElimination
+)
 
-    override fun graphChanged() {
-        hasChanged = true
-        domInfo = null
-    }
+class Optimizer(
+        private val passes: Iterable<OptimizerPass> = DEFAULT_PASSES,
+        private val repeat: Boolean = true,
+        private val doVerify: Boolean = true
+) {
+    private val _runPasses = mutableListOf<OptimizerPass>()
+    val runPasses: List<OptimizerPass> get() = _runPasses
 
-    override fun domInfo(): DominatorInfo {
-        domInfo?.let { return it }
-
-        val info = DominatorInfo(function)
-        domInfo = info
-        return info
-    }
-}
-
-class Optimizer(var doVerify: Boolean = true) {
-    private val programPasses: List<ProgramPass> = listOf(
-            DeadFunctionElimination/*,
-            DeadSignatureElimination,
-            FunctionInlining*/
-    )
-
-    private val functionPasses: List<FunctionPass> = listOf(
-            SplitAggregate,
-            AllocToPhi,
-            ConstantFolding,
-            DeadInstructionElimination,
-            SimplifyBlocks,
-            DeadBlockElimination
-    )
-
-    fun optimize(program: Program) {
-        fun verify(subject: Any?, pass: Any?) {
-            if (doVerify) {
-                try {
-                    program.verify()
-                } catch (e: Exception) {
-                    throw IllegalStateException("verify fail after pass $pass on $subject", e)
-                }
+    private fun verify(program: Program, pass: Any?, subject: Any?) {
+        if (doVerify) {
+            try {
+                program.verify()
+            } catch (e: Exception) {
+                throw IllegalStateException("verify fail after pass $pass on $subject", e)
             }
         }
+    }
 
-        verify(null, null)
+    fun optimize(program: Program) {
+        verify(program, null, null)
 
-        do {
-            var changed = false
-            //program passes
-            for (pass in programPasses) {
-                val programContext = ProgramContextImpl(program)
-                pass.apply { programContext.optimize(program) }
-                verify(program, pass)
+        val context = OptimizerContextImpl()
 
-                changed = changed || programContext.hasChanged
-                programContext.hasChanged = false
-            }
+        while (true) {
+            context.hasChanged = false
 
-            //function passes
-            for (function in program.functions) {
-                //val context = functionContexts.getValue(function)
-                for (pass in functionPasses) {
-                    val context = FunctionContextImpl(function)
-                    pass.apply { context.optimize(function) }
-                    verify(function, pass)
+            for (pass in passes) {
+                _runPasses += pass
 
-                    changed = changed || context.hasChanged
-                    context.hasChanged = false
+                with(pass) {
+                    context.runOnProgram(program) {
+                        verify(program, pass, it)
+                    }
                 }
             }
-        } while (changed)
+
+            if (!repeat || !context.hasChanged) break
+        }
     }
 }

@@ -5,8 +5,8 @@ import language.ir.Jump
 import language.ir.Phi
 import language.ir.Terminator
 
-object SimplifyBlocks : FunctionPass {
-    override fun FunctionContext.optimize(function: Function) {
+object SimplifyBlocks : FunctionPass() {
+    override fun OptimizerContext.optimize(function: Function) {
         val iter = function.blocks.iterator()
 
         for (block in iter) {
@@ -18,7 +18,7 @@ object SimplifyBlocks : FunctionPass {
                 if (users.all { it is Terminator || it is Function }) {
                     for (user in users)
                         user.replaceOperand(block, term.target)
-                    graphChanged()
+                    changed()
                     continue
                 }
             }

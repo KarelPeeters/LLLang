@@ -6,8 +6,8 @@ import language.ir.Phi
 import language.ir.Terminator
 
 
-object DeadBlockElimination : FunctionPass {
-    override fun FunctionContext.optimize(function: Function) {
+object DeadBlockElimination : FunctionPass() {
+    override fun OptimizerContext.optimize(function: Function) {
         val used = object : Graph<BasicBlock> {
             override val roots = setOf(function.entry)
             override fun children(node: BasicBlock) = node.successors()
@@ -26,7 +26,7 @@ object DeadBlockElimination : FunctionPass {
 
                 block.deepDelete()
                 iter.remove()
-                graphChanged()
+                changed()
             }
         }
     }

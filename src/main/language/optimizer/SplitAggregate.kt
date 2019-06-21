@@ -11,8 +11,8 @@ import language.ir.Instruction
 import language.ir.Load
 import language.ir.Store
 
-object SplitAggregate : FunctionPass {
-    override fun FunctionContext.optimize(function: Function) {
+object SplitAggregate : FunctionPass() {
+    override fun OptimizerContext.optimize(function: Function) {
         for (alloc in function.entryAllocs()) {
             val type = alloc.inner as? AggregateType ?: continue
 
@@ -58,11 +58,11 @@ object SplitAggregate : FunctionPass {
                 }
             }
 
-            instrChanged()
-
             val allocIndex = alloc.indexInBlock()
             alloc.block.addAll(allocIndex, replacements)
             alloc.deleteFromBlock()
+
+            changed()
         }
     }
 }

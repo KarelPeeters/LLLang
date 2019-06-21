@@ -15,8 +15,8 @@ import language.util.mapIfAllInstance
  *  * inline parameters that are always passed the same constant
  *  * removed the return type if it's never used by a callsite
  */
-object DeadSignatureElimination : ProgramPass {
-    override fun ProgramContext.optimize(program: Program) {
+object DeadSignatureElimination : ProgramPass() {
+    override fun OptimizerContext.optimize(program: Program) {
         val funcIter = program.functions.listIterator()
 
         for (function in funcIter) {

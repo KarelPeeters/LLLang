@@ -12,8 +12,8 @@ import language.ir.Phi
 import language.ir.UnaryOp
 import java.util.*
 
-object ConstantFolding : FunctionPass {
-    override fun FunctionContext.optimize(function: Function) {
+object ConstantFolding : FunctionPass() {
+    override fun OptimizerContext.optimize(function: Function) {
         val toVisit = ArrayDeque<Instruction>()
         function.blocks.flatMapTo(toVisit) { it.instructions }
 
@@ -26,7 +26,7 @@ object ConstantFolding : FunctionPass {
         }
     }
 
-    private fun FunctionContext.visit(instr: Instruction): Boolean {
+    private fun OptimizerContext.visit(instr: Instruction): Boolean {
         when (instr) {
             is BinaryOp -> {
                 val left = instr.left
@@ -37,7 +37,7 @@ object ConstantFolding : FunctionPass {
                     instr.replaceWith(result)
                     instr.deleteFromBlock()
 
-                    instrChanged()
+                    changed()
                     return true
                 }
             }
@@ -48,7 +48,7 @@ object ConstantFolding : FunctionPass {
                     instr.replaceWith(result)
                     instr.deleteFromBlock()
 
-                    instrChanged()
+                    changed()
                     return true
                 }
             }
@@ -69,7 +69,7 @@ object ConstantFolding : FunctionPass {
                     instr.block.terminator = Jump(target)
                     instr.delete()
 
-                    graphChanged()
+                    changed()
                 }
             }
             is Phi -> {
@@ -78,7 +78,7 @@ object ConstantFolding : FunctionPass {
                     instr.replaceWith(value)
                     instr.deleteFromBlock()
 
-                    instrChanged()
+                    changed()
                     return true
                 }
             }
@@ -93,7 +93,7 @@ object ConstantFolding : FunctionPass {
                         instr.replaceWith(value)
                         instr.deleteFromBlock()
 
-                        instrChanged()
+                        changed()
                         return true
                     }
                     return false

@@ -10,19 +10,18 @@ import language.ir.Store
 import language.ir.Value
 import java.util.*
 
-object AllocToPhi : FunctionPass {
-    override fun FunctionContext.optimize(function: Function) {
+object AllocToPhi : FunctionPass() {
+    override fun OptimizerContext.optimize(function: Function) {
         val variables = function.blocks
                 .flatMap { it.instructions.filterIsInstance<Alloc>() }
                 .filter { variable -> variable.users.all { it is Store || it is Load } }
         if (variables.isEmpty()) return
 
-        val dom = domInfo()
+        val dom = domInfo(function)
 
         for (variable in variables) {
             //remove alloc
-            variable.block.remove(variable)
-            instrChanged()
+            variable.deleteFromBlock()
 
             val stores = variable.users.filterIsInstance<Store>()
             val loads = variable.users.filterIsInstance<Load>()
@@ -43,7 +42,6 @@ object AllocToPhi : FunctionPass {
                         phis[block] = phi
                     }
                 }
-
             }
 
             /**
@@ -103,6 +101,8 @@ object AllocToPhi : FunctionPass {
             for (store in stores) {
                 store.deleteFromBlock()
             }
+
+            changed()
         }
     }
 
