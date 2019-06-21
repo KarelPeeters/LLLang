@@ -254,16 +254,17 @@ class Declaration(
         val identifier: String,
         val mutable: Boolean,
         val type: TypeAnnotation?,
-        val value: Expression
+        val value: Expression?
 ) : Statement(position) {
     override fun ASTRenderer.render() {
         print(if (mutable) "var" else "val")
         print(" $identifier")
         if (type != null) {
-            print(": ")
-            print(type)
+            print(": "); print(type)
         }
-        print(" = "); print(value)
+        if (value != null) {
+            print(" = "); print(value)
+        }
     }
 }
 

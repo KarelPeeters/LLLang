@@ -92,8 +92,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         }
         val identifier = expect(Id).text
         val type = if (accept(Colon)) type() else null
-        expect(Assign)
-        val value = expression()
+        val value = if (accept(Assign)) expression() else null
 
         return Declaration(pos, identifier, mutable, type, value)
     }

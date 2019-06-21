@@ -22,7 +22,7 @@ abstract class Value(val type: Type) : Node() {
     abstract fun str(env: NameEnv): String
 }
 
-class Constant constructor(type: Type, val value: Int) : Value(type) {
+class Constant(type: Type, val value: Int) : Value(type) {
     init {
         require(type is IntegerType)
     }
@@ -33,20 +33,21 @@ class Constant constructor(type: Type, val value: Int) : Value(type) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
-
         other as Constant
-        if (type != other.type) return false
-        if (value != other.value) return false
 
-        return true
+        return type == other.type && value == other.value
     }
 
     override fun hashCode(): Int {
         var result = value
         result = 31 * result + type.hashCode()
-        result = 31 * result + replaceAble.hashCode()
         return result
     }
+}
+
+class Undefined(type: Type) : Value(type) {
+    override val replaceAble = false
+    override fun str(env: NameEnv) = "undef $type"
 }
 
 object UnitValue : Value(UnitType) {

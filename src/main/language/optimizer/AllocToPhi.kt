@@ -7,6 +7,7 @@ import language.ir.Instruction
 import language.ir.Load
 import language.ir.Phi
 import language.ir.Store
+import language.ir.Undefined
 import language.ir.Value
 import java.util.*
 
@@ -76,25 +77,12 @@ object AllocToPhi : FunctionPass() {
                 load.deleteFromBlock()
             }
 
-            val problemPhis = mutableListOf<Phi>()
-
             //add operands to phi nodes
             for (phi in phis.values) {
                 for (pred in phi.block.predecessors()) {
                     val value = findLastValue(pred, null)
-                    if (value == null)
-                        problemPhis += phi
-                    else
-                        phi.sources[pred] = value
+                    phi.sources[pred] = value ?: Undefined(phi.type)
                 }
-            }
-
-            //make sure problemPhis aren't used
-            for (phi in problemPhis) {
-                if (!phi.isUsed())
-                    phi.deleteFromBlock()
-                else
-                    throw NoValueFoundException()
             }
 
             //remove stores

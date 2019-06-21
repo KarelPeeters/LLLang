@@ -197,10 +197,15 @@ class Flattener {
     private fun BasicBlock.appendStatement(scope: Scope, stmt: Statement): BasicBlock? = when (stmt) {
         is Expression -> appendExpression(scope, stmt).first
         is Declaration -> {
-            val (next, value) = appendLoadedExpression(scope, stmt.value)
-
-            val type = resolveType(stmt.type, value.type)
-            requireTypeMatch(stmt.position, type, value.type)
+            val (type, next, value) = if (stmt.value == null) {
+                if (stmt.type == null) throw MissingTypeDeclarationException(stmt.position)
+                Triple(resolveType(stmt.type), this, null)
+            } else {
+                val (next, value) = appendLoadedExpression(scope, stmt.value)
+                val type = resolveType(stmt.type, value.type)
+                requireTypeMatch(stmt.position, type, value.type)
+                Triple(type, next, value)
+            }
 
             val alloc = Alloc(stmt.identifier, type)
             allocs += alloc
@@ -210,7 +215,8 @@ class Flattener {
             if (!stmt.mutable)
                 scope.registerImmutableVal(alloc)
 
-            next.append(Store(alloc, value))
+            if (value != null)
+                next.append(Store(alloc, value))
             next
         }
         is CodeBlock -> appendNestedBlock(scope, stmt)
@@ -491,6 +497,9 @@ class NotInObjectScope(pos: SourcePosition)
 
 class DuplicateDeclarationException(pos: SourcePosition, identifier: String)
     : Exception("$pos: '$identifier' was already declared in this scope")
+
+class MissingTypeDeclarationException(pos: SourcePosition)
+    : Exception("Missing type delcaration at $pos")
 
 class IllegalTypeException(type: TypeAnnotation)
     : Exception("Illegal type '$type' at ${type.position}")
