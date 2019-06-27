@@ -11,14 +11,6 @@ sealed class Instruction(val name: String?, type: Type, val pure: Boolean) : Val
         this._block = block
     }
 
-    fun deleteFromBlock() {
-        block.remove(this)
-        delete()
-    }
-
-    fun indexInBlock() = block.instructions.indexOf(this)
-            .also { require(it >= 0) }
-
     abstract fun verify()
 
     abstract fun clone(): Instruction
@@ -28,7 +20,18 @@ sealed class Instruction(val name: String?, type: Type, val pure: Boolean) : Val
     abstract fun fullStr(env: NameEnv): String
 }
 
-class Alloc(name: String?, val inner: Type) : Instruction(name, inner.pointer, true) {
+sealed class BasicInstruction(name: String?, type: Type, pure: Boolean) : Instruction(name, type, pure) {
+    fun deleteFromBlock() {
+        block.remove(this)
+        delete()
+    }
+
+    fun indexInBlock() = block.basicInstructions.indexOf(this).also { require(it >= 0) }
+
+    abstract override fun clone(): BasicInstruction
+}
+
+class Alloc(name: String?, val inner: Type) : BasicInstruction(name, inner.pointer, true) {
     override fun fullStr(env: NameEnv) = "${str(env)} = alloc $inner"
 
     override fun clone() = Alloc(name, inner)
@@ -36,7 +39,7 @@ class Alloc(name: String?, val inner: Type) : Instruction(name, inner.pointer, t
     override fun verify() {}
 }
 
-class Store(pointer: Value, value: Value) : Instruction(null, UnitType, false) {
+class Store(pointer: Value, value: Value) : BasicInstruction(null, UnitType, false) {
     var pointer by operand(pointer)
     var value by operand(value)
 
@@ -49,7 +52,7 @@ class Store(pointer: Value, value: Value) : Instruction(null, UnitType, false) {
     override fun fullStr(env: NameEnv) = "store ${value.str(env)} -> ${pointer.str(env)}"
 }
 
-class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoint!!, true) {
+class Load(name: String?, pointer: Value) : BasicInstruction(name, pointer.type.unpoint!!, true) {
     var pointer by operand(pointer)
 
     override fun clone() = Load(name, pointer)
@@ -62,7 +65,7 @@ class Load(name: String?, pointer: Value) : Instruction(name, pointer.type.unpoi
 }
 
 class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Value) :
-        Instruction(name, opType.returnType(left.type, right.type), true) {
+        BasicInstruction(name, opType.returnType(left.type, right.type), true) {
     var left by operand(left)
     var right by operand(right)
 
@@ -76,7 +79,7 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
 }
 
 class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
-        Instruction(name, value.type, true) {
+        BasicInstruction(name, value.type, true) {
     var value by operand(value)
 
     override fun clone() = UnaryOp(name, opType, value)
@@ -88,7 +91,7 @@ class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
     override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${value.str(env)}"
 }
 
-class Phi(name: String?, type: Type) : Instruction(name, type, true) {
+class Phi(name: String?, type: Type) : BasicInstruction(name, type, true) {
     val sources by operandMap<BasicBlock, Value>()
 
     override fun clone(): Phi {
@@ -111,7 +114,7 @@ class Phi(name: String?, type: Type) : Instruction(name, type, true) {
     }
 }
 
-class Eat : Instruction(null, UnitType, false) {
+class Eat : BasicInstruction(null, UnitType, false) {
     val arguments by operandList<Value>()
 
     override fun clone(): Eat {
@@ -125,7 +128,7 @@ class Eat : Instruction(null, UnitType, false) {
     override fun fullStr(env: NameEnv) = "eat " + arguments.joinToString { it.str(env) }
 }
 
-class Blur(value: Value) : Instruction(null, value.type, false) {
+class Blur(value: Value) : BasicInstruction(null, value.type, false) {
     val value by operand(value)
 
     override fun clone() = Blur(value)
@@ -138,7 +141,7 @@ class Blur(value: Value) : Instruction(null, value.type, false) {
 }
 
 class Call(name: String?, target: Value, arguments: List<Value>)
-    : Instruction(name, (target.type as FunctionType).returnType, false) {
+    : BasicInstruction(name, (target.type as FunctionType).returnType, false) {
     var target by operand(target)
     val arguments by operandList(arguments)
 
@@ -158,7 +161,7 @@ class Call(name: String?, target: Value, arguments: List<Value>)
 }
 
 sealed class GetSubValue(name: String?, type: Type)
-    : Instruction(name, type, true) {
+    : BasicInstruction(name, type, true) {
 
     abstract val target: Value
 
@@ -206,7 +209,7 @@ sealed class GetSubValue(name: String?, type: Type)
 }
 
 sealed class GetSubPointer(name: String?, type: Type)
-    : Instruction(name, type, true) {
+    : BasicInstruction(name, type, true) {
     abstract var target: Value
 
     class Array(name: String?, target: Value, index: Value)
@@ -246,7 +249,7 @@ sealed class GetSubPointer(name: String?, type: Type)
 }
 
 class AggregateValue(name: String?, val atype: AggregateType, values: List<Value>)
-    : Instruction(name, atype, true) {
+    : BasicInstruction(name, atype, true) {
     val values by operandList(values)
 
     override fun clone() = AggregateValue(name, atype, values)

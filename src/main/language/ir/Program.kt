@@ -24,6 +24,10 @@ class Program : User by User() {
         val instructions = functions.flatMap { f -> f.blocks.flatMap { b -> b.instructions } }
         check(!blocks.hasDuplicates()) { "no duplicate blocks" }
         check(!instructions.hasDuplicates()) { "no duplicate instructions" }
+
+        for (function in functions) {
+            function.verify()
+        }
     }
 
     fun fullString(prgmEnv: ProgramNameEnv): String {

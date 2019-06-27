@@ -170,7 +170,7 @@ private class UserImpl : User {
             this.value = value
         }
 
-        override fun toString() = "[value]"
+        override fun toString() = "[$value]"
     }
 
     private inner class OperandList<T : Value> : OperandHolder, AbstractMutableList<T> {

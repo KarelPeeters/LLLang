@@ -18,7 +18,10 @@ object SimplifyBlocks : FunctionPass() {
                 if (users.all { it is Terminator || it is Function }) {
                     for (user in users)
                         user.replaceOperand(block, term.target)
+
                     changed()
+                    block.deepDelete()
+                    iter.remove()
                     continue
                 }
             }
@@ -30,7 +33,7 @@ object SimplifyBlocks : FunctionPass() {
                 val predTerm = pred.terminator
 
                 if (pred != block && predTerm is Jump) {
-                    for (instr in block.instructions.dropLast(1)) {
+                    for (instr in block.basicInstructions) {
                         pred.append(instr)
                     }
                     pred.terminator.delete()
@@ -39,8 +42,10 @@ object SimplifyBlocks : FunctionPass() {
                     block.users.toList().forEach {
                         (it as Phi).replaceOperand(block, pred)
                     }
-                    block.delete()
+
+                    changed()
                     iter.remove()
+                    continue
                 }
             }
         }

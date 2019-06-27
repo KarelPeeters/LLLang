@@ -124,7 +124,7 @@ fun findMinimalErrorPasses(program: () -> Program): List<OptimizerPass>? {
             val skippedPass = passes.removeAt(i)
 
             try {
-                Optimizer(passes, doVerify = true).optimize(program())
+                Optimizer(passes, doVerify = true, repeat = false).optimize(program())
 
                 //didn't crash, add back in and try the next index
                 passes.add(i, skippedPass)

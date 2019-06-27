@@ -2,6 +2,7 @@ package language.interpreter
 
 import language.interpreter.Color.*
 import language.ir.BasicBlock
+import language.ir.BasicInstruction
 import language.ir.Function
 import language.ir.Instruction
 import language.ir.NameEnv
@@ -162,7 +163,7 @@ class Debugger(
     private fun renderStack(env: NameEnv): List<String> = state.stack.map {
         val func = it.currFunction.str(env)
         val block = it.currBlock.str(env)
-        val instr = it.current.indexInBlock()
+        val instr = (it.current as? BasicInstruction)?.indexInBlock() ?: "t"
         "$func:$block:$instr"
     }
 

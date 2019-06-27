@@ -11,7 +11,7 @@ object DeadInstructionElimination : FunctionPass() {
         }.reached()
 
         for (block in function.blocks) {
-            val iter = block.instructions.iterator()
+            val iter = block.basicInstructions.iterator()
             for (instr in iter) {
                 if (instr !in used) {
                     instr.delete()

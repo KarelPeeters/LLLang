@@ -2,8 +2,8 @@ package language.optimizer
 
 import language.ir.Alloc
 import language.ir.BasicBlock
+import language.ir.BasicInstruction
 import language.ir.Function
-import language.ir.Instruction
 import language.ir.Load
 import language.ir.Phi
 import language.ir.Store
@@ -49,7 +49,7 @@ object AllocToPhi : FunctionPass() {
              * Find the last value assigned to the current `variable`, backtracking from [use] in [block].
              * If [use] is `null` start from the end of the given block.
              */
-            fun findLastValue(block: BasicBlock, use: Instruction?): Value? {
+            fun findLastValue(block: BasicBlock, use: BasicInstruction?): Value? {
                 var curr = block
                 while (true) {
                     //drop the instructions after the use instruction

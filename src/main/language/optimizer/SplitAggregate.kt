@@ -3,11 +3,11 @@ package language.optimizer
 import language.ir.AggregateType
 import language.ir.AggregateValue
 import language.ir.Alloc
+import language.ir.BasicInstruction
 import language.ir.Constant
 import language.ir.Function
 import language.ir.GetSubPointer
 import language.ir.GetSubValue
-import language.ir.Instruction
 import language.ir.Load
 import language.ir.Store
 
@@ -34,7 +34,7 @@ object SplitAggregate : FunctionPass() {
                         user.deleteFromBlock()
                     }
                     is Store -> {
-                        val instructions = mutableListOf<Instruction>()
+                        val instructions = mutableListOf<BasicInstruction>()
 
                         for ((i, repl) in replacements.withIndex()) {
                             val value = GetSubValue.getFixedIndex(user.value, i)

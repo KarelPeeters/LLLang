@@ -67,7 +67,7 @@ object FunctionInlining : ProgramPass() {
             val term = block.terminator
             if (term is Return) {
                 returnPhi.sources[block] = term.value
-                term.deleteFromBlock()
+                block.setTerminator(null)
                 block.terminator = Jump(afterBlock)
             }
         }
@@ -76,11 +76,14 @@ object FunctionInlining : ProgramPass() {
         //split code before and after call
         val callIndex = call.indexInBlock()
         beforeBlock.remove(call)
-        val iter = beforeBlock.instructions.subList(callIndex, beforeBlock.instructions.size).iterator()
+        val iter = beforeBlock.basicInstructions.subList(callIndex, beforeBlock.basicInstructions.size).iterator()
         for (instr in iter) {
-            afterBlock.appendOrReplaceTerminator(instr)
+            afterBlock.append(instr)
             iter.remove()
         }
+
+        afterBlock.terminator = beforeBlock.terminator
+        beforeBlock.setTerminator(null)
         beforeBlock.terminator = Jump(targetClone.entry)
 
         //change phi nodes using beforeBlock
@@ -102,7 +105,7 @@ object FunctionInlining : ProgramPass() {
     private fun BasicBlock.takeAllocs(): List<Alloc> {
         val result = mutableListOf<Alloc>()
 
-        val iter = instructions.iterator()
+        val iter = basicInstructions.iterator()
         for (instr in iter) {
             if (instr is Alloc) {
                 result.add(instr)
