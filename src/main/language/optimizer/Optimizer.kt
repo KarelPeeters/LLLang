@@ -54,6 +54,7 @@ val DEFAULT_PASSES = listOf(
         SplitAggregate,
         AllocToPhi,
         ConstantFolding,
+        SCCP,
         DeadInstructionElimination,
         SimplifyBlocks,
         DeadBlockElimination

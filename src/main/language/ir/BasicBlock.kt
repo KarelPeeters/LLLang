@@ -1,5 +1,7 @@
 package language.ir
 
+import language.util.takeWhileIsInstance
+
 /**
  * A list of instructions with a Terminator at the end. No control flow happens within a BasicBlock.
  */
@@ -79,6 +81,8 @@ class BasicBlock(val name: String?) : Value(BlockType) {
         instructions.forEach { it.delete() }
         delete()
     }
+
+    fun phis() = instructions.takeWhileIsInstance<Phi>()
 
     fun successors() = terminator.targets()
     fun predecessors() = this.users.mapNotNull { (it as? Terminator)?.block }
