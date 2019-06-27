@@ -29,22 +29,21 @@ object DeadSignatureElimination : ProgramPass() {
 
             //find unused parts of signature
             inlineCallsiteConstantParameters(function, callers)
-            val unusedParams: Set<Int> = (0 until paramCount)
-                    .filterTo(mutableSetOf()) { !function.parameters[it].isUsed() }
+            val usedParams = BooleanArray(paramCount) { function.parameters[it].isUsed() }
             val unusedReturn = function.returnType != UnitType && callers.none { it.isUsed() }
 
             //check if there's anyhting to change
-            if (unusedParams.isEmpty() && !unusedReturn)
+            if (usedParams.all { it } && !unusedReturn)
                 continue
 
             //create new function
-            val newParameters = function.parameters.filterIndexed { i, _ -> i !in unusedParams }
+            val newParameters = function.parameters.filterIndexed { i, _ -> usedParams[i] }
             val newReturnType = if (unusedReturn) UnitType else function.returnType
             val replacement = function.changedSignature(newParameters, newReturnType)
 
             //fix callers
             for (call in callers) {
-                val newArgs = call.arguments.filterIndexed { i, _ -> i !in unusedParams }
+                val newArgs = call.arguments.filterIndexed { i, _ -> usedParams[i] }
 
                 if (unusedReturn) {
                     //type has changed, need to make a new Call
@@ -80,9 +79,9 @@ object DeadSignatureElimination : ProgramPass() {
             callers[0].arguments[it] as? Constant
         }
 
-        var anyConstant = false
-
         for (caller in callers.asSequence().drop(1)) {
+            var anyConstant = false
+
             for (i in constants.indices) {
                 val first = constants[i] ?: continue
                 val second = caller.arguments[i]
