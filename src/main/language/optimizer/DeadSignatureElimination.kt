@@ -25,6 +25,8 @@ object DeadSignatureElimination : ProgramPass() {
                 continue
 
             val callers = function.users.mapIfAllInstance<Call>() ?: continue
+            if (callers.any { function in it.arguments }) continue
+
             val paramCount = function.parameters.size
 
             //find unused parts of signature
