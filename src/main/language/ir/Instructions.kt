@@ -11,7 +11,7 @@ sealed class Instruction(val name: String?, type: Type, val pure: Boolean) : Val
         this._block = block
     }
 
-    abstract fun verify()
+    abstract fun typeCheck()
 
     abstract fun clone(): Instruction
 
@@ -36,7 +36,7 @@ class Alloc(name: String?, val inner: Type) : BasicInstruction(name, inner.point
 
     override fun clone() = Alloc(name, inner)
 
-    override fun verify() {}
+    override fun typeCheck() {}
 }
 
 class Store(pointer: Value, value: Value) : BasicInstruction(null, UnitType, false) {
@@ -45,7 +45,7 @@ class Store(pointer: Value, value: Value) : BasicInstruction(null, UnitType, fal
 
     override fun clone() = Store(pointer, value)
 
-    override fun verify() {
+    override fun typeCheck() {
         check(pointer.type.unpoint == value.type) { "pointer type must be pointer to value type" }
     }
 
@@ -57,7 +57,7 @@ class Load(name: String?, pointer: Value) : BasicInstruction(name, pointer.type.
 
     override fun clone() = Load(name, pointer)
 
-    override fun verify() {
+    override fun typeCheck() {
         check(pointer.type.unpoint == this.type) { "pointer type must be pointer to load type" }
     }
 
@@ -71,7 +71,7 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
 
     override fun clone() = BinaryOp(name, opType, left, right)
 
-    override fun verify() {
+    override fun typeCheck() {
         check(opType.returnType(left.type, right.type) == this.type) { "left and right types must result in binaryOp type" }
     }
 
@@ -84,7 +84,7 @@ class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
 
     override fun clone() = UnaryOp(name, opType, value)
 
-    override fun verify() {
+    override fun typeCheck() {
         check(value.type == this.type) { "value type must be unaryOp type" }
     }
 
@@ -101,7 +101,7 @@ class Phi(name: String?, type: Type) : BasicInstruction(name, type, true) {
         return new
     }
 
-    override fun verify() {
+    override fun typeCheck() {
         check(sources.keys == block.predecessors().toSet()) { "must have source for every block predecessor" }
         check(sources.values.all { it.type == this.type }) { "source types must all equal phi type" }
     }
@@ -119,7 +119,7 @@ class Eat(arguments: List<Value>) : BasicInstruction(null, UnitType, false) {
 
     override fun clone(): Eat = Eat(arguments)
 
-    override fun verify() {}
+    override fun typeCheck() {}
 
     override fun fullStr(env: NameEnv) = "eat(" + arguments.joinToString { it.str(env) } + ")"
 }
@@ -129,7 +129,7 @@ class Blur(name: String?, value: Value) : BasicInstruction(name, value.type, fal
 
     override fun clone() = Blur(name, value)
 
-    override fun verify() {
+    override fun typeCheck() {
         check(value.type == this.type) { "value type must be blur type" }
     }
 
@@ -143,7 +143,7 @@ class Call(name: String?, target: Value, arguments: List<Value>)
 
     override fun clone() = Call(name, target, arguments.toList())
 
-    override fun verify() {
+    override fun typeCheck() {
         val funcType = target.type
         check(funcType is FunctionType) { "target must be a function" }
         check(funcType.paramTypes.size == arguments.size) { "parameter sizes must match" }
@@ -168,7 +168,7 @@ sealed class GetSubValue(name: String?, type: Type)
 
         override fun clone() = Struct(name, target, index)
 
-        override fun verify() {
+        override fun typeCheck() {
             val structType = target.type
             check(structType is StructType) { "target is a struct" }
             check(index in structType.properties.indices) { "valid index" }
@@ -186,7 +186,7 @@ sealed class GetSubValue(name: String?, type: Type)
 
         override fun clone() = Array(name, target, index)
 
-        override fun verify() {
+        override fun typeCheck() {
             val structType = target.type
             check(structType is ArrayType) { "target is a struct" }
             check(index.type is IntegerType) { "valid index" }
@@ -216,7 +216,7 @@ sealed class GetSubPointer(name: String?, type: Type)
 
         override fun clone() = Array(name, target, index)
 
-        override fun verify() {
+        override fun typeCheck() {
             val arrType = target.type.unpoint
             check(arrType is ArrayType) { "target is a struct pointer" }
             check(index.type is IntegerType) { "index is integer" }
@@ -233,7 +233,7 @@ sealed class GetSubPointer(name: String?, type: Type)
 
         override fun clone() = Struct(name, target, index)
 
-        override fun verify() {
+        override fun typeCheck() {
             val structType = target.type.unpoint
             check(structType is StructType) { "target is a struct pointer" }
             check(index in structType.properties.indices) { "valid index" }
@@ -250,7 +250,7 @@ class AggregateValue(name: String?, type: AggregateType, values: List<Value>)
 
     override fun clone() = AggregateValue(name, type as AggregateType, values)
 
-    override fun verify() {
+    override fun typeCheck() {
         check(type is AggregateType)
         check(type.size == values.size) { "sizes must match" }
         for ((t, v) in type.innerTypes zip values)
@@ -279,7 +279,7 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
 
     override fun clone() = Branch(value, ifTrue, ifFalse)
 
-    override fun verify() {
+    override fun typeCheck() {
         check(value.type == bool) { "branch conditional must be a boolean" }
     }
 
@@ -292,7 +292,7 @@ class Jump(target: BasicBlock?) : Terminator() {
 
     override fun clone() = Jump(target)
 
-    override fun verify() {}
+    override fun typeCheck() {}
 
     override fun targets() = setOf(target)
     override fun fullStr(env: NameEnv) = "jump ${target.str(env)}"
@@ -301,7 +301,7 @@ class Jump(target: BasicBlock?) : Terminator() {
 class Exit : Terminator() {
     override fun clone() = Exit()
 
-    override fun verify() {}
+    override fun typeCheck() {}
 
     override fun targets() = setOf<BasicBlock>()
     override fun fullStr(env: NameEnv) = "exit"
@@ -312,7 +312,7 @@ class Return(value: Value) : Terminator() {
 
     override fun clone() = Return(value)
 
-    override fun verify() {}
+    override fun typeCheck() {}
 
     override fun targets() = emptySet<BasicBlock>()
     override fun fullStr(env: NameEnv) = "return ${value.str(env)}"

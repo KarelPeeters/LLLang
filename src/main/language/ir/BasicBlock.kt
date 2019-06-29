@@ -29,16 +29,6 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     fun indexInFunction() = function.blocks.indexOf(this)
             .also { require(it >= 0) }
 
-    fun verify() {
-        check(_terminator != null)
-        check(instructions.all { it.block == this }) { "instruction.block must be this block" }
-        check(instructions.dropWhile { it is Phi }.all { it !is Phi }) { "all phi instructions are at the start of a block" }
-
-        for (instr in instructions) {
-            instr.verify()
-        }
-    }
-
     fun appendOrReplaceTerminator(instruction: Instruction) {
         when (instruction) {
             is BasicInstruction -> append(instruction)

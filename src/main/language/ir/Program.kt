@@ -1,7 +1,5 @@
 package language.ir
 
-import language.util.hasDuplicates
-
 class Program : User by User() {
     var entry by operand<Function>(null)
     val functions = mutableListOf<Function>()
@@ -14,20 +12,6 @@ class Program : User by User() {
     fun removeFunction(function: Function) {
         functions.remove(function)
         function.setProgram(null)
-    }
-
-    fun verify() {
-        check(entry in functions) { "entry must be one of the functions" }
-        check(entry.parameters.isEmpty()) { "entry must be a parameterless function" }
-
-        val blocks = functions.flatMap { it.blocks }
-        val instructions = functions.flatMap { f -> f.blocks.flatMap { b -> b.instructions } }
-        check(!blocks.hasDuplicates()) { "no duplicate blocks" }
-        check(!instructions.hasDuplicates()) { "no duplicate instructions" }
-
-        for (function in functions) {
-            function.verify()
-        }
     }
 
     fun fullString(prgmEnv: ProgramNameEnv): String {

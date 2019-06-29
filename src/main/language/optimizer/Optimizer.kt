@@ -2,6 +2,7 @@ package language.optimizer
 
 import language.ir.Function
 import language.ir.Program
+import language.ir.support.Verifier
 
 sealed class OptimizerPass {
     abstract fun OptimizerContext.runOnProgram(program: Program, afterPass: (subject: Any?) -> Unit)
@@ -71,7 +72,7 @@ class Optimizer(
     private fun verify(program: Program, pass: Any?, subject: Any?) {
         if (doVerify) {
             try {
-                program.verify()
+                Verifier.verifyProgram(program)
             } catch (e: Exception) {
                 throw IllegalStateException("verify fail after pass $pass on $subject", e)
             }

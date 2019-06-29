@@ -15,7 +15,7 @@ object FunctionInlining : ProgramPass() {
         val iter = program.functions.iterator()
         for (func in iter) {
             //only used by calls, also guaratees all Calls have an immediate Function target
-            if (func.users.any { it !is Call })
+            if (func.users.any { it !is Call || func in it.arguments })
                 continue
             val calls = func.users.map { it as Call }
 
@@ -30,9 +30,9 @@ object FunctionInlining : ProgramPass() {
                     inline(call)
                     changed()
                 }
-            }
 
-            if (!func.isUsed()) {
+                check(!func.isUsed())
+
                 func.deepDelete()
                 iter.remove()
             }
@@ -50,10 +50,6 @@ object FunctionInlining : ProgramPass() {
         //replace parameters
         for ((param, arg) in targetClone.parameters.zip(call.arguments))
             param.replaceWith(arg)
-
-        //move phi instructions to front
-        val targetCloneAllocs = targetClone.entry.takeAllocs()
-        containingFunction.entry.addAll(targetCloneAllocs)
 
         //insert new blocks
         val nextI = beforeBlock.indexInFunction()

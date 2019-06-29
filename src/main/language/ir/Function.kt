@@ -65,21 +65,6 @@ class Function private constructor(
         return newFunc
     }
 
-    fun verify() {
-        check(entry in blocks) { "entry must be one of the blocks" }
-        check(entry.predecessors().isEmpty()) { "entry can't be jumped to" }
-
-        for (block in blocks) {
-            check(block.function == this) { "blocks must refer to this function" }
-
-            val term = block.terminator
-            if (term is Return)
-                check(term.value.type == returnType) { "return type must match, ${term.value.type} != $returnType" }
-
-            block.verify()
-        }
-    }
-
     fun add(block: BasicBlock) {
         this.blocks += block
         block.setFunction(this)

@@ -2,9 +2,11 @@ package language.optimizer
 
 import language.ir.BasicBlock
 import language.ir.Function
+import language.ir.Instruction
+import language.ir.Terminator
 
 private fun calcDominatedBy(function: Function): Map<BasicBlock, Set<BasicBlock>> {
-    val result = function.blocks.associateTo(mutableMapOf()) { it to function.blocks.toMutableSet() }
+    val result = function.blocks.associateWithTo(mutableMapOf()) { function.blocks.toMutableSet() }
     result[function.entry] = mutableSetOf(function.entry)
 
     do {
@@ -40,7 +42,27 @@ class DominatorInfo(val function: Function) {
                 .toSet()
     }
 
-    fun domBy(block: BasicBlock, by: BasicBlock) = by in dominatedBy.getValue(block)
+    fun isDominatedBy(block: BasicBlock, by: BasicBlock) = by in dominatedBy.getValue(block)
+
+    fun isStrictlyDominatedBy(block: BasicBlock, by: BasicBlock) = block != by && isDominatedBy(block, by)
+
+    fun isStrictlyDominatedBy(instr: Instruction, by: Instruction): Boolean {
+        if (instr == by) return false
+
+        val instrBlock = instr.block
+        val byBlock = by.block
+
+        if (isStrictlyDominatedBy(instrBlock, byBlock)) return true
+        if (instrBlock != byBlock) return false
+
+        if (instr is Terminator) return true
+        if (by is Terminator) return false
+
+        val instrIndex = instrBlock.basicInstructions.indexOf(instr)
+        val byIndex = instrBlock.basicInstructions.indexOf(by)
+
+        return instrIndex > byIndex
+    }
 
     fun parent(block: BasicBlock) = domParent.getValue(block)
 
