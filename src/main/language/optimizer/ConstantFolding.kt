@@ -86,8 +86,8 @@ object ConstantFolding : FunctionPass() {
                 val target = instr.target
                 if (target is AggregateValue) {
                     when (instr) {
-                        is GetSubValue.GetStructValue -> instr.index
-                        is GetSubValue.GetArrayValue -> (instr.index as? Constant)?.value
+                        is GetSubValue.Struct -> instr.index
+                        is GetSubValue.Array -> (instr.index as? Constant)?.value
                     }?.let { index ->
                         val value = target.values[index]
                         instr.replaceWith(value)

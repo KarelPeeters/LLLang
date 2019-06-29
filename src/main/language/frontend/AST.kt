@@ -2,6 +2,7 @@ package language.frontend
 
 import language.ir.BinaryOpType
 import language.ir.UnaryOpType
+import language.parsing.SourcePosition
 
 abstract class ASTNode(val position: SourcePosition) {
     abstract fun ASTRenderer.render()

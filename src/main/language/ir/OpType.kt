@@ -1,13 +1,18 @@
 package language.ir
 
+import language.ir.ComparisonOpType.*
 import language.ir.IntegerType.Companion.i32
+import language.ir.UnaryOpType.Neg
+import language.ir.UnaryOpType.Not
 
 sealed class BinaryOpType(val symbol: String) {
+    val name = this::class.java.simpleName.toLowerCase()
+
     abstract fun returnType(leftType: Type, rightType: Type): Type
 
     abstract fun calculate(left: Constant, right: Constant): Constant
 
-    override fun toString(): String = this::class.java.simpleName.toLowerCase()
+    override fun toString(): String = name
 }
 
 abstract class ArithmeticOpType(symbol: String, private val calc: (Int, Int) -> Int) : BinaryOpType(symbol) {
@@ -37,10 +42,9 @@ sealed class ComparisonOpType(
         symbol: String,
         private val calc: (Int, Int) -> Boolean
 ) : BinaryOpType(symbol) {
-
     override fun returnType(leftType: Type, rightType: Type): Type {
         require(leftType == rightType) { "$leftType != $rightType" }
-        require(leftType is IntegerType) { "$leftType is not ${IntegerType::class.java.simpleName}" }
+        require(leftType is IntegerType) { "$leftType is not an integer" }
         return IntegerType.bool
     }
 
@@ -60,9 +64,11 @@ sealed class ComparisonOpType(
 }
 
 sealed class UnaryOpType(val symbol: String) {
-    override fun toString(): String = this::class.java.simpleName.toLowerCase()
+    val name = this::class.java.simpleName.toLowerCase()
 
     abstract fun calculate(value: Constant): Constant
+
+    override fun toString(): String = name
 
     object Neg : UnaryOpType("-") {
         override fun calculate(value: Constant): Constant {
@@ -86,3 +92,9 @@ private fun lowerMask(width: Int): Int {
     else
         (1 shl width) - 1
 }
+
+val AITHMETIC_OP_TYPES = listOf(ArithmeticOpType.Add, ArithmeticOpType.Sub, ArithmeticOpType.Mul, ArithmeticOpType.Div, ArithmeticOpType.Mod, ArithmeticOpType.And, ArithmeticOpType.Or)
+val COMPARISON_OP_TYPES = listOf(LT, GT, LTE, GTE, EQ, NEQ)
+val BINARY_OP_TYPES = AITHMETIC_OP_TYPES + COMPARISON_OP_TYPES
+
+val UNARY_OP_TYPES = listOf(Neg, Not)

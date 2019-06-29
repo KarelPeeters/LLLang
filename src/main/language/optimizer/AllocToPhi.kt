@@ -7,7 +7,7 @@ import language.ir.Function
 import language.ir.Load
 import language.ir.Phi
 import language.ir.Store
-import language.ir.Undefined
+import language.ir.UndefinedValue
 import language.ir.Value
 import java.util.*
 
@@ -81,7 +81,7 @@ object AllocToPhi : FunctionPass() {
             for (phi in phis.values) {
                 for (pred in phi.block.predecessors()) {
                     val value = findLastValue(pred, null)
-                    phi.sources[pred] = value ?: Undefined(phi.type)
+                    phi.sources[pred] = value ?: UndefinedValue(phi.type)
                 }
             }
 

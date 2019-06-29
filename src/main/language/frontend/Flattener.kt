@@ -24,6 +24,7 @@ import language.ir.UnitValue
 import language.ir.Value
 import language.ir.pointer
 import language.ir.unpoint
+import language.parsing.SourcePosition
 import java.util.*
 import language.ir.BinaryOp as IrBinaryOp
 import language.ir.Call as IrCall
@@ -361,9 +362,8 @@ class Flattener {
         if (exp.target is IdentifierExpression) {
             when (exp.target.identifier) {
                 "eat" -> {
-                    val eat = Eat()
                     val (after, arguments) = this.appendLoadedExpressionList(scope, exp.arguments)
-                    eat.arguments.addAll(arguments)
+                    val eat = Eat(arguments)
                     after.append(eat)
                     return after to RValue(eat)
                 }
@@ -371,7 +371,7 @@ class Flattener {
                     if (exp.arguments.size != 1)
                         throw ArgMismatchException(exp.position, 1, exp.arguments.size)
                     val (after, value) = appendLoadedExpression(scope, exp.arguments.first())
-                    val result = Blur(value)
+                    val result = Blur(null, value)
                     after.append(result)
                     return after to RValue(result)
                 }

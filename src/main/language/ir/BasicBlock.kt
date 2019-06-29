@@ -6,8 +6,6 @@ import language.util.takeWhileIsInstance
  * A list of [BasicInstruction]s with a [Terminator] at the end. No control flow happens within a BasicBlock.
  */
 class BasicBlock(val name: String?) : Value(BlockType) {
-    override val replaceAble = false
-
     val basicInstructions = mutableListOf<BasicInstruction>()
     val instructions get() = basicInstructions + terminator
 
@@ -82,9 +80,11 @@ class BasicBlock(val name: String?) : Value(BlockType) {
     fun successors() = terminator.targets()
     fun predecessors() = this.users.mapNotNull { (it as? Terminator)?.block }
 
-    override fun str(env: NameEnv) = "<${env.block(this)}>"
+    fun str(env: NameEnv) = untypedStr(env)
 
-    fun fullStr(env: NameEnv) = instructions.joinToString(separator = "\n", prefix = "${str(env)}\n") { it.fullStr(env) }
+    override fun untypedStr(env: NameEnv) = "<${env.block(this)}>"
+
+    fun fullStr(env: NameEnv) = instructions.joinToString(separator = "\n", prefix = "  ${str(env, false)}\n") { "    " + it.fullStr(env) }
 }
 
 object BlockType : Type() {

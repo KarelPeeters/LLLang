@@ -231,8 +231,8 @@ private inline fun computeInstructionResult(instr: Instruction, lattice: (Value)
         val target = instr.target
         if (target is AggregateValue) {
             val fixedIndex = when (instr) {
-                is GetSubValue.GetStructValue -> instr.index
-                is GetSubValue.GetArrayValue -> {
+                is GetSubValue.Struct -> instr.index
+                is GetSubValue.Array -> {
                     val index = lattice(instr.index)
                     (index as? Known)?.value?.value
                 }

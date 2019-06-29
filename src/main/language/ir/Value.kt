@@ -19,7 +19,12 @@ abstract class Value(val type: Type) : Node() {
         check(users.isEmpty()) { "value should have no users left after replacement" }
     }
 
-    abstract fun str(env: NameEnv): String
+    fun str(env: NameEnv, withType: Boolean = true): String {
+        val str = untypedStr(env)
+        return if (withType) "$str $type" else str
+    }
+
+    abstract fun untypedStr(env: NameEnv): String
 }
 
 class Constant(type: Type, val value: Int) : Value(type) {
@@ -28,7 +33,8 @@ class Constant(type: Type, val value: Int) : Value(type) {
     }
 
     override val replaceAble = false
-    override fun str(env: NameEnv) = "$value $type"
+
+    override fun untypedStr(env: NameEnv) = "$value"
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -45,11 +51,11 @@ class Constant(type: Type, val value: Int) : Value(type) {
     }
 }
 
-class Undefined(type: Type) : Value(type) {
+class UndefinedValue(type: Type) : Value(type) {
     override val replaceAble = false
-    override fun str(env: NameEnv) = "undef $type"
+    override fun untypedStr(env: NameEnv) = "undef"
 }
 
 object UnitValue : Value(UnitType) {
-    override fun str(env: NameEnv) = "unit"
+    override fun untypedStr(env: NameEnv) = "unit"
 }

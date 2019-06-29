@@ -1,15 +1,17 @@
 package language.frontend
 
-import language.frontend.TokenType.*
-import language.frontend.TokenType.Number
-import language.frontend.TokenType.Struct
+import language.frontend.LLLTokenType.*
+import language.frontend.LLLTokenType.Number
+import language.frontend.LLLTokenType.Struct
 import language.ir.ArithmeticOpType
 import language.ir.ComparisonOpType
 import language.ir.UnaryOpType
+import language.parsing.Parser
+import language.parsing.SourcePosition
 import java.util.*
 import language.frontend.Struct as ASTStruct
 
-class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
+class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
     fun parse() = program()
 
     private fun program() = Program(currentPosition, sequence {
@@ -57,7 +59,7 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         return Parameter(id.position, id.text, type())
     }
 
-    private fun block(end: TokenType) = CodeBlock(currentPosition, sequence {
+    private fun block(end: LLLTokenType) = CodeBlock(currentPosition, sequence {
         while (!accept(end)) {
             if (accept(Semi))
                 continue
@@ -124,26 +126,9 @@ class LLLParser(tokenizer: Tokenizer) : AbstractParser(tokenizer) {
         return WhileStatement(pos, condition, block)
     }
 
-    private fun expressionList(end: TokenType) = list(end) { expression() }
+    private fun expressionList(end: LLLTokenType) = list(end) { expression() }
 
-    private inline fun <T> list(end: TokenType, element: () -> T) = list(end, Comma, element)
-
-    private inline fun <T> list(end: TokenType, separator: TokenType?, element: () -> T): List<T> {
-        val list = mutableListOf<T>()
-        if (!accept(end)) {
-            list += element()
-
-            while (!accept(end)) {
-                if (separator != null) {
-                    expect(separator)
-                    if (accept(end))
-                        break
-                }
-                list += element()
-            }
-        }
-        return list
-    }
+    private inline fun <E> list(end: LLLTokenType, element: () -> E) = list(end, Comma, element)
 
     private fun expression() = assignment()
 

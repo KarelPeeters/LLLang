@@ -152,8 +152,8 @@ class Interpreter(val program: Program) {
                         callFunction(instr.function, callArgs, stack + frame)
                         ?: return null //propagate exit*/
                     }
-                    is GetSubValue.GetStructValue -> TODO("get")
-                    is GetSubValue.GetArrayValue -> TODO("get")
+                    is GetSubValue.Struct -> TODO("get")
+                    is GetSubValue.Array -> TODO("get")
                     is GetSubPointer.Array -> TODO("aptr")
                     is GetSubPointer.Struct -> TODO("sptr")
                     is AggregateValue -> TODO("aggregate value")

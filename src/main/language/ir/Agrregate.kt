@@ -9,8 +9,9 @@ data class StructType(val name: String, val properties: List<Type>) : AggregateT
     override val size get() = properties.size
 
     override val innerTypes get() = properties
-    override fun toString() = name
+    override fun toString() = "%$name"
 
+    fun fullString() = properties.joinToString(prefix = "{", postfix = "}") { it.toString() }
 }
 
 data class ArrayType(val inner: Type, override val size: Int) : AggregateType() {

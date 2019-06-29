@@ -15,7 +15,7 @@ sealed class Instruction(val name: String?, type: Type, val pure: Boolean) : Val
 
     abstract fun clone(): Instruction
 
-    override fun str(env: NameEnv) = "%${env.value(this)} $type"
+    override fun untypedStr(env: NameEnv) = "%${env.value(this)}"
 
     abstract fun fullStr(env: NameEnv): String
 }
@@ -49,7 +49,7 @@ class Store(pointer: Value, value: Value) : BasicInstruction(null, UnitType, fal
         check(pointer.type.unpoint == value.type) { "pointer type must be pointer to value type" }
     }
 
-    override fun fullStr(env: NameEnv) = "store ${value.str(env)} -> ${pointer.str(env)}"
+    override fun fullStr(env: NameEnv) = "store ${pointer.str(env)} = ${value.str(env)}"
 }
 
 class Load(name: String?, pointer: Value) : BasicInstruction(name, pointer.type.unpoint!!, true) {
@@ -114,24 +114,20 @@ class Phi(name: String?, type: Type) : BasicInstruction(name, type, true) {
     }
 }
 
-class Eat : BasicInstruction(null, UnitType, false) {
-    val arguments by operandList<Value>()
+class Eat(arguments: List<Value>) : BasicInstruction(null, UnitType, false) {
+    val arguments by operandList(arguments)
 
-    override fun clone(): Eat {
-        val new = Eat()
-        new.arguments.addAll(this.arguments)
-        return new
-    }
+    override fun clone(): Eat = Eat(arguments)
 
     override fun verify() {}
 
-    override fun fullStr(env: NameEnv) = "eat " + arguments.joinToString { it.str(env) }
+    override fun fullStr(env: NameEnv) = "eat(" + arguments.joinToString { it.str(env) } + ")"
 }
 
-class Blur(value: Value) : BasicInstruction(null, value.type, false) {
+class Blur(name: String?, value: Value) : BasicInstruction(name, value.type, false) {
     val value by operand(value)
 
-    override fun clone() = Blur(value)
+    override fun clone() = Blur(name, value)
 
     override fun verify() {
         check(value.type == this.type) { "value type must be blur type" }
@@ -156,7 +152,7 @@ class Call(name: String?, target: Value, arguments: List<Value>)
     }
 
     override fun fullStr(env: NameEnv): String {
-        return "${str(env)} = call ${target.str(env)}(${arguments.joinToString { it.str(env) }})"
+        return "${str(env)} = call ${target.str(env, false)}(${arguments.joinToString { it.str(env) }})"
     }
 }
 
@@ -165,12 +161,12 @@ sealed class GetSubValue(name: String?, type: Type)
 
     abstract val target: Value
 
-    class GetStructValue(name: String?, target: Value, val index: Int)
+    class Struct(name: String?, target: Value, val index: Int)
         : GetSubValue(name, (target.type as StructType).properties[index]) {
 
         override val target by operand(target)
 
-        override fun clone() = GetStructValue(name, target, index)
+        override fun clone() = Struct(name, target, index)
 
         override fun verify() {
             val structType = target.type
@@ -179,16 +175,16 @@ sealed class GetSubValue(name: String?, type: Type)
             check(structType.properties[index] == this.type) { "type match" }
         }
 
-        override fun fullStr(env: NameEnv) = "${str(env)} = get ${target.str(env)} $index"
+        override fun fullStr(env: NameEnv) = "${str(env)} = sget ${target.str(env)}, $index"
     }
 
-    class GetArrayValue(name: String?, target: Value, index: Value)
+    class Array(name: String?, target: Value, index: Value)
         : GetSubValue(name, (target.type as ArrayType).inner) {
 
         override val target by operand(target)
         val index by operand(index)
 
-        override fun clone() = GetArrayValue(name, target, index)
+        override fun clone() = Array(name, target, index)
 
         override fun verify() {
             val structType = target.type
@@ -197,13 +193,13 @@ sealed class GetSubValue(name: String?, type: Type)
             check(structType.inner == this.type) { "type match" }
         }
 
-        override fun fullStr(env: NameEnv) = "${str(env)} = get ${target.str(env)} $index"
+        override fun fullStr(env: NameEnv) = "${str(env)} = aget ${target.str(env)}, $index"
     }
 
     companion object {
         fun getFixedIndex(target: Value, index: Int) = when (target.type as AggregateType) {
-            is StructType -> GetStructValue(null, target, index)
-            is ArrayType -> GetArrayValue(null, target, Constant(i32, index))
+            is StructType -> Struct(null, target, index)
+            is ArrayType -> Array(null, target, Constant(i32, index))
         }
     }
 }
@@ -227,7 +223,7 @@ sealed class GetSubPointer(name: String?, type: Type)
             check(arrType.inner.pointer == this.type) { "type match" }
         }
 
-        override fun fullStr(env: NameEnv) = "${str(env)} = aptr ${target.str(env)} ${index.str(env)}"
+        override fun fullStr(env: NameEnv) = "${str(env)} = aptr ${target.str(env)}, ${index.str(env)}"
     }
 
     class Struct(name: String?, target: Value, val index: Int)
@@ -244,27 +240,29 @@ sealed class GetSubPointer(name: String?, type: Type)
             check(structType.properties[index].pointer == this.type) { "type match" }
         }
 
-        override fun fullStr(env: NameEnv) = "${str(env)} = sptr ${target.str(env)} $index"
+        override fun fullStr(env: NameEnv) = "${str(env)} = sptr ${target.str(env)}, $index"
     }
 }
 
-class AggregateValue(name: String?, val atype: AggregateType, values: List<Value>)
-    : BasicInstruction(name, atype, true) {
+class AggregateValue(name: String?, type: AggregateType, values: List<Value>)
+    : BasicInstruction(name, type, true) {
     val values by operandList(values)
 
-    override fun clone() = AggregateValue(name, atype, values)
+    override fun clone() = AggregateValue(name, type as AggregateType, values)
 
     override fun verify() {
-        check(atype.size == values.size) { "sizes must match" }
-        for ((t, v) in atype.innerTypes zip values)
+        check(type is AggregateType)
+        check(type.size == values.size) { "sizes must match" }
+        for ((t, v) in type.innerTypes zip values)
             check(t == v.type) { "inner types must match" }
     }
 
     override fun fullStr(env: NameEnv): String {
         val prefix = str(env)
         val propStr = values.joinToString { it.str(env) }
-        return when (atype) {
-            is StructType -> "$prefix = ${atype.name}($propStr)"
+        type as AggregateType
+        return when (type) {
+            is StructType -> "$prefix = $type($propStr)"
             is ArrayType -> "$prefix = {$propStr}"
         }
     }
@@ -286,7 +284,7 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
     }
 
     override fun targets() = setOf(ifTrue, ifFalse)
-    override fun fullStr(env: NameEnv) = "branch ${value.str(env)} T ${ifTrue.str(env)} F ${ifFalse.str(env)}"
+    override fun fullStr(env: NameEnv) = "branch ${value.str(env)} ${ifTrue.str(env)} ${ifFalse.str(env)}"
 }
 
 class Jump(target: BasicBlock?) : Terminator() {

@@ -119,19 +119,19 @@ class Function private constructor(
         blocks.forEach { env.block(it) } //preset names to keep them ordered
 
         val nameStr = env.function(this)
-        val paramStr = parameters.joinToString { it.str(env) }
+        val paramStr = parameters.joinToString { it.str(env, true) }
         val returnStr = if (returnType == UnitType) "" else ": $returnType"
-        val entryStr = if (entry != blocks.first()) "entry: ${entry.str(env)}" else ""
+        val entryStr = if (entry != blocks.first()) "\n  entry: ${entry.str(env, false)}" else ""
 
-        return "fun $nameStr($paramStr)$returnStr { $entryStr\n" +
-               blocks.joinToString("\n\n    ", prefix = "    ") { it.fullStr(env).replace("\n", "\n    ") } + "\n}\n"
+        return "fun %$nameStr($paramStr)$returnStr { $entryStr\n" +
+               blocks.joinToString("\n") { it.fullStr(env) } + "\n}\n"
     }
 
-    override fun str(env: NameEnv) = env.function(this)
+    override fun untypedStr(env: NameEnv) = "%" + env.function(this)
 }
 
 class ParameterValue(val name: String?, type: Type) : Value(type) {
-    override fun str(env: NameEnv) = "%${env.value(this)} $type"
+    override fun untypedStr(env: NameEnv) = "%${env.value(this)}"
 }
 
 data class FunctionType(val paramTypes: List<Type>, val returnType: Type) : Type() {
