@@ -19,10 +19,10 @@ class NameEnv(val parent: ProgramNameEnv) {
 }
 
 private class PartEnv {
-    private val nodeNames = mutableMapOf<Pair<Node, String?>, String>()
+    private val nodeNames = mutableMapOf<Pair<User, String?>, String>()
     private val nextIndex = mutableMapOf<String?, Int>()
 
-    fun name(node: Node, name: String?): String {
+    fun name(node: User, name: String?): String {
         name?.let { require(it.isNotEmpty()) { "names can't be empty, use null instead" } }
 
         val key = node to name

@@ -4,7 +4,7 @@ class Function private constructor(
         val name: String?,
         val parameters: List<ParameterValue>,
         val returnType: Type
-) : Value(FunctionType(parameters.map(ParameterValue::type), returnType)), User by User() {
+) : Value(FunctionType(parameters.map(ParameterValue::type), returnType)) {
     var entry by operand<BasicBlock>(null)
     val blocks = mutableListOf<BasicBlock>()
 
@@ -41,14 +41,14 @@ class Function private constructor(
 
         //shallow clone, keep mappings old -> new
         val instrMap = mutableMapOf<Instruction, Instruction>()
-        val blockMap = blocks.associate { oldBlock ->
+        val blockMap = blocks.associateWith { oldBlock ->
             val newBlock = BasicBlock(oldBlock.name)
             for (instr in oldBlock.instructions) {
                 val newInstr = instr.clone()
                 instrMap[instr] = newInstr
                 newBlock.appendOrReplaceTerminator(newInstr)
             }
-            oldBlock to newBlock
+            newBlock
         }
 
         //replace instructions and blocks
@@ -96,6 +96,13 @@ class Function private constructor(
         for (block in blocks)
             block.deepDelete()
         delete()
+    }
+
+    override fun delete() {
+        for (param in parameters) {
+            param.delete()
+        }
+        super.delete()
     }
 
     fun entryAllocs() = entry.instructions.filterIsInstance<Alloc>()

@@ -1,6 +1,6 @@
 package language.ir
 
-class Program : User by User() {
+class Program : User() {
     var entry by operand<Function>(null)
     val functions = mutableListOf<Function>()
 

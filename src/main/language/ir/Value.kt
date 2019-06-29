@@ -1,6 +1,6 @@
 package language.ir
 
-abstract class Value(val type: Type) : Node() {
+abstract class Value(val type: Type) : User() {
     val users = mutableSetOf<User>()
 
     protected open val replaceAble = true
