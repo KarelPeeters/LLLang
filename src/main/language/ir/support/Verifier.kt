@@ -15,6 +15,7 @@ import language.optimizer.DominatorInfo
 object Verifier {
     fun verifyProgram(program: Program) {
         //basic checks
+        check(!program.isDeleted) { "program was deleted" }
         check(program.entry in program.functions) { "entry must be one of the functions" }
         check(program.entry.parameters.isEmpty()) { "entry must be a parameterless function" }
 
@@ -35,7 +36,8 @@ object Verifier {
     }
 
     fun verifyFunction(function: Function) {
-        //entry checks
+        //basic checks
+        check(!function.isDeleted) { "function was deleted" }
         check(function.entry in function.blocks) { "entry must be one of the blocks" }
         check(function.entry.predecessors().isEmpty()) { "entry can't be jumped to" }
 
@@ -53,12 +55,19 @@ object Verifier {
     }
 
     fun verifyBlock(block: BasicBlock) {
+        //basic checks
+        check(!block.isDeleted) { "block was deleted" }
         check(block.instructions.dropWhile { it is Phi }.all { it !is Phi }) { "all phi instructions are at the start of the block" }
 
         for (instr in block.instructions) {
             check(instr.block == block) { "instruction $instr has wrong block" }
-            instr.typeCheck()
+            verifyInstruction(instr)
         }
+    }
+
+    fun verifyInstruction(instr: Instruction) {
+        check(!instr.isDeleted)
+        instr.typeCheck()
     }
 }
 

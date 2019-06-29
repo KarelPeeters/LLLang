@@ -7,7 +7,7 @@ import kotlin.reflect.KProperty
 
 @Suppress("unchecked_cast")
 abstract class User {
-    var deleted = false
+    var isDeleted = false
         private set
 
     private val holders = mutableListOf<OperandHolder>()
@@ -24,8 +24,9 @@ abstract class User {
     }
 
     open fun delete() {
-        if (deleted) error("$this was already deleted")
-        deleted = true
+        if (isDeleted)
+            error("$this was already deleted")
+        isDeleted = true
 
         for (holder in holders)
             holder.clearOperands()
@@ -52,7 +53,7 @@ abstract class User {
     }
 
     private fun checkOperandAccess() {
-        if (deleted)
+        if (isDeleted)
             error(IllegalStateException("use of operand of $this after deletion"))
     }
 
