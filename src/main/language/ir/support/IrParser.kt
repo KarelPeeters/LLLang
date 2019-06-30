@@ -40,6 +40,10 @@ import language.ir.support.IrTokenType.Number
 import language.parsing.Parser
 
 class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
+    companion object {
+        fun parse(input: String) = IrParser(IrTokenizer(input)).parse()
+    }
+
     private lateinit var structTypes: Map<String, StructType>
 
     private val globalVariablePlaceholders = mutableMapOf<String, PlaceholderValue>()

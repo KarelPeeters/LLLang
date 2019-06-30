@@ -12,6 +12,10 @@ import java.util.*
 import language.frontend.Struct as ASTStruct
 
 class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
+    companion object {
+        fun parse(input: String) = LLLParser(LLLTokenizer(input)).parse()
+    }
+
     fun parse() = program()
 
     private fun program() = Program(currentPosition, sequence {
