@@ -4,6 +4,8 @@ import language.ir.BasicBlock
 import language.ir.Function
 import language.ir.Phi
 import language.ir.Terminator
+import language.util.Graph
+import language.util.reached
 
 
 object DeadBlockElimination : FunctionPass() {

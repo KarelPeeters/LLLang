@@ -2,6 +2,8 @@ package language.optimizer
 
 import language.ir.Function
 import language.ir.Program
+import language.util.Graph
+import language.util.reached
 
 object DeadFunctionElimination : ProgramPass() {
     override fun OptimizerContext.optimize(program: Program) {

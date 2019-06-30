@@ -2,6 +2,8 @@ package language.optimizer
 
 import language.ir.Function
 import language.ir.Instruction
+import language.util.Graph
+import language.util.reached
 
 object DeadInstructionElimination : FunctionPass() {
     override fun OptimizerContext.optimize(function: Function) {

@@ -98,7 +98,7 @@ abstract class User {
 
         override fun getValue(thisRef: User, property: KProperty<*>): T {
             checkOperandAccess()
-            return value ?: throw IllegalStateException("propertu was never initialized")
+            return value ?: throw IllegalStateException("property was never initialized")
         }
 
         override fun setValue(thisRef: User, property: KProperty<*>, value: T) {

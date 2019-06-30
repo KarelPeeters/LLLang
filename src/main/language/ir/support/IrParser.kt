@@ -62,6 +62,9 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         val program = Program()
         for (func in functions)
             program.addFunction(func)
+
+        program.entry = functions.single { it.name == "main" }
+
         return program
     }
 
