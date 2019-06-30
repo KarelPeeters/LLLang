@@ -1,4 +1,4 @@
-package language.optimizer
+package language.optimizer.passes
 
 import language.ir.AggregateValue
 import language.ir.Alloc
@@ -20,7 +20,9 @@ import language.ir.Store
 import language.ir.Terminator
 import language.ir.UnaryOp
 import language.ir.Value
-import language.optimizer.LatticeState.*
+import language.optimizer.FunctionPass
+import language.optimizer.OptimizerContext
+import language.optimizer.passes.LatticeState.*
 import java.util.*
 
 /**

@@ -1,4 +1,4 @@
-package language.optimizer
+package language.optimizer.passes
 
 import language.ir.AggregateValue
 import language.ir.BinaryOp
@@ -10,6 +10,8 @@ import language.ir.Instruction
 import language.ir.Jump
 import language.ir.Phi
 import language.ir.UnaryOp
+import language.optimizer.FunctionPass
+import language.optimizer.OptimizerContext
 import java.util.*
 
 object ConstantFolding : FunctionPass() {

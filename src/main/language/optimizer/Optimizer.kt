@@ -3,6 +3,16 @@ package language.optimizer
 import language.ir.Function
 import language.ir.Program
 import language.ir.support.Verifier
+import language.optimizer.passes.AllocToPhi
+import language.optimizer.passes.ConstantFolding
+import language.optimizer.passes.DeadBlockElimination
+import language.optimizer.passes.DeadFunctionElimination
+import language.optimizer.passes.DeadInstructionElimination
+import language.optimizer.passes.DeadSignatureElimination
+import language.optimizer.passes.FunctionInlining
+import language.optimizer.passes.SCCP
+import language.optimizer.passes.SimplifyBlocks
+import language.optimizer.passes.SplitAggregate
 
 sealed class OptimizerPass {
     abstract fun OptimizerContext.runOnProgram(program: Program, afterPass: (subject: Any?) -> Unit)

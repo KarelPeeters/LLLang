@@ -1,7 +1,9 @@
-package language.optimizer
+package language.optimizer.passes
 
 import language.ir.Function
 import language.ir.Program
+import language.optimizer.OptimizerContext
+import language.optimizer.ProgramPass
 import language.util.Graph
 import language.util.reached
 

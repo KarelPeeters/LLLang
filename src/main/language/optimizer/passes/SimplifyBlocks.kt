@@ -1,9 +1,11 @@
-package language.optimizer
+package language.optimizer.passes
 
 import language.ir.Function
 import language.ir.Jump
 import language.ir.Phi
 import language.ir.Terminator
+import language.optimizer.FunctionPass
+import language.optimizer.OptimizerContext
 
 object SimplifyBlocks : FunctionPass() {
     override fun OptimizerContext.optimize(function: Function) {

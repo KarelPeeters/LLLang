@@ -1,4 +1,4 @@
-package language.optimizer
+package language.optimizer.passes
 
 import language.ir.Call
 import language.ir.Constant
@@ -7,6 +7,8 @@ import language.ir.Program
 import language.ir.Return
 import language.ir.UnitType
 import language.ir.UnitValue
+import language.optimizer.OptimizerContext
+import language.optimizer.ProgramPass
 import language.util.mapIfAllInstance
 
 /**

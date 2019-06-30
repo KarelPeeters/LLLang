@@ -1,4 +1,4 @@
-package language.optimizer
+package language.optimizer.passes
 
 import language.ir.AggregateType
 import language.ir.AggregateValue
@@ -10,6 +10,8 @@ import language.ir.GetSubPointer
 import language.ir.GetSubValue
 import language.ir.Load
 import language.ir.Store
+import language.optimizer.FunctionPass
+import language.optimizer.OptimizerContext
 
 object SplitAggregate : FunctionPass() {
     override fun OptimizerContext.optimize(function: Function) {

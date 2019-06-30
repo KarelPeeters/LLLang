@@ -1,4 +1,4 @@
-package language.optimizer
+package language.optimizer.passes
 
 import language.ir.Alloc
 import language.ir.BasicBlock
@@ -9,6 +9,8 @@ import language.ir.Phi
 import language.ir.Program
 import language.ir.Return
 import language.ir.Terminator
+import language.optimizer.OptimizerContext
+import language.optimizer.ProgramPass
 
 object FunctionInlining : ProgramPass() {
     override fun OptimizerContext.optimize(program: Program) {

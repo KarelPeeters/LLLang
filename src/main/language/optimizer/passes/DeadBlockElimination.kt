@@ -1,9 +1,11 @@
-package language.optimizer
+package language.optimizer.passes
 
 import language.ir.BasicBlock
 import language.ir.Function
 import language.ir.Phi
 import language.ir.Terminator
+import language.optimizer.FunctionPass
+import language.optimizer.OptimizerContext
 import language.util.Graph
 import language.util.reached
 
