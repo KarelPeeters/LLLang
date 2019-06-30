@@ -20,6 +20,7 @@ fun programEquals(lProg: Program, rProg: Program): Boolean {
     if (map(lProg.entry) != rProg.entry) return false
 
     for ((lFunc, rFunc) in lProg.orderedFunctions() zip rProg.orderedFunctions()) {
+        if (lFunc.attributes != rFunc.attributes) return false
         if (map(lFunc.entry) != rFunc.entry) return false
 
         for ((lBlock, rBlock) in lFunc.orderedBlocks() zip rFunc.orderedBlocks()) {

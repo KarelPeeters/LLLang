@@ -2,6 +2,9 @@ package language.ir.support
 
 import language.ir.BINARY_OP_TYPES
 import language.ir.UNARY_OP_TYPES
+import language.ir.support.IrTokenType.*
+import language.ir.support.IrTokenType.Annotation
+import language.ir.support.IrTokenType.Number
 import language.parsing.Token
 import language.parsing.Tokenizer
 
@@ -34,11 +37,12 @@ enum class IrTokenType(val string: String? = null) {
     UnitTypeToken("Unit"), UnitValueToken("unit"),
     IntegerTypeToken,
 
+    Annotation,
+
     Number,
     Id,
     BlockId,
 
-    EndLn("\n"),
     Eof;
 }
 
@@ -46,12 +50,12 @@ class IrTokenizer(source: String) : Tokenizer<IrTokenType>(source) {
     override fun next(): Token<IrTokenType> {
         skipCommentsAndWhiteSpace()
         if (reachedEOF())
-            return Token(IrTokenType.Eof, "", currentPosition())
+            return Token(Eof, "", currentPosition())
 
         val position = currentPosition()
 
         //trivial match
-        for (type in IrTokenType.values()) {
+        for (type in values()) {
             val str = type.string ?: continue
             if (accept(str))
                 return Token(type, str, position)
@@ -60,7 +64,7 @@ class IrTokenizer(source: String) : Tokenizer<IrTokenType>(source) {
         //number
         if (first() in '0'..'9') {
             val string = expectNumber()
-            return Token(IrTokenType.Number, string, position)
+            return Token(Number, string, position)
         }
 
         //identifier
@@ -70,9 +74,10 @@ class IrTokenizer(source: String) : Tokenizer<IrTokenType>(source) {
             while (first() in ID_CHARS)
                 builder.append(eat())
 
-            return Token(IrTokenType.Id, builder.toString(), position)
+            return Token(Id, builder.toString(), position)
         }
 
+        //block name
         if (first() == '<') {
             val builder = StringBuilder()
             builder.append(eat())
@@ -80,24 +85,34 @@ class IrTokenizer(source: String) : Tokenizer<IrTokenType>(source) {
                 builder.append(eat())
             builder.append(eat())
 
-            return Token(IrTokenType.BlockId, builder.toString(), position)
+            return Token(BlockId, builder.toString(), position)
         }
 
-        //binaryop and unaryop
+        //binaryop
         for (type in BINARY_OP_TYPES) {
             if (accept(type.name))
-                return Token(IrTokenType.BinaryOpToken, type.name, position)
+                return Token(BinaryOpToken, type.name, position)
         }
 
+        //unaryop
         for (type in UNARY_OP_TYPES) {
             if (accept(type.name))
-                return Token(IrTokenType.UnaryOpToken, type.name, position)
+                return Token(UnaryOpToken, type.name, position)
         }
 
         //integertype
         if (accept("i")) {
             val string = "i" + expectNumber()
-            return Token(IrTokenType.IntegerTypeToken, string, position)
+            return Token(IntegerTypeToken, string, position)
+        }
+
+        //annotation
+        if (accept("@")) {
+            val builder = StringBuilder()
+            builder.append('@')
+            while (first() in ID_CHARS)
+                builder.append(eat())
+            return Token(Annotation, builder.toString(), position)
         }
 
         error("unexpected character '${first()}' at $position")

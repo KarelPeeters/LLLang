@@ -7,6 +7,7 @@ class Function private constructor(
 ) : Value(FunctionType(parameters.map(ParameterValue::type), returnType)) {
     var entry by operand<BasicBlock>(null)
     val blocks = mutableListOf<BasicBlock>()
+    val attributes = mutableSetOf<Attribute>()
 
     private var _program: Program? = null
 
@@ -110,16 +111,26 @@ class Function private constructor(
     fun fullStr(env: NameEnv): String {
         blocks.forEach { env.block(it) } //preset names to keep them ordered
 
+        val attrString = if (attributes.isNotEmpty()) attributes.joinToString("\n", postfix = "\n") { "@${it.name}" } else ""
         val nameStr = env.function(this)
         val paramStr = parameters.joinToString { it.str(env, true) }
         val returnStr = if (returnType == UnitType) "" else ": $returnType"
         val entryStr = if (entry != blocks.first()) "\n  entry: ${entry.str(env, false)}" else ""
 
-        return "fun %$nameStr($paramStr)$returnStr { $entryStr\n" +
+        return "${attrString}fun %$nameStr($paramStr)$returnStr { $entryStr\n" +
                blocks.joinToString("\n") { it.fullStr(env) } + "\n}\n"
     }
 
     override fun untypedStr(env: NameEnv) = "%" + env.function(this)
+
+    enum class Attribute {
+        NoInline,
+        ;
+
+        companion object {
+            fun findByName(name: String) = values().find { it.name == name }
+        }
+    }
 }
 
 class ParameterValue(val name: String?, type: Type) : Value(type) {

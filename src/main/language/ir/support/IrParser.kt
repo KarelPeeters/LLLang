@@ -35,6 +35,7 @@ import language.ir.UnitValue
 import language.ir.Value
 import language.ir.pointer
 import language.ir.support.IrTokenType.*
+import language.ir.support.IrTokenType.Annotation
 import language.ir.support.IrTokenType.Number
 import language.parsing.Parser
 
@@ -84,6 +85,15 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
     }
 
     private fun function(): Function {
+        val attributes = mutableSetOf<Function.Attribute>()
+        while (at(Annotation)) {
+            val attributeName = pop().text.drop(1)
+            val attribute = Function.Attribute.findByName(attributeName)
+                            ?: error("Invalid attribute name $attributeName")
+            if (!attributes.add(attribute))
+                error("Specified attribute $attribute multiple times")
+        }
+
         expect(Fun)
         val name = idName()
         expect(OpenB)
@@ -136,6 +146,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         }
 
         //finish constructing function
+        func.attributes.addAll(attributes)
         func.addAll(blocks)
         func.entry = if (entryName == null)
             blocks.firstOrNull() ?: error("No block in function $name")

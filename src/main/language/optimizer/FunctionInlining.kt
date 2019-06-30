@@ -14,6 +14,9 @@ object FunctionInlining : ProgramPass() {
     override fun OptimizerContext.optimize(program: Program) {
         val iter = program.functions.iterator()
         for (func in iter) {
+            if (Function.Attribute.NoInline in func.attributes)
+                continue
+
             //only used by calls, also guaratees all Calls have an immediate Function target
             if (func.users.any { it !is Call || func in it.arguments })
                 continue
