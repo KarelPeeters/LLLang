@@ -7,6 +7,7 @@ import language.ir.Terminator
 import language.optimizer.FunctionPass
 import language.optimizer.OptimizerContext
 
+
 object SimplifyBlocks : FunctionPass() {
     override fun OptimizerContext.optimize(function: Function) {
         val iter = function.blocks.iterator()
@@ -14,7 +15,10 @@ object SimplifyBlocks : FunctionPass() {
         for (block in iter) {
             //redirect users of empty blocks that end in Jump
             val term = block.terminator
-            if (block.instructions.size == 1 && term is Jump && term.target != block) {
+
+            if (block.basicInstructions.isEmpty() && term is Jump && term.target != block &&
+                !(block == function.entry && term.target.predecessors().isNotEmpty())
+            ) {
                 val users = block.users.toList()
 
                 if (users.all { it is Terminator || it is Function }) {

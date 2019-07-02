@@ -1,0 +1,10 @@
+//unchanged
+fun %main() {
+  <entry>
+    jump <target>
+  <other>
+    eat(0 i32)
+    jump <target>
+  <target>
+    return unit Unit
+}
