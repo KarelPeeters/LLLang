@@ -26,7 +26,7 @@ fun testBeforeAfter(name: String, passes: List<OptimizerPass>) {
 }
 
 private fun readFile(name: String): Pair<Program, Program> {
-    val string = resourceToString("passes/$name.ir").trim()
+    val string = resourceToString("passes/$name").trim()
 
     val (beforeString, afterString) = when {
         string.startsWith("//before") -> {
@@ -51,6 +51,6 @@ private fun readFile(name: String): Pair<Program, Program> {
 }
 
 private fun resourceToString(path: String): String {
-    val res = ::resourceToString::class.java.getResourceAsStream(path)
+    val res = ::resourceToString::class.java.getResourceAsStream(path) ?: error("'$path' not found")
     return IOUtils.toString(res, Charsets.UTF_8)
 }
