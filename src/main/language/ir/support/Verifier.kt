@@ -8,6 +8,7 @@ import language.ir.ParameterValue
 import language.ir.Phi
 import language.ir.Program
 import language.ir.Return
+import language.ir.UndefinedValue
 import language.ir.UnitValue
 import language.ir.Value
 import language.optimizer.DominatorInfo
@@ -81,7 +82,7 @@ private fun verifyOperandDominance(program: Program) {
                 is Function -> op in program.functions
                 is BasicBlock -> op in func.blocks
                 is ParameterValue -> op in func.parameters
-                is Constant, is UnitValue -> true
+                is Constant, is UnitValue, is UndefinedValue -> true
                 else -> error("Unknown optype ${op::class.java}")
             }
 
