@@ -9,6 +9,7 @@ import language.ir.Phi
 import language.ir.Program
 import language.ir.Return
 import language.ir.Terminator
+import language.ir.support.Cloner
 import language.optimizer.OptimizerContext
 import language.optimizer.ProgramPass
 
@@ -48,7 +49,7 @@ object FunctionInlining : ProgramPass() {
         val target = call.target as Function
         val containingFunction = call.block.function
 
-        val targetClone = target.deepClone()
+        val targetClone = Cloner.cloneFunction(target)
         val beforeBlock = call.block
         val afterBlock = BasicBlock(null)
 

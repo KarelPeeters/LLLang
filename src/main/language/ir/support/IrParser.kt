@@ -105,7 +105,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         val retType = if (accept(Colon)) type() else UnitType
         expect(OpenC)
 
-        val func = Function(name, parameters, retType)
+        val func = Function(name, parameters, retType, attributes)
 
         val entryName = if (accept(Entry)) {
             expect(Colon)
@@ -150,7 +150,6 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         }
 
         //finish constructing function
-        func.attributes.addAll(attributes)
         func.addAll(blocks)
         func.entry = if (entryName == null)
             blocks.firstOrNull() ?: error("No block in function $name")

@@ -1,0 +1,25 @@
+//before
+fun %main() {
+  <entry>
+    %r Unit = call %foo(5 i32)
+    return unit Unit
+}
+
+fun %foo(%x i32) {
+  <entry>
+    %r Unit = call %foo(5 i32)
+    return unit Unit
+}
+
+//after
+fun %main() { 
+  <entry>
+    %r Unit = call %foo()
+    return unit Unit
+}
+
+fun %foo() {
+  <entry>
+    %r Unit = call %foo()
+    return unit Unit
+}

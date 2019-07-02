@@ -3,11 +3,12 @@ package language.ir
 class Function private constructor(
         val name: String?,
         val parameters: List<ParameterValue>,
-        val returnType: Type
+        val returnType: Type,
+        attributes: Set<Attribute>
 ) : Value(FunctionType(parameters.map(ParameterValue::type), returnType)) {
     var entry by operand<BasicBlock>(null)
     val blocks = mutableListOf<BasicBlock>()
-    val attributes = mutableSetOf<Attribute>()
+    val attributes = attributes.toMutableSet()
 
     private var _program: Program? = null
 
@@ -17,8 +18,8 @@ class Function private constructor(
     }
 
     companion object {
-        operator fun invoke(name: String?, parameters: List<Pair<String?, Type>>, returnType: Type) =
-                Function(name, parameters.map { ParameterValue(it.first, it.second) }, returnType)
+        operator fun invoke(name: String?, parameters: List<Pair<String?, Type>>, returnType: Type, attributes: Set<Attribute>) =
+                Function(name, parameters.map { ParameterValue(it.first, it.second) }, returnType, attributes)
     }
 
     /**
@@ -26,43 +27,13 @@ class Function private constructor(
      * As this creates a shallow copy, the current function is shallowDeleted.
      */
     fun changedSignature(parameters: List<ParameterValue>, returnType: Type): Function {
-        val newFunc = Function(this.name, parameters, returnType)
+        val newFunc = Function(this.name, parameters, returnType, attributes)
 
         newFunc.addAll(this.blocks)
         newFunc.entry = this.entry
         newFunc._program = this._program
 
         this.delete()
-        return newFunc
-    }
-
-    fun deepClone(): Function {
-        val newFunc = Function(this.name, this.parameters.map { it.name to it.type }, this.returnType)
-        val paramMap = this.parameters.zip(newFunc.parameters).toMap()
-
-        //shallow clone, keep mappings old -> new
-        val instrMap = mutableMapOf<Instruction, Instruction>()
-        val blockMap = blocks.associateWith { oldBlock ->
-            val newBlock = BasicBlock(oldBlock.name)
-            for (instr in oldBlock.instructions) {
-                val newInstr = instr.clone()
-                instrMap[instr] = newInstr
-                newBlock.appendOrReplaceTerminator(newInstr)
-            }
-            newBlock
-        }
-
-        //replace instructions and blocks
-        val replaceMap = paramMap + instrMap + blockMap
-        for (node in instrMap.values) {
-            for ((old, new) in replaceMap)
-                node.replaceOperand(old, new)
-        }
-
-        //finish new function
-        for (block in blockMap.values)
-            newFunc.add(block)
-        newFunc.entry = blockMap.getValue(this.entry)
         return newFunc
     }
 

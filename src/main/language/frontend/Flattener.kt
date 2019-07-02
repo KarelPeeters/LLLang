@@ -110,7 +110,8 @@ class Flattener {
                     val irFunction = IrFunction(
                             name,
                             topLevel.parameters.map { it.name to resolveType(it.type) },
-                            resolveType(topLevel.retType, UnitType)
+                            resolveType(topLevel.retType, UnitType),
+                            emptySet()
                     )
 
                     programScope.register(topLevel.position, name, RValue(irFunction))
@@ -127,7 +128,8 @@ class Flattener {
                         val irFunction = IrFunction(
                                 method.name,
                                 listOf("this" to structType.pointer) + method.parameters.map { it.name to resolveType(it.type) },
-                                resolveType(method.retType, UnitType)
+                                resolveType(method.retType, UnitType),
+                                emptySet()
                         )
                         program.addFunction(irFunction)
                         method.name to (method to irFunction)

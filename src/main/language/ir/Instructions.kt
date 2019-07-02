@@ -324,6 +324,8 @@ class AggregateValue(name: String?, type: AggregateType, values: List<Value>)
 
 sealed class Terminator : Instruction(null, UnitType, false) {
     abstract fun targets(): Set<BasicBlock>
+
+    abstract override fun clone(): Terminator
 }
 
 class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator() {
