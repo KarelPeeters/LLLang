@@ -3,6 +3,7 @@ package language.optimizer.passes
 import language.ir.AggregateValue
 import language.ir.Alloc
 import language.ir.BasicBlock
+import language.ir.BasicInstruction
 import language.ir.BinaryOp
 import language.ir.Blur
 import language.ir.Branch
@@ -108,16 +109,17 @@ private class SCCPImpl(val function: Function) {
     }
 
     fun visitInstruction(instr: Instruction) {
-        if (instr is Terminator) {
-            visitTerminator(instr)
-        } else {
-            val result = if (instr is Phi) {
-                calculatePhiResult(instr)
-            } else {
-                computeInstructionResult(instr, this::valueToLattice) ?: return
-            }
+        when (instr) {
+            is Terminator -> visitTerminator(instr)
+            is BasicInstruction -> {
+                val result = if (instr is Phi) {
+                    calculatePhiResult(instr)
+                } else {
+                    computeInstructionResult(instr, this::valueToLattice) ?: return
+                }
 
-            updateLattice(instr, result)
+                updateLattice(instr, result)
+            }
         }
     }
 
@@ -200,14 +202,14 @@ private fun Sequence<LatticeState>.merge(): LatticeState {
  *
  * This function contains the actual constant folding logic and tries to return the simplest result possible.
  */
-private inline fun computeInstructionResult(instr: Instruction, lattice: (Value) -> LatticeState): LatticeState? = when (instr) {
+private inline fun computeInstructionResult(instr: BasicInstruction, lattice: (Value) -> LatticeState): LatticeState? = when (instr) {
     is Alloc, is Load, is Call, is Blur -> Variable
     is GetSubPointer.Array, is GetSubPointer.Struct -> Variable
     is AggregateValue -> Variable
 
     is Store, is Eat -> null
 
-    is Terminator, is Phi -> error("should be handled elsewhere")
+    is Phi -> error("should be handled elsewhere")
 
     is BinaryOp -> {
         val left = lattice(instr.left)
