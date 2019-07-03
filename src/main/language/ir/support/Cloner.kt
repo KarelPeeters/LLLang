@@ -2,7 +2,9 @@ package language.ir.support
 
 import language.ir.BasicBlock
 import language.ir.Function
+import language.ir.Instruction
 import language.ir.Program
+import language.ir.User
 import language.ir.Value
 
 object Cloner {
@@ -10,34 +12,9 @@ object Cloner {
      * Deep clone [program], replacing uses of functions with the corresponding clones.
      */
     fun cloneProgram(program: Program): Program {
-        val replaceMap = mutableMapOf<Value, Value>()
-
-        //shallow clone
-        val newProgram = Program()
-        newProgram.entry = program.entry
-
-        for (func in program.functions) {
-            val newFunc = cloneFunction(func)
-            newProgram.addFunction(newFunc)
-            replaceMap[func] = newFunc
-        }
-
-        //replace uses
-        val users = sequence {
-            yield(newProgram)
-            yieldAll(newProgram.functions)
-            for (func in newProgram.functions) {
-                yieldAll(func.blocks)
-                for (block in func.blocks)
-                    yieldAll(block.instructions)
-            }
-        }
-
-        for (user in users) {
-            for ((old, new) in replaceMap)
-                user.replaceOperand(old, new)
-        }
-
+        val cloner = ClonerImpl()
+        val newProgram = cloner.flatCloneProgram(program)
+        cloner.doReplacements()
         return newProgram
     }
 
@@ -45,42 +22,87 @@ object Cloner {
      * Deep clone [func], replacing uses of blocks, instructions and the function itself with the clones.
      */
     fun cloneFunction(func: Function): Function {
-        val replaceMap = mutableMapOf<Value, Value>()
+        val cloner = ClonerImpl()
+        val newFunction = cloner.flatCloneFunction(func)
+        cloner.doReplacements()
+        return newFunction
+    }
 
-        //shallow clone
-        val newFunc = Function(func.name, func.parameters.map { it.name to it.type }, func.returnType, func.attributes)
-        newFunc.entry = func.entry
-
-        replaceMap[func] = newFunc
-        (func.parameters zip newFunc.parameters).toMap(replaceMap)
-
-        for (block in func.blocks) {
-            val newBlock = cloneBlock(block)
-            newFunc.add(newBlock)
-
-            replaceMap[block] = newBlock
-            (block.instructions zip newBlock.instructions).toMap(replaceMap)
-        }
-
-        //replace uses
-        //all Users are conveniently also part of the replaceMap so we can just iterate over the keys
-        for (user in replaceMap.values)
-            for (op in user.operands.toSet())
-                user.replaceOperand(op, replaceMap[op] ?: continue)
-
-        return newFunc
+    /**
+     * Deep clone [block], replacing uses of instructions and the block itself with the clones.
+     */
+    fun cloneBlock(block: BasicBlock): BasicBlock {
+        val cloner = ClonerImpl()
+        val newBlock = cloner.flatCloneBlock(block)
+        cloner.doReplacements()
+        return newBlock
     }
 }
 
 /**
- * Doesn't replace any uses, it's easier to let that happen at the function level. The resulting semantics are strange,
- * so this function is kept private.
+ * Each `flatClone` function adds itself to [users] and optionally to [replaceMap].
+ * [doReplacements] then goes trough the users and replaces their operands.
  */
-private fun cloneBlock(block: BasicBlock): BasicBlock {
-    val newBlock = BasicBlock(block.name)
-    for (instr in block.basicInstructions) {
-        newBlock.append(instr.clone())
+private class ClonerImpl {
+    val users = mutableSetOf<User>()
+    val replaceMap = mutableMapOf<Value, Value>()
+
+    fun doReplacements() {
+        for (user in users)
+            for (op in user.operands.toSet())
+                user.replaceOperand(op, replaceMap[op] ?: continue)
     }
-    newBlock.terminator = block.terminator.clone()
-    return newBlock
+
+    fun flatCloneProgram(program: Program): Program {
+        val newProgram = Program()
+        newProgram.entry = program.entry
+
+        users += newProgram
+
+        for (func in program.functions) {
+            val newFunc = flatCloneFunction(func)
+            newProgram.addFunction(newFunc)
+        }
+
+        return newProgram
+    }
+
+    fun flatCloneFunction(func: Function): Function {
+        val newFunc = Function(func.name, func.parameters.map { it.name to it.type }, func.returnType, func.attributes)
+        newFunc.entry = func.entry
+
+        users += newFunc
+        replaceMap[func] = newFunc
+        (func.parameters zip newFunc.parameters).toMap(replaceMap)
+
+        for (block in func.blocks) {
+            val newBlock = flatCloneBlock(block)
+            newFunc.add(newBlock)
+        }
+
+        return newFunc
+    }
+
+    fun flatCloneBlock(block: BasicBlock): BasicBlock {
+        val newBlock = BasicBlock(block.name)
+
+        users += newBlock
+        replaceMap[block] = newBlock
+
+        for (instr in block.instructions) {
+            val newInstr = flatCloneInstr(instr)
+            newBlock.appendOrReplaceTerminator(newInstr)
+        }
+
+        return newBlock
+    }
+
+    fun flatCloneInstr(instr: Instruction): Instruction {
+        val newInstr = instr.clone()
+
+        users += newInstr
+        replaceMap[instr] = newInstr
+
+        return newInstr
+    }
 }
