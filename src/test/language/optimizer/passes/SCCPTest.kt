@@ -9,4 +9,7 @@ class SCCPTest {
 
     @Test
     fun loopDifferent() = testBeforeAfter("sccp_loopDifferent.ir", SCCP)
+
+    @Test
+    fun undef() = testBeforeAfter("sccp_undef.ir", SCCP, DeadInstructionElimination)
 }

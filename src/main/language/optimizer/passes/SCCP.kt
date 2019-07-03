@@ -20,6 +20,7 @@ import language.ir.Phi
 import language.ir.Store
 import language.ir.Terminator
 import language.ir.UnaryOp
+import language.ir.UndefinedValue
 import language.ir.Value
 import language.optimizer.FunctionPass
 import language.optimizer.OptimizerContext
@@ -56,6 +57,7 @@ private class SCCPImpl(val function: Function) {
     private fun valueToLattice(value: Value) = when (value) {
         is Constant -> Known(value)
         is Instruction -> lattice.getValue(value)
+        is UndefinedValue -> Unknown
         else -> Variable
     }
 

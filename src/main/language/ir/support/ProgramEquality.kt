@@ -4,6 +4,7 @@ import language.ir.BasicBlock
 import language.ir.Constant
 import language.ir.Function
 import language.ir.Program
+import language.ir.UndefinedValue
 import language.ir.UnitValue
 import language.ir.Value
 import language.util.Graph
@@ -13,7 +14,7 @@ fun programEquals(lProg: Program, rProg: Program): Boolean {
     val mappping = buildValueMapping(lProg, rProg) ?: return false
 
     fun map(value: Value): Value = when (value) {
-        is Constant, is UnitValue -> value
+        is Constant, is UnitValue, is UndefinedValue -> value
         else -> mappping.getValue(value)
     }
 

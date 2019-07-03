@@ -40,6 +40,8 @@ enum class IrTokenType(val string: String? = null) {
     Annotation,
 
     Number,
+    Undef("undef"),
+
     Id,
     BlockId,
 

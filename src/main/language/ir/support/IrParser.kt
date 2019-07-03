@@ -30,6 +30,7 @@ import language.ir.Terminator
 import language.ir.Type
 import language.ir.UNARY_OP_TYPES
 import language.ir.UnaryOp
+import language.ir.UndefinedValue
 import language.ir.UnitType
 import language.ir.UnitValue
 import language.ir.Value
@@ -290,6 +291,10 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         accept(UnitValueToken) -> {
             expect(UnitTypeToken)
             UnitValue
+        }
+        accept(Undef) -> {
+            val type = type()
+            UndefinedValue(type)
         }
         else -> unexpected()
     }

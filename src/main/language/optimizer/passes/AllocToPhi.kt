@@ -71,10 +71,11 @@ object AllocToPhi : FunctionPass() {
                 }
             }
 
+            val undef = UndefinedValue(variable.inner)
 
             //remap loads
             for (load in loads) {
-                val value = findLastValue(load.block, load) ?: throw NoValueFoundException()
+                val value = findLastValue(load.block, load) ?: undef
                 load.replaceWith(value)
                 load.deleteFromBlock()
             }
@@ -83,7 +84,7 @@ object AllocToPhi : FunctionPass() {
             for (phi in phis.values) {
                 for (pred in phi.block.predecessors()) {
                     val value = findLastValue(pred, null)
-                    phi.sources[pred] = value ?: UndefinedValue(phi.type)
+                    phi.sources[pred] = value ?: undef
                 }
             }
 
