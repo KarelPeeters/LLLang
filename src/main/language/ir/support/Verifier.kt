@@ -17,6 +17,7 @@ object Verifier {
     fun verifyProgram(program: Program) {
         //basic checks
         check(!program.isDeleted) { "program was deleted" }
+        check(program.operands.none { it.isDeleted })
         check(program.entry in program.functions) { "entry must be one of the functions" }
         check(program.entry.parameters.isEmpty()) { "entry must be a parameterless function" }
 
@@ -39,6 +40,7 @@ object Verifier {
     fun verifyFunction(function: Function) {
         //basic checks
         check(!function.isDeleted) { "function was deleted" }
+        check(function.operands.none { it.isDeleted })
         check(function.entry in function.blocks) { "entry must be one of the blocks" }
         check(function.entry.predecessors().isEmpty()) { "entry can't be jumped to" }
 
@@ -58,6 +60,7 @@ object Verifier {
     fun verifyBlock(block: BasicBlock) {
         //basic checks
         check(!block.isDeleted) { "block was deleted" }
+        check(block.operands.none { it.isDeleted })
         check(block.instructions.dropWhile { it is Phi }.all { it !is Phi }) { "all phi instructions are at the start of the block" }
 
         for (instr in block.instructions) {
@@ -68,6 +71,7 @@ object Verifier {
 
     fun verifyInstruction(instr: Instruction) {
         check(!instr.isDeleted)
+        check(instr.operands.none { it.isDeleted })
         instr.typeCheck()
     }
 }
