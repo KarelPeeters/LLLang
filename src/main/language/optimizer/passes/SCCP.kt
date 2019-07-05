@@ -37,51 +37,85 @@ object SCCP : FunctionPass() {
     }
 }
 
-private class SCCPImpl(val function: Function) {
-    val lattice = mutableMapOf<Instruction, LatticeState>()
+private class SCCPImpl {
+    /** Keys can be [Instruction] or [Function] */
+    val lattice = mutableMapOf<Value, LatticeState>()
+
     val executableEdges = mutableSetOf<FlowEdge>()
     val executableBlocks = mutableSetOf<BasicBlock>()
 
-    val blockQueue: Queue<BasicBlock> = ArrayDeque()
-    val instrQueue: Queue<Instruction> = ArrayDeque()
+    val queue: Queue<Any> = ArrayDeque()
 
-    init {
-        for (instr in function.blocks.flatMap { it.instructions }) {
-            if (instr !is Terminator && instr !is Eat && instr !is Store)
-                lattice[instr] = Unknown
-        }
-
+    constructor(function: Function) {
         updateExecutableEdge(null, function.entry)
     }
 
-    private fun valueToLattice(value: Value) = when (value) {
-        is Constant -> Known(value)
-        is Instruction -> lattice.getValue(value)
-        is UndefinedValue -> Unknown
-        else -> Variable
+    fun run() {
+        computeLattice()
+        replaceValues()
     }
 
-    private fun updateLattice(instr: Instruction, value: LatticeState) {
-        if (lattice.put(instr, value) != value) {
-            for (user in instr.users) {
-                if (user is Instruction)
-                    instrQueue += user
+    private fun computeLattice() {
+        while (queue.isNotEmpty()) {
+            when (val curr = queue.poll()) {
+                is BasicBlock -> visitBlock(curr)
+                is Instruction -> visitInstruction(curr)
+                else -> error("unexpected queue item ${curr::class}")
             }
         }
     }
 
+    private fun replaceValues() {
+        for ((value, state) in lattice) {
+            if (state is Known)
+                value.replaceWith(state.value)
+        }
+    }
+
+    private fun lattice(value: Value) = when (value) {
+        is Constant -> Known(value)
+        is Instruction, is Function -> lattice.getValue(value)
+        is UndefinedValue -> Unknown
+        else -> Variable
+    }
+
     private fun updateExecutableEdge(from: BasicBlock?, to: BasicBlock) {
         if (executableEdges.add(FlowEdge(from, to))) {
-            instrQueue += to.phis()
+            queue.addAll(to.phis())
 
             if (executableBlocks.add(to))
-                blockQueue += to
+                queue += to
+        }
+    }
+
+    private fun updateLattice(value: Value, state: LatticeState) {
+        if (lattice.put(value, state) != state) {
+            for (user in value.users) {
+                if (user is Instruction)
+                    queue += user
+            }
+        }
+    }
+
+    private fun visitBlock(block: BasicBlock) {
+        for (instr in block.instructions) {
+            visitInstruction(instr)
+        }
+    }
+
+    private fun visitInstruction(instr: Instruction) {
+        when (instr) {
+            is Terminator -> visitTerminator(instr)
+            is BasicInstruction -> {
+                val result = computeInstructionResult(instr) ?: return
+                updateLattice(instr, result)
+            }
         }
     }
 
     private fun visitTerminator(instr: Terminator) {
         if (instr is Branch) {
-            when (val value = valueToLattice(instr.value)) {
+            when (val value = lattice(instr.value)) {
                 Unknown -> error("can't happen, value was just lowered")
                 is Known -> {
                     check(value.value.type == IntegerType.bool)
@@ -101,68 +135,68 @@ private class SCCPImpl(val function: Function) {
         }
     }
 
-    private fun calculatePhiResult(instr: Phi): LatticeState {
-        return instr.sources.asSequence().map { (block, value) ->
-            if (FlowEdge(block, instr.block) in executableEdges)
-                valueToLattice(value)
+    /**
+     * Compute the result of an instruction based on [lattice], [executableEdges].
+     * This function contains the actual constant folding logic and tries to return the simplest result possible.
+     */
+    private fun computeInstructionResult(instr: BasicInstruction): LatticeState? = when (instr) {
+        is Alloc, is Load, is Call, is Blur -> Variable
+        is GetSubPointer.Array, is GetSubPointer.Struct -> Variable
+        is AggregateValue -> Variable
+
+        is Store, is Eat -> null
+
+        is Phi -> {
+            instr.sources.asSequence().map { (block, value) ->
+                if (FlowEdge(block, instr.block) in executableEdges)
+                    lattice(value)
+                else
+                    Unknown
+            }.merge()
+        }
+
+        is BinaryOp -> {
+            val left = lattice(instr.left)
+            val right = lattice(instr.right)
+
+            if (left == Variable || right == Variable)
+                Variable
+            else if (left is Known && right is Known)
+                Known(instr.opType.calculate(left.value, right.value))
             else
                 Unknown
-        }.merge()
-    }
+        }
 
-    fun visitInstruction(instr: Instruction) {
-        when (instr) {
-            is Terminator -> visitTerminator(instr)
-            is BasicInstruction -> {
-                val result = if (instr is Phi) {
-                    calculatePhiResult(instr)
-                } else {
-                    computeInstructionResult(instr, this::valueToLattice) ?: return
+        is UnaryOp -> {
+            when (val value = lattice(instr.value)) {
+                Unknown -> Unknown
+                is Known -> Known(instr.opType.calculate(value.value))
+                Variable -> Variable
+            }
+        }
+
+        is GetSubValue -> {
+            val target = instr.target
+            if (target is AggregateValue) {
+                val fixedIndex = when (instr) {
+                    is GetSubValue.Struct -> instr.index
+                    is GetSubValue.Array -> {
+                        val index = lattice(instr.index)
+                        (index as? Known)?.value?.value
+                    }
                 }
 
-                updateLattice(instr, result)
-            }
+                if (fixedIndex != null)
+                    lattice(target.values[fixedIndex])
+                else
+                    Variable
+            } else
+                Variable
         }
-    }
-
-    fun visitBlock(block: BasicBlock) {
-        for (instr in block.instructions) {
-            visitInstruction(instr)
-        }
-    }
-
-    fun computeLattice() {
-        while (true) {
-            val block = blockQueue.poll()
-            if (block != null) {
-                visitBlock(block)
-                continue
-            }
-
-            val instr = instrQueue.poll()
-            if (instr != null) {
-                visitInstruction(instr)
-                continue
-            }
-
-            break
-        }
-    }
-
-    fun replaceValues() {
-        for ((value, state) in lattice) {
-            if (state is Known)
-                value.replaceWith(state.value)
-        }
-    }
-
-    fun run() {
-        computeLattice()
-        replaceValues()
     }
 }
 
-data class FlowEdge(val from: BasicBlock?, val to: BasicBlock)
+private data class FlowEdge(val from: BasicBlock?, val to: BasicBlock)
 
 /**
  * A lattice state, see subclass docs for the meaning of each state.
@@ -196,59 +230,4 @@ private fun Sequence<LatticeState>.merge(): LatticeState {
     }
 
     return current
-}
-
-/**
- * Compute the result of an instruction as a [LatticeState] where the operands' [LatticeState]s can be determined by
- * calling [lattice] with the operand value.
- *
- * This function contains the actual constant folding logic and tries to return the simplest result possible.
- */
-private inline fun computeInstructionResult(instr: BasicInstruction, lattice: (Value) -> LatticeState): LatticeState? = when (instr) {
-    is Alloc, is Load, is Call, is Blur -> Variable
-    is GetSubPointer.Array, is GetSubPointer.Struct -> Variable
-    is AggregateValue -> Variable
-
-    is Store, is Eat -> null
-
-    is Phi -> error("should be handled elsewhere")
-
-    is BinaryOp -> {
-        val left = lattice(instr.left)
-        val right = lattice(instr.right)
-
-        if (left == Variable || right == Variable)
-            Variable
-        else if (left is Known && right is Known)
-            Known(instr.opType.calculate(left.value, right.value))
-        else
-            Unknown
-    }
-
-    is UnaryOp -> {
-        when (val value = lattice(instr.value)) {
-            Unknown -> Unknown
-            is Known -> Known(instr.opType.calculate(value.value))
-            Variable -> Variable
-        }
-    }
-
-    is GetSubValue -> {
-        val target = instr.target
-        if (target is AggregateValue) {
-            val fixedIndex = when (instr) {
-                is GetSubValue.Struct -> instr.index
-                is GetSubValue.Array -> {
-                    val index = lattice(instr.index)
-                    (index as? Known)?.value?.value
-                }
-            }
-
-            if (fixedIndex != null)
-                lattice(target.values[fixedIndex])
-            else
-                Variable
-        } else
-            Variable
-    }
 }
