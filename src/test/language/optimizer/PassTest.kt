@@ -7,7 +7,7 @@ import language.ir.support.Verifier
 import language.ir.support.programEquals
 import org.apache.commons.io.IOUtils
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.fail
 
 fun testBeforeAfter(name: String, vararg passes: OptimizerPass) = testBeforeAfter(name, passes.asList())
 
@@ -20,8 +20,8 @@ fun testBeforeAfter(name: String, passes: List<OptimizerPass>) {
     Optimizer(passes = passes, repeat = false, doVerify = true).optimize(before)
 
     if (!programEquals(before, after)) {
-        assertEquals(after.fullString(ProgramNameEnv()), before.fullString(ProgramNameEnv()))
-        assertTrue(false)
+        assertEquals(after.fullString(ProgramNameEnv()), before.fullString(ProgramNameEnv())) { "After mismatch" }
+        fail { "Programs don't equal but string representation does" }
     }
 }
 

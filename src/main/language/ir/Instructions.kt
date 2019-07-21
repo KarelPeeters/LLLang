@@ -121,7 +121,7 @@ class Phi(name: String?, type: Type) : BasicInstruction(name, type, true) {
     }
 
     override fun typeCheck() {
-        check(sources.keys == block.predecessors().toSet()) { "must have source for every block predecessor" }
+        check(sources.keys == block.predecessors().toSet()) { "phi sources don't match predecessors" }
         check(sources.values.all { it.type == this.type }) { "source types must all equal phi type" }
     }
 
@@ -365,7 +365,8 @@ class Exit : Terminator() {
 
     override fun typeCheck() {}
 
-    override fun targets() = setOf<BasicBlock>()
+    override fun targets() = emptySet<BasicBlock>()
+
     override fun fullStr(env: NameEnv) = "exit"
 
     override fun matches(other: Instruction, map: (Value) -> Value) =

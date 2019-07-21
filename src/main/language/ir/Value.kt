@@ -34,6 +34,8 @@ class Constant(type: Type, val value: Int) : Value(type) {
 
     override val replaceAble = false
 
+    override fun toString() = "$value $type"
+
     override fun untypedStr(env: NameEnv) = "$value"
 
     override fun equals(other: Any?): Boolean {
@@ -44,16 +46,22 @@ class Constant(type: Type, val value: Int) : Value(type) {
         return type == other.type && value == other.value
     }
 
-    override fun hashCode(): Int {
-        var result = value
-        result = 31 * result + type.hashCode()
-        return result
-    }
+    override fun hashCode() = 31 * value + type.hashCode()
 }
 
 class UndefinedValue(type: Type) : Value(type) {
     override val replaceAble = false
     override fun untypedStr(env: NameEnv) = "undef"
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        other as UndefinedValue
+
+        return type == other.type
+    }
+
+    override fun hashCode() = type.hashCode()
 }
 
 object UnitValue : Value(UnitType) {

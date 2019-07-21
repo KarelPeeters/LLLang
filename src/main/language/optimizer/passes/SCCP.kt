@@ -16,7 +16,10 @@ import language.ir.GetSubValue
 import language.ir.Instruction
 import language.ir.IntegerType
 import language.ir.Load
+import language.ir.ParameterValue
 import language.ir.Phi
+import language.ir.Program
+import language.ir.Return
 import language.ir.Store
 import language.ir.Terminator
 import language.ir.UnaryOp
@@ -24,6 +27,7 @@ import language.ir.UndefinedValue
 import language.ir.Value
 import language.optimizer.FunctionPass
 import language.optimizer.OptimizerContext
+import language.optimizer.ProgramPass
 import language.optimizer.passes.LatticeState.*
 import java.util.*
 
@@ -37,8 +41,14 @@ object SCCP : FunctionPass() {
     }
 }
 
+object ProgramSCCP : ProgramPass() {
+    override fun OptimizerContext.optimize(program: Program) {
+        SCCPImpl(program).run()
+    }
+}
+
 private class SCCPImpl {
-    /** Keys can be [Instruction] or [Function] */
+    /** Keys can be [Instruction], [Function] or [ParameterValue] */
     val lattice = mutableMapOf<Value, LatticeState>()
 
     val executableEdges = mutableSetOf<FlowEdge>()
@@ -46,8 +56,16 @@ private class SCCPImpl {
 
     val queue: Queue<Any> = ArrayDeque()
 
+    val multiFunc: Boolean
+
+    constructor(program: Program) {
+        updateExecutableEntry(program.entry.entry)
+        multiFunc = true
+    }
+
     constructor(function: Function) {
-        updateExecutableEdge(null, function.entry)
+        updateExecutableEntry(function.entry)
+        multiFunc = false
     }
 
     fun run() {
@@ -58,7 +76,7 @@ private class SCCPImpl {
     private fun computeLattice() {
         while (queue.isNotEmpty()) {
             when (val curr = queue.poll()) {
-                is BasicBlock -> visitBlock(curr)
+                is BasicBlock -> initializeBlock(curr)
                 is Instruction -> visitInstruction(curr)
                 else -> error("unexpected queue item ${curr::class}")
             }
@@ -67,19 +85,28 @@ private class SCCPImpl {
 
     private fun replaceValues() {
         for ((value, state) in lattice) {
-            if (state is Known)
-                value.replaceWith(state.value)
+            when (state) {
+                Unknown -> value.replaceWith(UndefinedValue(value.type))
+                is Known -> value.replaceWith(state.value)
+                Variable -> Unit
+            }
         }
     }
 
     private fun lattice(value: Value) = when (value) {
         is Constant -> Known(value)
-        is Instruction, is Function -> lattice.getValue(value)
+        is Function -> Variable
+        is Call -> {
+            val target = value.target
+            if (multiFunc && target is Function) lattice.getValue(target) else Variable
+        }
+        is Instruction -> lattice.getValue(value)
+        is ParameterValue -> lattice[value] ?: Unknown
         is UndefinedValue -> Unknown
         else -> Variable
     }
 
-    private fun updateExecutableEdge(from: BasicBlock?, to: BasicBlock) {
+    fun updateExecutableEdge(from: BasicBlock, to: BasicBlock) {
         if (executableEdges.add(FlowEdge(from, to))) {
             queue.addAll(to.phis())
 
@@ -88,8 +115,26 @@ private class SCCPImpl {
         }
     }
 
+    private fun updateExecutableEntry(to: BasicBlock): Boolean {
+        check(to.phis().isEmpty()) { "entry can't have phis" }
+
+        if (executableBlocks.add(to)) {
+            queue += to
+            return true
+        }
+
+        return false
+    }
+
+    private fun updateMerge(value: Value, state: LatticeState) {
+        updateLattice(value, merge(lattice(value), state))
+    }
+
     private fun updateLattice(value: Value, state: LatticeState) {
-        if (lattice.put(value, state) != state) {
+        val prev = lattice.put(value, state)
+        check(prev == null || prev >= state)
+
+        if (prev != state) {
             for (user in value.users) {
                 if (user is Instruction)
                     queue += user
@@ -97,15 +142,31 @@ private class SCCPImpl {
         }
     }
 
-    private fun visitBlock(block: BasicBlock) {
+    private fun initializeBlock(block: BasicBlock) {
         for (instr in block.instructions) {
             visitInstruction(instr)
+
+            if (multiFunc) {
+                val operands = if (instr is Call) instr.arguments else instr.operands
+
+                for (op in operands) {
+                    if (op is Function) {
+                        //the function appears as an operand that's not an immediate call target
+                        //be safe and make worst-case assumptions: executable and all parameters variable
+                        updateExecutableEntry(op.entry)
+                        for (param in op.parameters)
+                            updateLattice(param, Variable)
+                    }
+                }
+            }
         }
     }
 
     private fun visitInstruction(instr: Instruction) {
         when (instr) {
-            is Terminator -> visitTerminator(instr)
+            is Return -> visitReturn(instr)
+            is Terminator -> visitControlflowTerminator(instr)
+            is Call -> visitCall(instr)
             is BasicInstruction -> {
                 val result = computeInstructionResult(instr) ?: return
                 updateLattice(instr, result)
@@ -113,7 +174,28 @@ private class SCCPImpl {
         }
     }
 
-    private fun visitTerminator(instr: Terminator) {
+    private fun visitReturn(instr: Return) {
+        if (multiFunc) {
+            updateMerge(instr.block.function, lattice(instr.value))
+        }
+    }
+
+    private fun visitCall(instr: Call) {
+        if (multiFunc) {
+            val target = instr.target
+            if (target is Function) {
+                for ((param, arg) in (target.parameters zip instr.arguments)) {
+                    updateMerge(param, lattice(arg))
+                }
+                if (updateExecutableEntry(target.entry))
+                    updateLattice(target, Unknown)
+            }
+        } else {
+            updateLattice(instr, Variable)
+        }
+    }
+
+    private fun visitControlflowTerminator(instr: Terminator) {
         if (instr is Branch) {
             when (val value = lattice(instr.value)) {
                 Unknown -> error("can't happen, value was just lowered")
@@ -140,11 +222,13 @@ private class SCCPImpl {
      * This function contains the actual constant folding logic and tries to return the simplest result possible.
      */
     private fun computeInstructionResult(instr: BasicInstruction): LatticeState? = when (instr) {
-        is Alloc, is Load, is Call, is Blur -> Variable
+        is Alloc, is Load, is Blur -> Variable
         is GetSubPointer.Array, is GetSubPointer.Struct -> Variable
         is AggregateValue -> Variable
 
         is Store, is Eat -> null
+
+        is Call -> error("handled separately")
 
         is Phi -> {
             instr.sources.asSequence().map { (block, value) ->
@@ -196,21 +280,23 @@ private class SCCPImpl {
     }
 }
 
-private data class FlowEdge(val from: BasicBlock?, val to: BasicBlock)
+private data class FlowEdge(val from: BasicBlock, val to: BasicBlock)
 
 /**
  * A lattice state, see subclass docs for the meaning of each state.
  * Subclasses of this class should properly implement [equals].
  */
-private sealed class LatticeState {
+private sealed class LatticeState(private val order: Int) {
+    operator fun compareTo(other: LatticeState): Int = this.order.compareTo(other.order)
+
     /** Assumed to be constant but no known value yet */
-    object Unknown : LatticeState()
+    object Unknown : LatticeState(2)
 
     /** Assumed to be constant with the given [value] */
-    data class Known(val value: Constant) : LatticeState()
+    data class Known(val value: Constant) : LatticeState(1)
 
     /** Known to not be constant */
-    object Variable : LatticeState()
+    object Variable : LatticeState(0)
 }
 
 /**
@@ -230,4 +316,13 @@ private fun Sequence<LatticeState>.merge(): LatticeState {
     }
 
     return current
+}
+
+private fun merge(left: LatticeState, right: LatticeState): LatticeState {
+    if (left == right) return left
+
+    if (left == Unknown) return right
+    if (right == Unknown) return left
+
+    return Variable
 }

@@ -1,0 +1,19 @@
+//unchanged
+fun %main() {
+  <entry>
+    %u1 Unit = call %foo(2 i32)
+    %u2 Unit = call %calltrough(%foo (i32) -> Unit)
+    return unit Unit
+}
+
+fun %calltrough(%f (i32) -> Unit) {
+  <entry>
+    %u Unit = call %f(5 i32)
+    return unit Unit
+}
+
+fun %foo(%x i32) {
+  <entry>
+    eat(%x i32)
+    return unit Unit
+}

@@ -1,0 +1,23 @@
+//unchanged
+fun %main() {
+  <entry>
+    return unit Unit
+  <dead.start>
+    %x i32 = add 2 i32, 3 i32
+    %c i1 = blur 1 i1
+    branch %c i1 <dead1> <dead2>
+  <dead1>
+    %y i32 = add 5 i32, 6 i32
+    jump <dead.end>
+  <dead2>
+    jump <dead.end>
+  <dead.end>
+    %r i32 = phi [<dead1>: %y i32, <dead2>: %x i32]
+    eat(%r i32)
+    return unit Unit
+}
+
+fun %foo(%x i32): i32 {
+  <dead.entry>
+    return %x i32
+}
