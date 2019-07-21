@@ -1,0 +1,14 @@
+//unchanged
+fun %main() {
+  <entry>
+    %x i32 = call %foo()
+    %y i32 = call %foo()
+    eat(%x i32, %y i32)
+    return unit Unit
+}
+
+fun %foo(): i32 {
+  <entry>
+    %x i32 = blur 5 i32
+    return %x i32
+}

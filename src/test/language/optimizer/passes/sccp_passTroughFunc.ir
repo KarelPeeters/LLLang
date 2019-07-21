@@ -3,7 +3,7 @@ fun %main() {
   <entry>
     %x1 i32 = call %pass(1 i32)
     %x2 i32 = call %pass(2 i32)
-    %r i32 = add %x1 i32, %x2 i32
+    eat(%x1 i32, %x2 i32)
     return unit Unit
 }
 

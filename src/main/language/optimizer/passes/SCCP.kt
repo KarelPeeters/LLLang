@@ -22,6 +22,7 @@ import language.ir.Program
 import language.ir.Return
 import language.ir.Store
 import language.ir.Terminator
+import language.ir.Type
 import language.ir.UnaryOp
 import language.ir.UndefinedValue
 import language.ir.Value
@@ -48,8 +49,9 @@ object ProgramSCCP : ProgramPass() {
 }
 
 private class SCCPImpl {
-    /** Keys can be [Instruction], [Function] or [ParameterValue] */
+    /** Keys can be [Instruction] or [ParameterValue] */
     val lattice = mutableMapOf<Value, LatticeState>()
+    val returnLattice = mutableMapOf<Function, LatticeState>()
 
     val executableEdges = mutableSetOf<FlowEdge>()
     val executableBlocks = mutableSetOf<BasicBlock>()
@@ -59,18 +61,21 @@ private class SCCPImpl {
     val multiFunc: Boolean
 
     constructor(program: Program) {
-        updateExecutableEntry(program.entry.entry)
         multiFunc = true
+        updateExecutableFunction(program.entry)
     }
 
     constructor(function: Function) {
-        updateExecutableEntry(function.entry)
         multiFunc = false
+        updateExecutableFunction(function)
     }
 
     fun run() {
         computeLattice()
         replaceValues()
+
+        if (!multiFunc)
+            check(returnLattice.isEmpty())
     }
 
     private fun computeLattice() {
@@ -85,20 +90,25 @@ private class SCCPImpl {
 
     private fun replaceValues() {
         for ((value, state) in lattice) {
-            when (state) {
-                Unknown -> value.replaceWith(UndefinedValue(value.type))
-                is Known -> value.replaceWith(state.value)
-                Variable -> Unit
+            val replacement = state.asValue(value.type) ?: continue
+            value.replaceWith(replacement)
+        }
+
+        for ((func, state) in returnLattice) {
+            val replacement = state.asValue(func.returnType) ?: continue
+
+            for (user in func.users) {
+                if (user is Call && user.target == func)
+                    user.replaceWith(replacement)
             }
         }
     }
 
     private fun lattice(value: Value) = when (value) {
         is Constant -> Known(value)
-        is Function -> Variable
         is Call -> {
             val target = value.target
-            if (multiFunc && target is Function) lattice.getValue(target) else Variable
+            if (multiFunc && target is Function) returnLattice.getValue(target) else Variable
         }
         is Instruction -> lattice.getValue(value)
         is ParameterValue -> lattice[value] ?: Unknown
@@ -115,15 +125,13 @@ private class SCCPImpl {
         }
     }
 
-    private fun updateExecutableEntry(to: BasicBlock): Boolean {
-        check(to.phis().isEmpty()) { "entry can't have phis" }
+    private fun updateExecutableFunction(function: Function) {
+        if (executableBlocks.add(function.entry)) {
+            if (multiFunc)
+                check(returnLattice.put(function, Unknown) == null)
 
-        if (executableBlocks.add(to)) {
-            queue += to
-            return true
+            queue += function.entry
         }
-
-        return false
     }
 
     private fun updateMerge(value: Value, state: LatticeState) {
@@ -153,7 +161,7 @@ private class SCCPImpl {
                     if (op is Function) {
                         //the function appears as an operand that's not an immediate call target
                         //be safe and make worst-case assumptions: executable and all parameters variable
-                        updateExecutableEntry(op.entry)
+                        updateExecutableFunction(op)
                         for (param in op.parameters)
                             updateLattice(param, Variable)
                     }
@@ -176,7 +184,18 @@ private class SCCPImpl {
 
     private fun visitReturn(instr: Return) {
         if (multiFunc) {
-            updateMerge(instr.block.function, lattice(instr.value))
+            val func = instr.block.function
+
+            val prev = returnLattice.getValue(func)
+            val next = merge(prev, lattice(instr.value))
+
+            if (returnLattice.put(func, next) != next) {
+                //queue users of call instructions with this function as the target
+                for (user in func.users) {
+                    if (user is Call && user.target == func)
+                        queue.addAll(user.users)
+                }
+            }
         }
     }
 
@@ -184,11 +203,10 @@ private class SCCPImpl {
         if (multiFunc) {
             val target = instr.target
             if (target is Function) {
+                updateExecutableFunction(target)
                 for ((param, arg) in (target.parameters zip instr.arguments)) {
                     updateMerge(param, lattice(arg))
                 }
-                if (updateExecutableEntry(target.entry))
-                    updateLattice(target, Unknown)
             }
         } else {
             updateLattice(instr, Variable)
@@ -287,16 +305,24 @@ private data class FlowEdge(val from: BasicBlock, val to: BasicBlock)
  * Subclasses of this class should properly implement [equals].
  */
 private sealed class LatticeState(private val order: Int) {
+    abstract fun asValue(type: Type): Value?
+
     operator fun compareTo(other: LatticeState): Int = this.order.compareTo(other.order)
 
     /** Assumed to be constant but no known value yet */
-    object Unknown : LatticeState(2)
+    object Unknown : LatticeState(2) {
+        override fun asValue(type: Type): Value? = UndefinedValue(type)
+    }
 
     /** Assumed to be constant with the given [value] */
-    data class Known(val value: Constant) : LatticeState(1)
+    data class Known(val value: Constant) : LatticeState(1) {
+        override fun asValue(type: Type): Value? = value.also { check(value.type == type) }
+    }
 
     /** Known to not be constant */
-    object Variable : LatticeState(0)
+    object Variable : LatticeState(0) {
+        override fun asValue(type: Type): Value? = null
+    }
 }
 
 /**

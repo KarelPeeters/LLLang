@@ -20,6 +20,15 @@ class SCCPTest {
     fun constantParam() = testBeforeAfter("sccp_constantParam.ir", ProgramSCCP)
 
     @Test
+    fun nonConstantParam() = testBeforeAfter("sccp_nonConstantParam.ir", ProgramSCCP)
+
+    @Test
+    fun constantReturn() = testBeforeAfter("sccp_constantReturn.ir", ProgramSCCP)
+
+    @Test
+    fun nonConstantReturn() = testBeforeAfter("sccp_nonConstantReturn.ir", ProgramSCCP)
+
+    @Test
     fun deadCode() = testBeforeAfter("sccp_deadCode.ir", ProgramSCCP)
 
     @Test
@@ -27,4 +36,7 @@ class SCCPTest {
 
     @Test
     fun passTroughFunc() = testBeforeAfter("sccp_passTroughFunc.ir", ProgramSCCP)
+
+    @Test
+    fun multiFuncLoop() = testBeforeAfter("sccp_multiFuncLoop.ir", ProgramSCCP)
 }
