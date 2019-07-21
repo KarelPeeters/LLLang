@@ -52,7 +52,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
     private val localBlockPlaceholders = mutableMapOf<String, BasicBlock>()
 
     fun parse(): Program {
-        parseStructTypeDeclarations()
+        structTypes = parseStructTypeDeclarations()
 
         val functions = list(Eof, null) { function() }
 
@@ -74,7 +74,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         return program
     }
 
-    private fun parseStructTypeDeclarations() {
+    private fun parseStructTypeDeclarations(): MutableMap<String, StructType> {
         val structTypes = mutableMapOf<String, StructType>()
 
         while (accept(TypeDef)) {
@@ -86,7 +86,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
             structTypes[id] = StructType(id, properties)
         }
 
-        this.structTypes = structTypes
+        return structTypes
     }
 
     private fun function(): Function {
@@ -100,13 +100,13 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         }
 
         expect(Fun)
-        val name = idName()
+        val funcName = idName()
         expect(OpenB)
         val parameters = list(CloseB, ::parameter)
         val retType = if (accept(Colon)) type() else UnitType
         expect(OpenC)
 
-        val func = Function(name, parameters, retType, attributes)
+        val func = Function(funcName, parameters, retType, attributes)
 
         val entryName = if (accept(Entry)) {
             expect(Colon)
@@ -121,22 +121,31 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
             blocks += block()
         expect(CloseC)
 
-        //resolve local placeholders
+        //replacement map for values to ensure there are no duplicate replacements available
+        val valueMap = mutableMapOf<String, Value>()
+
+        //visit all local values
         for (block in blocks) {
             for (instr in block.instructions) {
-                val variablePlaceholder = localVariablePlaceholders.remove(instr.name ?: continue) ?: continue
-                variablePlaceholder.replaceWith(instr)
+                if (valueMap.put(instr.name ?: continue, instr) != null)
+                    error("Duplicate name ${instr.name}")
             }
 
+            //blocks can't conflict and can be immediatly replaced
             val blockPlaceholder = localBlockPlaceholders.remove(block.name!!) ?: continue
             blockPlaceholder.replaceWith(block)
         }
+
         for (param in func.parameters) {
-            val paramPlaceholder = localVariablePlaceholders.remove(param.name!!) ?: continue
-            paramPlaceholder.replaceWith(param)
+            if (valueMap.put(param.name!!, param) != null)
+                error("Duplicate name ${param.name}")
         }
 
-        //can't have leftover blocks
+        //replace local values
+        for ((name, value) in valueMap)
+            (localVariablePlaceholders.remove(name) ?: continue).replaceWith(value)
+
+        //there are no global blocks, so there can't be any leftovers
         if (localBlockPlaceholders.isNotEmpty())
             error("Missing blocks: " + localBlockPlaceholders.keys.joinToString())
 
@@ -153,7 +162,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         //finish constructing function
         func.addAll(blocks)
         func.entry = if (entryName == null)
-            blocks.firstOrNull() ?: error("No block in function $name")
+            blocks.firstOrNull() ?: error("No block in function $funcName")
         else
             blocks.find { it.name == entryName } ?: error("Missing entry block '$entryName'")
         return func
@@ -223,6 +232,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
                     val block = blockPlaceholder()
                     expect(Colon)
                     val value = typedValue()
+                    requireTypeMatch(type, value.type)
                     block to value
                 }
 
@@ -231,8 +241,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
                     error("Duplicate source block in phi $name")
 
                 val phi = Phi(name, type)
-                for ((block, value) in sources)
-                    phi.sources[block] = value
+                phi.sources += sources
                 phi
             }
             accept(BlurToken) -> Blur(name, typedValue())
@@ -262,7 +271,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
                 val values = list(CloseB, ::typedValue)
                 AggregateValue(name, structType, values)
             }
-            else -> unexpected()
+            else -> expected("instruction")
         }
 
         requireTypeMatch(type, instr.type)
@@ -296,7 +305,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
             val type = type()
             UndefinedValue(type)
         }
-        else -> unexpected()
+        else -> expected("value")
     }
 
     private fun type(): Type {
@@ -320,7 +329,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
                 val retType = type()
                 FunctionType(paramTypes, retType)
             }
-            else -> unexpected()
+            else -> expected("type")
         }
 
         var curr = inner
@@ -352,16 +361,16 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
             new
         } else {
             if (value.type != type)
-                error("Comflicting types for $name: $type and ${value.type}")
+                error("Conflicting types for $name: $type and ${value.type}")
             value
         }
     }
 
     private inline fun <E> list(end: IrTokenType, element: () -> E) = list(end, Comma, element)
 
-    private fun requireTypeMatch(first: Type, second: Type) {
-        if (first != second)
-            error("Type mismatch: $first != $second")
+    private fun requireTypeMatch(expected: Type, actual: Type) {
+        if (expected != actual)
+            error("Type mismatch: expected $expected, got $actual")
     }
 }
 

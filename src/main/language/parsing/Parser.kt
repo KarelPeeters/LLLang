@@ -16,7 +16,7 @@ abstract class Parser<T>(private val tokenizer: Tokenizer<T>) {
 
     protected fun expect(type: T): Token<T> {
         if (!at(type))
-            error("expected $type, got ${next.type} at ${next.position}")
+            error("expected $type, got ${next.type} at $currentPosition")
         return pop()
     }
 
@@ -33,7 +33,8 @@ abstract class Parser<T>(private val tokenizer: Tokenizer<T>) {
         lookahead = tokenizer.next()
     }
 
-    protected fun unexpected(): Nothing = error("Unexpected token $next")
+    protected fun expected(expected: String): Nothing =
+            error("Unexpected token $next, expected $expected")
 
     protected fun error(msg: String): Nothing = throw ParseError(msg)
 

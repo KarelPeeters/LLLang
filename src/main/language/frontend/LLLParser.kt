@@ -28,7 +28,7 @@ class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
         return when {
             at(Struct) -> struct()
             at(Fun) -> function()
-            else -> unexpected()
+            else -> expected("top level declaration")
         }
     }
 
@@ -51,7 +51,7 @@ class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
         val content = when {
             at(OpenC) -> Function.FunctionBody.Block(pop().position, block(CloseC))
             at(Assign) -> Function.FunctionBody.Expr(pop().position, expression()).also { expect(Semi) }
-            else -> unexpected()
+            else -> expected("function body")
         }
 
         return Function(pos, name, parameters, ret, content)
@@ -94,7 +94,7 @@ class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
         val mutable = when {
             accept(Var) -> true
             accept(Val) -> false
-            else -> unexpected()
+            else -> expected("variable declaration")
         }
         val identifier = expect(Id).text
         val type = if (accept(Colon)) type() else null
@@ -281,7 +281,7 @@ class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
             at(Number) -> NumberLiteral(currentPosition, pop().text)
             at(Id) -> IdentifierExpression(currentPosition, pop().text)
             at(This) -> ThisExpression(pop().position)
-            else -> unexpected()
+            else -> expected("atomic expression")
         }
     }
 
@@ -312,6 +312,6 @@ class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
 
             TypeAnnotation.Array(pos, innerType, size)
         }
-        else -> unexpected()
+        else -> expected("type")
     }
 }
