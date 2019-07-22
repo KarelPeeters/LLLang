@@ -31,6 +31,7 @@ import language.ir.Call as IrCall
 import language.ir.Function as IrFunction
 import language.ir.Program as IrProgram
 import language.ir.UnaryOp as IrUnaryOp
+import language.ir.UnaryOpType as IrUnaryOpType
 
 interface LValue : RValue {
     val pointer: Value
@@ -320,8 +321,14 @@ class Flattener {
             afterRight to RValue(result)
         }
         is UnaryOp -> {
+            val type = when (exp.type) {
+                UnaryOpType.Not -> IrUnaryOpType.Not
+                UnaryOpType.Minus -> IrUnaryOpType.Neg
+                else -> TODO("unary type ${exp.type}")
+            }
+
             val (afterValue, value) = appendLoadedExpression(scope, exp.value)
-            val result = IrUnaryOp(null, exp.type, value)
+            val result = IrUnaryOp(null, type, value)
             afterValue.append(result)
             afterValue to RValue(result)
         }

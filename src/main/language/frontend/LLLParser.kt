@@ -5,7 +5,6 @@ import language.frontend.LLLTokenType.Number
 import language.frontend.LLLTokenType.Struct
 import language.ir.ArithmeticOpType
 import language.ir.ComparisonOpType
-import language.ir.UnaryOpType
 import language.parsing.Parser
 import language.parsing.SourcePosition
 import java.util.*
@@ -246,8 +245,8 @@ class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
             val type = when {
                 accept(Inc) -> TODO()
                 accept(Dec) -> TODO()
-                accept(Plus) -> TODO()
-                accept(Minus) -> UnaryOpType.Neg
+                accept(Plus) -> UnaryOpType.Plus
+                accept(Minus) -> UnaryOpType.Minus
                 accept(Bang) -> UnaryOpType.Not
                 accept(Tilde) -> UnaryOpType.Not
                 else -> break@loop

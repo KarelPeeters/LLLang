@@ -79,5 +79,5 @@ class LLLTokenizer(source: String) : Tokenizer<LLLTokenType>(source) {
     }
 }
 
-private val ID_START_CHARS = (('a'..'z') + ('A'..'Z') + '_' + '-').toSet()
-private val ID_CHARS = ID_START_CHARS + ('0'..'9')
+private val ID_START_CHARS = (('a'..'z') + ('A'..'Z') + '_').toSet()
+private val ID_CHARS = ID_START_CHARS + ('0'..'9') + '-'
