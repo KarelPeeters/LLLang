@@ -17,7 +17,7 @@ object AllocToPhi : FunctionPass() {
     override fun OptimizerContext.optimize(function: Function) {
         val variables = function.blocks
                 .flatMap { it.instructions.filterIsInstance<Alloc>() }
-                .filter { variable -> variable.users.all { it is Store || it is Load } }
+                .filter { variable -> variable.users.all { (it is Store && it.value != variable) || it is Load } }
         if (variables.isEmpty()) return
 
         val dom = domInfo(function)

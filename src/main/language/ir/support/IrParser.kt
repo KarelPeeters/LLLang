@@ -201,7 +201,8 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
             val value = typedValue()
             Store(target, value)
         }
-        else -> valueInstr()
+        at(Id) -> valueInstr()
+        else -> expected("instruction")
     }
 
     private fun valueInstr(): BasicInstruction {

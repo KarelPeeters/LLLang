@@ -9,7 +9,8 @@ import org.apache.commons.io.IOUtils
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.fail
 
-fun testBeforeAfter(name: String, vararg passes: OptimizerPass) = testBeforeAfter(name, passes.asList())
+fun testBeforeAfter(name: String, pass: OptimizerPass, vararg passes: OptimizerPass) =
+        testBeforeAfter(name, listOf(pass) + passes)
 
 fun testBeforeAfter(name: String, passes: List<OptimizerPass>) {
     val (before, after) = readFile(name)
