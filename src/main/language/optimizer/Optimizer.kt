@@ -3,16 +3,6 @@ package language.optimizer
 import language.ir.Function
 import language.ir.Program
 import language.ir.support.Verifier
-import language.optimizer.passes.AllocToPhi
-import language.optimizer.passes.ConstantFolding
-import language.optimizer.passes.DeadBlockElimination
-import language.optimizer.passes.DeadFunctionElimination
-import language.optimizer.passes.DeadInstructionElimination
-import language.optimizer.passes.DeadSignatureElimination
-import language.optimizer.passes.FunctionInlining
-import language.optimizer.passes.SCCP
-import language.optimizer.passes.SimplifyBlocks
-import language.optimizer.passes.SplitAggregate
 
 sealed class OptimizerPass {
     abstract fun OptimizerContext.runOnProgram(program: Program, afterPass: (subject: Any?) -> Unit)
@@ -55,24 +45,8 @@ private class OptimizerContextImpl : OptimizerContext {
     override fun domInfo(function: Function) = DominatorInfo(function)
 }
 
-val DEFAULT_PASSES = listOf(
-        //program passes
-        DeadFunctionElimination,
-        DeadSignatureElimination,
-        FunctionInlining,
-
-        //function passes
-        SplitAggregate,
-        AllocToPhi,
-        ConstantFolding,
-        SCCP,
-        DeadInstructionElimination,
-        SimplifyBlocks,
-        DeadBlockElimination
-)
-
 class Optimizer(
-        private val passes: Iterable<OptimizerPass> = DEFAULT_PASSES,
+        private val passes: Iterable<OptimizerPass>,
         private val repeat: Boolean = true,
         private val doVerify: Boolean
 ) {
@@ -117,8 +91,8 @@ class Optimizer(
  * otherwise identical programs, this is a woraround until full program cloning is possible.
  * Returns `null` if this optimisation doesn't crash at all.
  */
-fun findMinimalErrorPasses(program: () -> Program): List<OptimizerPass>? {
-    val optimizer = Optimizer(doVerify = true)
+fun findMinimalErrorPasses(initalPasses: Iterable<OptimizerPass>, program: () -> Program): List<OptimizerPass>? {
+    val optimizer = Optimizer(initalPasses, doVerify = true)
 
     try {
         optimizer.optimize(program())
