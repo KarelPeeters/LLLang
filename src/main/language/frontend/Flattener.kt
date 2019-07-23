@@ -2,14 +2,17 @@ package language.frontend
 
 import language.ir.AggregateValue
 import language.ir.Alloc
+import language.ir.ArithmeticOpType
 import language.ir.ArrayType
 import language.ir.BasicBlock
+import language.ir.BinaryOpType
 import language.ir.Blur
 import language.ir.Branch
 import language.ir.Constant
 import language.ir.Eat
 import language.ir.FunctionType
 import language.ir.GetSubPointer
+import language.ir.IntegerType
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
 import language.ir.Jump
@@ -321,16 +324,22 @@ class Flattener {
             afterRight to RValue(result)
         }
         is UnaryOp -> {
-            val type = when (exp.type) {
-                UnaryOpType.Not -> IrUnaryOpType.Not
-                UnaryOpType.Minus -> IrUnaryOpType.Neg
-                else -> TODO("unary type ${exp.type}")
-            }
+            when (exp.type) {
+                UnaryOpType.Not -> appendBasicUnaryExpression(scope, exp, IrUnaryOpType.Not)
+                UnaryOpType.Minus -> appendBasicUnaryExpression(scope, exp, IrUnaryOpType.Neg)
 
-            val (afterValue, value) = appendLoadedExpression(scope, exp.value)
-            val result = IrUnaryOp(null, type, value)
-            afterValue.append(result)
-            afterValue to RValue(result)
+                UnaryOpType.PreInc -> appendIncDecExpression(scope, exp, ArithmeticOpType.Add, pre = true)
+                UnaryOpType.PostInc -> appendIncDecExpression(scope, exp, ArithmeticOpType.Add, pre = false)
+                UnaryOpType.PreDec -> appendIncDecExpression(scope, exp, ArithmeticOpType.Sub, pre = true)
+                UnaryOpType.PostDec -> appendIncDecExpression(scope, exp, ArithmeticOpType.Sub, pre = false)
+
+                UnaryOpType.Plus -> {
+                    val (after, value) = appendLoadedExpression(scope, exp.value)
+                    if (value.type !is IntegerType)
+                        throw ExpectedIntegerTypeException(exp.value.position, value.type)
+                    after to RValue(value)
+                }
+            }
         }
         is Call -> appendCallExpression(scope, exp)
         is DotIndex -> {
@@ -365,6 +374,29 @@ class Flattener {
 
             afterIndex to LValue(result)
         }
+    }
+
+    private fun BasicBlock.appendBasicUnaryExpression(scope: Scope, exp: UnaryOp, type: language.ir.UnaryOpType): Pair<BasicBlock, RValue> {
+        val (afterValue, value) = appendLoadedExpression(scope, exp.value)
+        val result = IrUnaryOp(null, type, value)
+        afterValue.append(result)
+        return afterValue to RValue(result)
+    }
+
+    private fun BasicBlock.appendIncDecExpression(scope: Scope, exp: UnaryOp, type: BinaryOpType, pre: Boolean): Pair<BasicBlock, RValue> {
+        val (afterValue, target) = appendPointerExpression(scope, exp.value)
+        if (scope.isImmutableVal(target))
+            throw VariableImmutableException(exp.position, (exp.value as IdentifierExpression).identifier)
+
+        val old = Load(null, target)
+        val new = IrBinaryOp(null, type, old, Constant(old.type, 1))
+
+        afterValue.append(old)
+        afterValue.append(new)
+        afterValue.append(Store(target, new))
+
+        val result = if (pre) new else old
+        return afterValue to RValue(result)
     }
 
     private fun BasicBlock.appendCallExpression(scope: Scope, exp: Call): Pair<BasicBlock, RValue> {
@@ -524,6 +556,9 @@ class MissingReturnStatement(function: Function)
 
 class TypeMismatchException(pos: SourcePosition, expected: Type, actual: Type)
     : Exception("Expected type was $expected, actual $actual at $pos")
+
+class ExpectedIntegerTypeException(pos: SourcePosition, actual: Type)
+    : Exception("Expected an integer type, got $actual at $pos")
 
 class ArgMismatchException : Exception {
     constructor(pos: SourcePosition, expected: List<Type>, actual: List<Type>) :

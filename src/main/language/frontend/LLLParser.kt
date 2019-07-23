@@ -4,10 +4,10 @@ import language.frontend.LLLTokenType.*
 import language.frontend.LLLTokenType.Number
 import language.frontend.LLLTokenType.Struct
 import language.ir.ArithmeticOpType
+import language.ir.BinaryOpType
 import language.ir.ComparisonOpType
 import language.parsing.Parser
 import language.parsing.SourcePosition
-import java.util.*
 import language.frontend.Struct as ASTStruct
 
 class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
@@ -133,155 +133,65 @@ class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
 
     private inline fun <E> list(end: LLLTokenType, element: () -> E) = list(end, Comma, element)
 
-    private fun expression() = assignment()
+    private fun expression(): Expression = precedenceClimb(-1)
 
-    private fun assignment(): Expression {
-        val expressions = mutableListOf<Expression>()
-        val assignPositions = mutableListOf<SourcePosition>()
+    private fun precedenceClimb(lowerLevel: Int): Expression {
+        var curr = unary()
+
+        while (true) {
+            val info = operatorInfo[next.type]
+            if (info == null || info.level < lowerLevel) break
+
+            val pos = pop().position
+
+            val level = if (info.bindLeft) info.level + 1 else info.level
+            val next = precedenceClimb(level)
+
+            curr = info.build(pos, curr, next)
+        }
+
+        return curr
+    }
+
+    private fun unary(): Expression {
+        val preList = mutableListOf<Pair<SourcePosition, UnaryOpType>>()
         loop@ while (true) {
-            expressions += disjunction()
-            val assignPos = currentPosition
-            if (accept(Assign)) assignPositions += assignPos
-            else break@loop
-        }
-
-        return expressions.reduceRightIndexed { i, target, value ->
-            Assignment(assignPositions[i], target, value)
-        }
-    }
-
-    private fun disjunction(): Expression {
-        var left = conjunction()
-        while (true) {
-            val pos = currentPosition
-            if (!accept(DoublePipe) && !accept(Pipe))
-                return left
-            left = BinaryOp(pos, ArithmeticOpType.Or, left, conjunction())
-        }
-
-    }
-
-    private fun conjunction(): Expression {
-        var left = equality()
-        val pos = currentPosition
-        while (true) {
-            if (!accept(DoubleAmper) && !accept(Amper))
-                return left
-            left = BinaryOp(pos, ArithmeticOpType.And, left, equality())
-        }
-    }
-
-    private fun equality(): Expression {
-        var left = comparison()
-        while (true) {
-            val pos = currentPosition
-            val type = when {
-                accept(EQ) -> ComparisonOpType.EQ
-                accept(NEQ) -> ComparisonOpType.NEQ
-                else -> return left
-            }
-            left = BinaryOp(pos, type, left, comparison())
-        }
-    }
-
-    private fun comparison(): Expression {
-        var left = addition()
-        while (true) {
-            val pos = currentPosition
-            val type = when {
-                accept(LT) -> ComparisonOpType.LT
-                accept(GT) -> ComparisonOpType.GT
-                accept(LTE) -> ComparisonOpType.LTE
-                accept(GTE) -> ComparisonOpType.GTE
-                else -> return left
-            }
-            left = BinaryOp(pos, type, left, addition())
-        }
-    }
-
-    private fun addition(): Expression {
-        var left = multiplication()
-        while (true) {
-            val pos = currentPosition
-            val type = when {
-                accept(Plus) -> ArithmeticOpType.Add
-                accept(Minus) -> ArithmeticOpType.Sub
-                else -> return left
-            }
-            left = BinaryOp(pos, type, left, multiplication())
-        }
-    }
-
-    private fun multiplication(): Expression {
-        var left = power()
-        while (true) {
-            val pos = currentPosition
-            val type = when {
-                accept(Times) -> ArithmeticOpType.Mul
-                accept(Divide) -> ArithmeticOpType.Div
-                accept(Percent) -> ArithmeticOpType.Mod
-                else -> return left
-            }
-            left = BinaryOp(pos, type, left, power())
-        }
-    }
-
-    private fun power(): Expression {
-        /*var left = prefix()
-        while (true) {
-            val pos = currentPosition
-            if (accept(Power))
-                left = BinaryOp(pos, BinaryOpType.Power, left, prefix())
-            else
-                return left
-        }*/
-        return prefix()
-    }
-
-    private fun prefix(): Expression {
-        val ops = ArrayDeque<Pair<UnaryOpType, SourcePosition>>()
-        loop@ while (true) {
-            val pos = currentPosition
-            val type = when {
-                accept(Inc) -> TODO()
-                accept(Dec) -> TODO()
-                accept(Plus) -> UnaryOpType.Plus
-                accept(Minus) -> UnaryOpType.Minus
+            preList += currentPosition to when {
                 accept(Bang) -> UnaryOpType.Not
-                accept(Tilde) -> UnaryOpType.Not
+                accept(Minus) -> UnaryOpType.Minus
+                accept(Plus) -> UnaryOpType.Plus
+                accept(Inc) -> UnaryOpType.PreInc
+                accept(Dec) -> UnaryOpType.PreDec
                 else -> break@loop
             }
-            ops.push(type to pos)
         }
-        return ops.fold(suffix()) { acc, (type, pos) -> UnaryOp(pos, type, acc) }
-    }
 
-    private fun suffix(): Expression {
-        var expr = atomic()
-        while (true) {
+        var curr = atomic()
+
+        loop@ while (true) {
             val pos = currentPosition
-            expr = when {
-                accept(Inc) -> TODO()
-                accept(Dec) -> TODO()
-                accept(OpenB) -> Call(pos, expr, expressionList(CloseB))
-                accept(OpenS) -> ArrayIndex(pos, expr, expression()).also { expect(CloseS) }
-                accept(Dot) -> DotIndex(currentPosition, expr, expect(Id).text)
-                else -> return expr
+            curr = when {
+                accept(Inc) -> UnaryOp(pos, UnaryOpType.PostInc, curr)
+                accept(Dec) -> UnaryOp(pos, UnaryOpType.PostDec, curr)
+                accept(OpenB) -> Call(pos, curr, expressionList(CloseB))
+                accept(OpenS) -> ArrayIndex(pos, curr, expression()).also { expect(CloseS) }
+                accept(Dot) -> DotIndex(currentPosition, curr, expect(Id).text)
+                else -> break@loop
             }
         }
+
+        return preList.foldRight(curr) { (p, t), a -> UnaryOp(p, t, a) }
     }
 
-    private fun atomic(): Expression {
-        return when {
-            accept(OpenB) -> expression().also { expect(CloseB) }
-            at(OpenC) -> arrayInitializer()
-            at(True) -> BooleanLiteral(pop().position, true)
-            at(False) -> BooleanLiteral(pop().position, false)
-            at(Number) -> NumberLiteral(currentPosition, pop().text)
-            at(Id) -> IdentifierExpression(currentPosition, pop().text)
-            at(This) -> ThisExpression(pop().position)
-            else -> expected("atomic expression")
-        }
+    private fun atomic(): Expression = when {
+        accept(OpenB) -> expression().also { expect(CloseB) }
+        at(OpenC) -> arrayInitializer()
+        at(True) -> BooleanLiteral(pop().position, true)
+        at(False) -> BooleanLiteral(pop().position, false)
+        at(Number) -> NumberLiteral(currentPosition, pop().text)
+        at(Id) -> IdentifierExpression(currentPosition, pop().text)
+        at(This) -> ThisExpression(pop().position)
+        else -> expected("atomic expression")
     }
 
     private fun arrayInitializer(): Expression {
@@ -314,3 +224,37 @@ class LLLParser(tokenizer: LLLTokenizer) : Parser<LLLTokenType>(tokenizer) {
         else -> expected("type")
     }
 }
+
+data class BinaryOpInfo(
+        val level: Int,
+        val bindLeft: Boolean,
+        val build: (SourcePosition, Expression, Expression) -> Expression
+) {
+    constructor(level: Int, bindLeft: Boolean, type: BinaryOpType) :
+            this(level, bindLeft, { p, l, r -> BinaryOp(p, type, l, r) })
+}
+
+val operatorInfo = mapOf(
+        Assign to BinaryOpInfo(0, false, ::Assignment),
+
+        Pipe to BinaryOpInfo(1, true, ArithmeticOpType.Or),
+        DoublePipe to BinaryOpInfo(1, true, ArithmeticOpType.Or),
+
+        Amper to BinaryOpInfo(2, true, ArithmeticOpType.And),
+        DoubleAmper to BinaryOpInfo(2, true, ArithmeticOpType.And),
+
+        EQ to BinaryOpInfo(3, true, ComparisonOpType.EQ),
+        NEQ to BinaryOpInfo(3, true, ComparisonOpType.NEQ),
+
+        LT to BinaryOpInfo(4, true, ComparisonOpType.LT),
+        GT to BinaryOpInfo(4, true, ComparisonOpType.GT),
+        LTE to BinaryOpInfo(4, true, ComparisonOpType.LTE),
+        GTE to BinaryOpInfo(4, true, ComparisonOpType.GTE),
+
+        Plus to BinaryOpInfo(5, true, ArithmeticOpType.Add),
+        Minus to BinaryOpInfo(5, true, ArithmeticOpType.Sub),
+
+        Times to BinaryOpInfo(6, true, ArithmeticOpType.Mul),
+        Divide to BinaryOpInfo(6, true, ArithmeticOpType.Div),
+        Percent to BinaryOpInfo(6, true, ArithmeticOpType.Mod)
+)
