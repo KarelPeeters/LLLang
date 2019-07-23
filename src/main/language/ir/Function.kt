@@ -33,7 +33,12 @@ class Function private constructor(
         newFunc.entry = this.entry
         newFunc._program = this._program
 
-        this.delete()
+        for (param in this.parameters) {
+            if (param !in parameters)
+                param.delete()
+        }
+        this.delete(deleteParameters = false)
+
         return newFunc
     }
 
@@ -70,12 +75,15 @@ class Function private constructor(
         delete()
     }
 
-    override fun delete() {
-        for (param in parameters) {
-            param.delete()
+    fun delete(deleteParameters: Boolean) {
+        if (deleteParameters) {
+            for (param in parameters)
+                param.delete()
         }
         super.delete()
     }
+
+    override fun delete() = delete(true)
 
     fun entryAllocs() = entry.instructions.filterIsInstance<Alloc>()
 
