@@ -88,87 +88,99 @@ class Generator private constructor() {
 
         //store into phi registers
         for (phi in block.successors().flatMap { it.phis() }) {
-            append(VInstruction.Put(phi.asV(), phi.sources.getValue(block).asV()))
+            val source = phi.sources.getValue(block).asV() ?: continue
+            append(VInstruction.Put(phi.asV(), source))
         }
 
         appendTerminator(block.terminator, nextBlock)
     }
 
-    private fun appendBasicInstruction(instr: BasicInstruction): Unit = when (instr) {
-        is Alloc -> TODO("alloc, keep track of original sp at start of function if dynamic")
-        is Store -> {
-            append(VInstruction.Store(AddressCalc(instr.pointer.asV()), instr.value.asV()))
-        }
-        is Load -> {
-            append(VInstruction.Load(AddressCalc(instr.pointer.asV()), instr.asV()))
-        }
-        is BinaryOp -> {
-            append(VInstruction.Binary(instr.opType, instr.asV(), instr.left.asV(), instr.right.asV()))
-        }
-        is UnaryOp -> {
-            append(VInstruction.Unary(instr.opType, instr.asV(), instr.value.asV()))
-        }
-        is Phi -> Unit //do nothing, this is handled at the block level
-        is Eat -> Unit //do nothing
-        is Blur -> {
-            //TODO avoid register allocation for blur altogether instead?
-            append(VInstruction.Put(instr.asV(), instr.value.asV()))
-        }
-        is Call -> {
-            if (instr.arguments.isNotEmpty()) TODO("arguments")
-            if (instr.type != UnitType) TODO("return value")
+    private fun appendBasicInstruction(instr: BasicInstruction) {
+        when (instr) {
+            is Alloc -> TODO("alloc, keep track of original sp at start of function if dynamic")
+            is Store -> {
+                val address = instr.pointer.asV() ?: return
+                val value = instr.value.asV() ?: return
+                append(VInstruction.Store(AddressCalc(address), value))
+            }
+            is Load -> {
+                val address = instr.pointer.asV() ?: return
+                append(VInstruction.Load(AddressCalc(address), instr.asV()))
+            }
+            is BinaryOp -> {
+                val left = instr.left.asV() ?: return
+                val right = instr.right.asV() ?: return
+                append(VInstruction.Binary(instr.opType, instr.asV(), left, right))
+            }
+            is UnaryOp -> {
+                val value = instr.value.asV() ?: return
+                append(VInstruction.Unary(instr.opType, instr.asV(), value))
+            }
+            is Phi -> Unit //do nothing, this is handled at the block level
+            is Eat -> Unit //do nothing
+            is Blur -> {
+                //TODO avoid register allocation for blur altogether instead?
+                val value = instr.value.asV() ?: return
+                append(VInstruction.Put(instr.asV(), value))
+            }
+            is Call -> {
+                if (instr.arguments.isNotEmpty()) TODO("arguments")
+                if (instr.type != UnitType) TODO("return value")
 
-            //TODO optimize this as part of real register allocation
-            //push currently used registers to stack
-            val regs = registerAlloc.values.toList()
-            for (reg in regs)
-                append(VInstruction.Push(reg))
+                //TODO optimize this as part of real register allocation
+                //push currently used registers to stack
+                val regs = registerAlloc.values.toList()
+                for (reg in regs)
+                    append(VInstruction.Push(reg))
 
-            //return to the Jump instruction which then runs the instruction after that
-            append(VInstruction.Push(Const(nextAdress() + 1)))
-            appendJump(instr.target, null)
+                //return to the Jump instruction which then runs the instruction after that
+                append(VInstruction.Push(Const(nextAdress() + 1)))
+                appendJump(instr.target, null)
 
-            //pop registers again in reversed order
-            for (reg in regs.asReversed())
-                append(VInstruction.Pop(reg))
+                //pop registers again in reversed order
+                for (reg in regs.asReversed())
+                    append(VInstruction.Pop(reg))
+            }
+            is GetSubValue.Struct -> TODO()
+            is GetSubValue.Array -> TODO()
+            is GetSubPointer.Array -> TODO()
+            is GetSubPointer.Struct -> TODO()
+            is AggregateValue -> TODO()
         }
-        is GetSubValue.Struct -> TODO()
-        is GetSubValue.Array -> TODO()
-        is GetSubPointer.Array -> TODO()
-        is GetSubPointer.Struct -> TODO()
-        is AggregateValue -> TODO()
     }
 
-    private fun appendTerminator(term: Terminator, nextBlock: BasicBlock?): Unit = when (term) {
-        is Branch -> {
-            when (val cond = term.value.asV()) {
+    private fun appendTerminator(term: Terminator, nextBlock: BasicBlock?) {
+        when (term) {
+            is Branch -> when (val cond = term.value.asV()) {
                 //const condition not allowed
                 is Const -> {
                     val target = if (cond.value == 0) term.ifFalse else term.ifTrue
                     appendJump(target, nextBlock)
                 }
                 is Reg -> {
-                    append(VInstruction.Jump(term.ifTrue.asV(), cond))
+                    val target = term.ifTrue.asV() ?: return
+                    append(VInstruction.Jump(target, cond))
                     appendJump(term.ifFalse, nextBlock)
                 }
+                null -> Unit
             }
-        }
-        is Jump -> {
-            appendJump(term.target, nextBlock)
-        }
-        is Exit -> {
-            append(VInstruction.Exit)
-        }
-        is Return -> {
-            if (term.value.type != UnitType) TODO("return value")
+            is Jump -> {
+                appendJump(term.target, nextBlock)
+            }
+            is Exit -> {
+                append(VInstruction.Exit)
+            }
+            is Return -> {
+                if (term.value.type != UnitType) TODO("return value")
 
-            append(VInstruction.Pop(Reg.PC))
+                append(VInstruction.Pop(Reg.PC))
+            }
         }
     }
 
     private fun appendJump(target: Value, nextBlock: BasicBlock?) {
         if (target != nextBlock)
-            append(VInstruction.Jump(target.asV(), null))
+            append(VInstruction.Jump(target.asV() ?: return, null))
     }
 
     private fun append(instr: VInstruction) {
@@ -176,11 +188,12 @@ class Generator private constructor() {
     }
 
     private fun Instruction.asV(): Reg = converter(this)
+    /** Returns the [Value] as a [ConstOrReg], `null` represents an [UndefinedValue]. */
     private fun Value.asV() = converter(this)
 
     private val converter = VConverter()
 
-    private inner class VConverter : ValueVisitor<ConstOrReg> {
+    private inner class VConverter : ValueVisitor<ConstOrReg?> {
         override fun invoke(value: Function) = funcAddresses.getValue(value)
         override fun invoke(value: BasicBlock) = blockAddresses.getValue(value)
 
@@ -188,7 +201,7 @@ class Generator private constructor() {
         override fun invoke(value: ParameterValue) = TODO("parameters")
 
         override fun invoke(value: Constant): Const = Const(value.value)
-        override fun invoke(value: UndefinedValue) = TODO("undefined")
+        override fun invoke(value: UndefinedValue): Nothing? = null
         override fun invoke(value: UnitValue) = error("use of UnitValue")
     }
 }
