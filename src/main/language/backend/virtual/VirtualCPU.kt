@@ -104,6 +104,8 @@ class VirtualCPU(val numRegs: Int) {
             is Reg -> this.get()
         }
     }
+
+    private fun AddressCalc.get(): Int = base.get() + size.get() * index.get()
 }
 
 /**
@@ -176,11 +178,23 @@ sealed class ConstOrReg {
     }
 
     class Const(var value: Int) : ConstOrReg() {
-        override fun toString() = "Const($value)"
+        override fun toString() = "$value"
     }
 }
 
 class IllegalRegException(msg: String) : Exception(msg)
+
+class AddressCalc(val base: ConstOrReg, val size: Const, val index: ConstOrReg) {
+    constructor(base: ConstOrReg) : this(base, Const(0), Const(0))
+
+    override fun toString(): String {
+        return when {
+            size == Const(0) || index == Const(0) -> "$base"
+            size == Const(1) -> "$base + $index"
+            else -> "$base + $size * $index"
+        }
+    }
+}
 
 sealed class VInstruction {
     //basic
@@ -206,12 +220,12 @@ sealed class VInstruction {
     }
 
     //memory
-    class Load(val address: ConstOrReg, val target: Reg) : VInstruction() {
-        override fun toString() = "load $address, $target"
+    class Load(val address: AddressCalc, val target: Reg) : VInstruction() {
+        override fun toString() = "load [$address] -> $target"
     }
 
-    class Store(val address: ConstOrReg, val value: ConstOrReg) : VInstruction() {
-        override fun toString() = "store $address $value"
+    class Store(val address: AddressCalc, val value: ConstOrReg) : VInstruction() {
+        override fun toString() = "store [$address] <- $value"
     }
 
     //control flow
