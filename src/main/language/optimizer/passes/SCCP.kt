@@ -25,7 +25,9 @@ import language.ir.Terminator
 import language.ir.Type
 import language.ir.UnaryOp
 import language.ir.UndefinedValue
+import language.ir.UnitValue
 import language.ir.Value
+import language.ir.visitors.ValueVisitor
 import language.optimizer.FunctionPass
 import language.optimizer.OptimizerContext
 import language.optimizer.ProgramPass
@@ -48,25 +50,21 @@ object ProgramSCCP : ProgramPass() {
     }
 }
 
-private class SCCPImpl {
+private class SCCPImpl private constructor(val multiFunc: Boolean) {
     /** Keys can be [Instruction] or [ParameterValue] */
-    val lattice = mutableMapOf<Value, LatticeState>()
-    val returnLattice = mutableMapOf<Function, LatticeState>()
+    val latticeMap = mutableMapOf<Value, LatticeState>()
+    val returnLatticeMap = mutableMapOf<Function, LatticeState>()
 
     val executableEdges = mutableSetOf<FlowEdge>()
     val executableBlocks = mutableSetOf<BasicBlock>()
 
     val queue: Queue<Any> = ArrayDeque()
 
-    val multiFunc: Boolean
-
-    constructor(program: Program) {
-        multiFunc = true
+    constructor(program: Program) : this(multiFunc = true) {
         updateExecutableFunction(program.entry)
     }
 
-    constructor(function: Function) {
-        multiFunc = false
+    constructor(function: Function) : this(multiFunc = false) {
         updateExecutableFunction(function)
     }
 
@@ -75,7 +73,7 @@ private class SCCPImpl {
         replaceValues()
 
         if (!multiFunc)
-            check(returnLattice.isEmpty())
+            check(returnLatticeMap.isEmpty())
     }
 
     private fun computeLattice() {
@@ -89,12 +87,12 @@ private class SCCPImpl {
     }
 
     private fun replaceValues() {
-        for ((value, state) in lattice) {
+        for ((value, state) in latticeMap) {
             val replacement = state.asValue(value.type) ?: continue
             value.replaceWith(replacement)
         }
 
-        for ((func, state) in returnLattice) {
+        for ((func, state) in returnLatticeMap) {
             val replacement = state.asValue(func.returnType) ?: continue
 
             for (user in func.users) {
@@ -104,16 +102,24 @@ private class SCCPImpl {
         }
     }
 
-    private fun lattice(value: Value) = when (value) {
-        is Constant -> Known(value)
-        is Call -> {
-            val target = value.target
-            if (multiFunc && target is Function) returnLattice.getValue(target) else Variable
+    private val lattice = object : ValueVisitor<LatticeState> {
+        override fun invoke(value: Function) = Variable
+        override fun invoke(value: BasicBlock) = Variable
+        override fun invoke(value: Instruction) = when (value) {
+            is Call -> {
+                val target = value.target
+                if (multiFunc && target is Function)
+                    returnLatticeMap.getValue(target)
+                else
+                    Variable
+            }
+            else -> latticeMap.getValue(value)
         }
-        is Instruction -> lattice.getValue(value)
-        is ParameterValue -> lattice[value] ?: Unknown
-        is UndefinedValue -> Unknown
-        else -> Variable
+
+        override fun invoke(value: ParameterValue) = latticeMap[value] ?: Unknown
+        override fun invoke(value: Constant) = Known(value)
+        override fun invoke(value: UndefinedValue) = Unknown
+        override fun invoke(value: UnitValue) = Variable
     }
 
     fun updateExecutableEdge(from: BasicBlock, to: BasicBlock) {
@@ -128,7 +134,7 @@ private class SCCPImpl {
     private fun updateExecutableFunction(function: Function) {
         if (executableBlocks.add(function.entry)) {
             if (multiFunc)
-                check(returnLattice.put(function, Unknown) == null)
+                check(returnLatticeMap.put(function, Unknown) == null)
 
             queue += function.entry
         }
@@ -139,7 +145,7 @@ private class SCCPImpl {
     }
 
     private fun updateLattice(value: Value, state: LatticeState) {
-        val prev = lattice.put(value, state)
+        val prev = latticeMap.put(value, state)
         check(prev == null || prev >= state)
 
         if (prev != state) {
@@ -186,10 +192,10 @@ private class SCCPImpl {
         if (multiFunc) {
             val func = instr.block.function
 
-            val prev = returnLattice.getValue(func)
+            val prev = returnLatticeMap.getValue(func)
             val next = merge(prev, lattice(instr.value))
 
-            if (returnLattice.put(func, next) != next) {
+            if (returnLatticeMap.put(func, next) != next) {
                 //queue users of call instructions with this function as the target
                 for (user in func.users) {
                     if (user is Call && user.target == func)

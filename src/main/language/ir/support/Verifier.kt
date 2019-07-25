@@ -11,6 +11,7 @@ import language.ir.Return
 import language.ir.UndefinedValue
 import language.ir.UnitValue
 import language.ir.Value
+import language.ir.visitors.ValueVisitor
 import language.optimizer.DominatorInfo
 
 object Verifier {
@@ -80,16 +81,20 @@ private fun verifyOperandDominance(program: Program) {
     for (func in program.functions) {
         val domInfo = DominatorInfo(func)
 
-        fun checkDominance(instr: Instruction, op: Value) {
-            val dominated = when (op) {
-                is Instruction -> domInfo.isStrictlyDominatedBy(instr, op)
-                is Function -> op in program.functions
-                is BasicBlock -> op in func.blocks
-                is ParameterValue -> op in func.parameters
-                is Constant, is UnitValue, is UndefinedValue -> true
-                else -> error("Unknown optype ${op::class.java}")
-            }
+        val domChecker = object : ValueVisitor<Boolean?> {
+            override fun invoke(value: Function) = value in program.functions
+            override fun invoke(value: BasicBlock) = value in func.blocks
 
+            override fun invoke(value: Instruction): Boolean? = null
+            override fun invoke(value: ParameterValue) = value in func.parameters
+
+            override fun invoke(value: Constant) = true
+            override fun invoke(value: UndefinedValue) = true
+            override fun invoke(value: UnitValue) = true
+        }
+
+        fun checkDominance(instr: Instruction, op: Value) {
+            val dominated = domChecker(op) ?: domInfo.isStrictlyDominatedBy(instr, op as Instruction)
             check(dominated) { "value $op doesn't dominate user $instr" }
         }
 

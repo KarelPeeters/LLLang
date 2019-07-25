@@ -3,19 +3,28 @@ package language.ir.support
 import language.ir.BasicBlock
 import language.ir.Constant
 import language.ir.Function
+import language.ir.Instruction
+import language.ir.ParameterValue
 import language.ir.Program
 import language.ir.UndefinedValue
 import language.ir.UnitValue
 import language.ir.Value
+import language.ir.visitors.ValueVisitor
 import language.util.Graph
 import language.util.reached
 
 fun programEquals(lProg: Program, rProg: Program): Boolean {
     val mappping = buildValueMapping(lProg, rProg) ?: return false
 
-    fun map(value: Value): Value = when (value) {
-        is Constant, is UnitValue, is UndefinedValue -> value
-        else -> mappping.getValue(value)
+    val map = object : ValueVisitor<Value> {
+        override fun invoke(value: Function) = mappping.getValue(value)
+        override fun invoke(value: BasicBlock) = mappping.getValue(value)
+        override fun invoke(value: Instruction) = mappping.getValue(value)
+        override fun invoke(value: ParameterValue) = mappping.getValue(value)
+
+        override fun invoke(value: Constant) = value
+        override fun invoke(value: UndefinedValue) = value
+        override fun invoke(value: UnitValue) = value
     }
 
     if (map(lProg.entry) != rProg.entry) return false
@@ -26,7 +35,7 @@ fun programEquals(lProg: Program, rProg: Program): Boolean {
 
         for ((lBlock, rBlock) in lFunc.orderedBlocks() zip rFunc.orderedBlocks()) {
             for ((lInstr, rInstr) in lBlock.instructions zip rBlock.instructions) {
-                if (!lInstr.matches(rInstr, ::map)) return false
+                if (!lInstr.matches(rInstr, map::invoke)) return false
             }
         }
     }

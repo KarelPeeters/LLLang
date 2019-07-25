@@ -526,7 +526,7 @@ class Flattener {
     }
 }
 
-fun requireTypeMatch(pos: SourcePosition, expected: Type, actual: Type) {
+private fun requireTypeMatch(pos: SourcePosition, expected: Type, actual: Type) {
     if (expected != actual) throw TypeMismatchException(pos, expected, actual)
 }
 
