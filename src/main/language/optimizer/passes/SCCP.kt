@@ -52,8 +52,8 @@ object ProgramSCCP : ProgramPass() {
 
 private class SCCPImpl private constructor(val multiFunc: Boolean) {
     /** Keys can be [Instruction] or [ParameterValue] */
-    val latticeMap = mutableMapOf<Value, LatticeState>()
-    val returnLatticeMap = mutableMapOf<Function, LatticeState>()
+    val latticeMap = mutableMapOf<Value, LatticeState>().withDefault { Unknown }
+    val returnLatticeMap = mutableMapOf<Function, LatticeState>().withDefault { Unknown }
 
     val executableEdges = mutableSetOf<FlowEdge>()
     val executableBlocks = mutableSetOf<BasicBlock>()
@@ -132,12 +132,8 @@ private class SCCPImpl private constructor(val multiFunc: Boolean) {
     }
 
     private fun updateExecutableFunction(function: Function) {
-        if (executableBlocks.add(function.entry)) {
-            if (multiFunc)
-                check(returnLatticeMap.put(function, Unknown) == null)
-
+        if (executableBlocks.add(function.entry))
             queue += function.entry
-        }
     }
 
     private fun updateMerge(value: Value, state: LatticeState) {

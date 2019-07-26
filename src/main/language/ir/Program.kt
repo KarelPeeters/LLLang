@@ -22,7 +22,7 @@ class Program : User() {
 
         //code
         functions.forEach { prgmEnv.function(it) } //preset names to keep them ordered
-        return functions.joinToString("\n\n") { it.fullStr(prgmEnv.subEnv(it)) }
+        return functions.joinToString("\n") { it.fullStr(prgmEnv.subEnv(it)) }
     }
 }
 

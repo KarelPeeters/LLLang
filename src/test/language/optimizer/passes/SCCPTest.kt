@@ -39,4 +39,7 @@ class SCCPTest {
 
     @Test
     fun multiFuncLoop() = testBeforeAfter("sccp_multiFuncLoop.ir", ProgramSCCP)
+
+    @Test
+    fun sumLoop() = testBeforeAfter("sccp_sumLoop.ir", ProgramSCCP)
 }
