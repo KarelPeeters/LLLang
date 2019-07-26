@@ -31,6 +31,9 @@ import language.ir.UnitType
 import language.ir.UnitValue
 import language.ir.Value
 import language.ir.visitors.ValueVisitor
+import language.util.Graph
+import language.util.TraverseOrder.DepthFirst
+import language.util.reachable
 
 class Generator private constructor() {
     companion object {
@@ -50,11 +53,12 @@ class Generator private constructor() {
     private fun generateProgram(program: Program): VProgram {
         funcAddresses.putAll(program.functions.associateWith { Const(0) })
 
-        appendBasicInstruction(Call(null, program.entry, emptyList()))
-        append(VInstruction.Exit)
-
+        //put the entry function first, so no initial call is neccesary
+        //entry returns will be replaced by Exit instrucions
+        appendFunction(program.entry)
         for (function in program.functions) {
-            appendFunction(function)
+            if (!function.isEntryFunction())
+                appendFunction(function)
         }
 
         funcAddresses.clear()
@@ -68,10 +72,18 @@ class Generator private constructor() {
         if (function.parameters.isNotEmpty()) TODO("parameters")
         if (function.returnType != UnitType) TODO("return value")
 
-        appendJump(function.entry, function.blocks.first())
+        //order blocks so the ifFalse block is behind the jump as often as possible
+        //also puts the entry first, so no initial jump neccesary
+        val orderedBlocks = object : Graph<BasicBlock> {
+            override val roots = listOf(function.entry)
+            override fun children(node: BasicBlock) = when (val term = node.terminator) {
+                is Branch -> listOf(term.ifFalse, term.ifTrue)
+                else -> node.successors()
+            }
+        }.reachable(DepthFirst).toList()
 
-        for ((i, block) in function.blocks.withIndex()) {
-            appendBlock(block, function.blocks.getOrNull(i + 1))
+        for ((i, block) in orderedBlocks.withIndex()) {
+            appendBlock(block, orderedBlocks.getOrNull(i + 1))
         }
 
         blockAddresses.clear()
@@ -171,6 +183,11 @@ class Generator private constructor() {
                 append(VInstruction.Exit)
             }
             is Return -> {
+                if (term.function.isEntryFunction()) {
+                    append(VInstruction.Exit)
+                    return
+                }
+
                 if (term.value.type != UnitType) TODO("return value")
 
                 append(VInstruction.Pop(Reg.PC))

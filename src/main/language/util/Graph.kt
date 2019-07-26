@@ -1,25 +1,41 @@
 package language.util
 
+import language.util.TraverseOrder.BreadthFirst
+import language.util.TraverseOrder.Unordered
 import java.util.*
-import kotlin.collections.LinkedHashSet
 
 interface Graph<N> {
-    val roots: Collection<N>
-    fun children(node: N): Collection<N>
+    val roots: List<N>
+    fun children(node: N): List<N>
+}
+
+enum class TraverseOrder {
+    DepthFirst,
+    BreadthFirst,
+    Unordered,
 }
 
 /**
- * Find all reachable nodes. The returned set is ordered breadth-first.
+ * Find all reachable nodes. The returned set is ordered according to [order].
  */
-fun <N> Graph<N>.reached(): Set<N> {
-    val toVisit: Deque<N> = ArrayDeque()
+fun <N> Graph<N>.reachable(order: TraverseOrder = Unordered): Set<N> {
+    val toVisit = ArrayDeque<N>()
     toVisit.addAll(this.roots)
-    val reached = LinkedHashSet<N>()
 
-    while (toVisit.isNotEmpty()) {
-        val curr = toVisit.poll()
-        if (reached.add(curr))
-            toVisit.addAll(this.children(curr))
+    val reached: MutableSet<N> = when (order) {
+        Unordered -> hashSetOf()
+        else -> linkedSetOf()
+    }
+
+    while (true) {
+        val curr = toVisit.poll() ?: break
+
+        if (reached.add(curr)) {
+            when (order) {
+                BreadthFirst, Unordered -> toVisit.addAll(children(curr))
+                TraverseOrder.DepthFirst -> children(curr).asReversed().forEach(toVisit::addFirst)
+            }
+        }
     }
 
     return reached

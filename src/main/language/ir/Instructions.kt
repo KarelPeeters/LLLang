@@ -11,6 +11,8 @@ sealed class Instruction(val name: String?, type: Type, val pure: Boolean) : Val
         this._block = block
     }
 
+    val function get() = block.function
+
     abstract fun typeCheck()
 
     abstract fun clone(): Instruction
@@ -323,7 +325,7 @@ class AggregateValue(name: String?, type: AggregateType, values: List<Value>)
 }
 
 sealed class Terminator : Instruction(null, UnitType, false) {
-    abstract fun targets(): Set<BasicBlock>
+    abstract fun targets(): List<BasicBlock>
 
     abstract override fun clone(): Terminator
 }
@@ -339,7 +341,7 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
         check(value.type == bool) { "branch conditional must be a boolean" }
     }
 
-    override fun targets() = setOf(ifTrue, ifFalse)
+    override fun targets() = listOf(ifTrue, ifFalse)
     override fun fullStr(env: NameEnv) = "branch ${value.str(env)} ${ifTrue.str(env)} ${ifFalse.str(env)}"
 
     override fun matches(other: Instruction, map: (Value) -> Value) =
@@ -353,7 +355,7 @@ class Jump(target: BasicBlock?) : Terminator() {
 
     override fun typeCheck() {}
 
-    override fun targets() = setOf(target)
+    override fun targets() = listOf(target)
     override fun fullStr(env: NameEnv) = "jump ${target.str(env)}"
 
     override fun matches(other: Instruction, map: (Value) -> Value) =
@@ -365,7 +367,7 @@ class Exit : Terminator() {
 
     override fun typeCheck() {}
 
-    override fun targets() = emptySet<BasicBlock>()
+    override fun targets() = emptyList<BasicBlock>()
 
     override fun fullStr(env: NameEnv) = "exit"
 
@@ -380,7 +382,7 @@ class Return(value: Value) : Terminator() {
 
     override fun typeCheck() {}
 
-    override fun targets() = emptySet<BasicBlock>()
+    override fun targets() = emptyList<BasicBlock>()
     override fun fullStr(env: NameEnv) = "return ${value.str(env)}"
 
     override fun matches(other: Instruction, map: (Value) -> Value) =

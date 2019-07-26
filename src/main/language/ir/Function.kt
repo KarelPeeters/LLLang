@@ -85,6 +85,8 @@ class Function private constructor(
 
     override fun delete() = delete(true)
 
+    fun isEntryFunction() = program.entry == this
+
     fun entryAllocs() = entry.instructions.filterIsInstance<Alloc>()
 
     fun fullStr(env: NameEnv): String {

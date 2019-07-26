@@ -11,7 +11,8 @@ import language.ir.UnitValue
 import language.ir.Value
 import language.ir.visitors.ValueVisitor
 import language.util.Graph
-import language.util.reached
+import language.util.TraverseOrder.BreadthFirst
+import language.util.reachable
 
 fun programEquals(lProg: Program, rProg: Program): Boolean {
     val mappping = buildValueMapping(lProg, rProg) ?: return false
@@ -81,9 +82,9 @@ private fun Program.orderedFunctions() = object : Graph<Function> {
             instr.operands.filterIsInstance<Function>()
         }
     }
-}.reached()
+}.reachable(BreadthFirst)
 
 private fun Function.orderedBlocks() = object : Graph<BasicBlock> {
     override val roots = listOf(entry)
-    override fun children(node: BasicBlock) = node.successors()
-}.reached()
+    override fun children(node: BasicBlock): List<BasicBlock> = node.successors()
+}.reachable(BreadthFirst)

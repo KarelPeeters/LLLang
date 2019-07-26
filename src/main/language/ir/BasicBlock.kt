@@ -67,7 +67,7 @@ class BasicBlock(val name: String?) : Value(BlockType) {
 
     fun phis() = instructions.takeWhileIsInstance<Phi>()
 
-    fun successors() = terminator.targets()
+    fun successors(): List<BasicBlock> = terminator.targets()
     fun predecessors() = this.users.mapNotNull { (it as? Terminator)?.block }
 
     fun str(env: NameEnv) = untypedStr(env)

@@ -7,15 +7,15 @@ import language.ir.Terminator
 import language.optimizer.FunctionPass
 import language.optimizer.OptimizerContext
 import language.util.Graph
-import language.util.reached
+import language.util.reachable
 
 
 object DeadBlockElimination : FunctionPass() {
     override fun OptimizerContext.optimize(function: Function) {
         val used = object : Graph<BasicBlock> {
-            override val roots = setOf(function.entry)
+            override val roots = listOf(function.entry)
             override fun children(node: BasicBlock) = node.successors()
-        }.reached()
+        }.reachable()
 
         val iter = function.blocks.iterator()
         for (block in iter) {
