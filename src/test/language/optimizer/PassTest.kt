@@ -22,7 +22,7 @@ fun testBeforeAfter(name: String, passes: List<OptimizerPass>) {
 
     if (!programEquals(before, after)) {
         assertEquals(after.fullString(ProgramNameEnv()), before.fullString(ProgramNameEnv())) { "After mismatch" }
-        fail { "Programs don't equal but string representation does" }
+        fail { "Programs don't equal but string representations do" }
     }
 }
 

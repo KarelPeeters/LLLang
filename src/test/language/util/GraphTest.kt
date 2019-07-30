@@ -33,7 +33,7 @@ class GraphTest {
 
     @Test
     fun reachedUnordered() {
-        assertEquals(setOf(1, 2, 4, 5, 3, 6), basicGraph.reachable(DepthFirst)) {
+        assertEquals(setOf(1, 2, 4, 5, 3, 6), basicGraph.reachable()) {
             "must contain all nodes"
         }
     }
