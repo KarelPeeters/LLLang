@@ -64,6 +64,6 @@ class UndefinedValue(type: Type) : Value(type) {
     override fun hashCode() = type.hashCode()
 }
 
-object UnitValue : Value(UnitType) {
-    override fun untypedStr(env: NameEnv) = "unit"
+object VoidValue : Value(VoidType) {
+    override fun untypedStr(env: NameEnv) = "void"
 }

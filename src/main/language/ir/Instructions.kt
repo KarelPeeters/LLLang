@@ -48,7 +48,7 @@ class Alloc(name: String?, val inner: Type) : BasicInstruction(name, inner.point
             other is Alloc && inner == other.inner
 }
 
-class Store(pointer: Value, value: Value) : BasicInstruction(null, UnitType, false) {
+class Store(pointer: Value, value: Value) : BasicInstruction(null, VoidType, false) {
     var pointer by operand(pointer)
     var value by operand(value)
 
@@ -146,7 +146,7 @@ class Phi(name: String?, type: Type) : BasicInstruction(name, type, true) {
     }
 }
 
-class Eat(arguments: List<Value>) : BasicInstruction(null, UnitType, false) {
+class Eat(arguments: List<Value>) : BasicInstruction(null, VoidType, false) {
     val arguments by operandList(arguments)
 
     override fun clone(): Eat = Eat(arguments)
@@ -190,7 +190,10 @@ class Call(name: String?, target: Value, arguments: List<Value>)
     }
 
     override fun fullStr(env: NameEnv): String {
-        return "${str(env)} = call ${target.str(env, false)}(${arguments.joinToString { it.str(env) }})"
+        val retStr = if (type == VoidType) "" else "${str(env)} = "
+        val targetStr = target.str(env, false)
+        val argStr = arguments.joinToString { it.str(env) }
+        return "${retStr}call $targetStr($argStr)"
     }
 
     override fun matches(other: Instruction, map: (Value) -> Value) =
@@ -324,7 +327,7 @@ class AggregateValue(name: String?, type: AggregateType, values: List<Value>)
             other is AggregateValue && values.map(map) == other.values
 }
 
-sealed class Terminator : Instruction(null, UnitType, false) {
+sealed class Terminator : Instruction(null, VoidType, false) {
     abstract fun targets(): List<BasicBlock>
 
     abstract override fun clone(): Terminator
@@ -383,7 +386,10 @@ class Return(value: Value) : Terminator() {
     override fun typeCheck() {}
 
     override fun targets() = emptyList<BasicBlock>()
-    override fun fullStr(env: NameEnv) = "return ${value.str(env)}"
+    override fun fullStr(env: NameEnv) = when (value) {
+        is VoidValue -> "return"
+        else -> "return ${value.str(env)}"
+    }
 
     override fun matches(other: Instruction, map: (Value) -> Value) =
             other is Return && map(value) == other.value

@@ -1,18 +1,18 @@
 //unchanged
 fun %main() {
   <entry>
-    %x Unit = call %take(%foo () -> Unit)
-    return unit Unit
+    call %take(%foo () -> Void)
+    return
 }
 
 @NoInline
-fun %take(%f () -> Unit) {
+fun %take(%f () -> Void) {
   <entry>
-    %x Unit = call %f()
-    return unit Unit
+    call %f()
+    return
 }
 
 fun %foo() {
   <entry>
-    return unit Unit
+    return
 }

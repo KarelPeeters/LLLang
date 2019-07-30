@@ -95,7 +95,7 @@ class Function private constructor(
         val attrString = if (attributes.isNotEmpty()) attributes.joinToString("\n", postfix = "\n") { "@${it.name}" } else ""
         val nameStr = env.function(this)
         val paramStr = parameters.joinToString { it.str(env, true) }
-        val returnStr = if (returnType == UnitType) "" else ": $returnType"
+        val returnStr = if (returnType == VoidType) "" else ": $returnType"
         val entryStr = if (entry != blocks.first()) "\n  entry: ${entry.str(env, false)}" else ""
 
         return "${attrString}fun %$nameStr($paramStr)$returnStr { $entryStr\n" +

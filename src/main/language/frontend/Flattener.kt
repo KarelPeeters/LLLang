@@ -22,9 +22,9 @@ import language.ir.Return
 import language.ir.Store
 import language.ir.StructType
 import language.ir.Type
-import language.ir.UnitType
-import language.ir.UnitValue
 import language.ir.Value
+import language.ir.VoidType
+import language.ir.VoidValue
 import language.ir.pointer
 import language.ir.unpoint
 import language.parsing.SourcePosition
@@ -114,7 +114,7 @@ class Flattener {
                     val irFunction = IrFunction(
                             name,
                             topLevel.parameters.map { it.name to resolveType(it.type) },
-                            resolveType(topLevel.retType, UnitType),
+                            resolveType(topLevel.retType, VoidType),
                             emptySet()
                     )
 
@@ -132,7 +132,7 @@ class Flattener {
                         val irFunction = IrFunction(
                                 method.name,
                                 listOf("this" to structType.pointer) + method.parameters.map { it.name to resolveType(it.type) },
-                                resolveType(method.retType, UnitType),
+                                resolveType(method.retType, VoidType),
                                 emptySet()
                         )
                         program.addFunction(irFunction)
@@ -179,9 +179,9 @@ class Flattener {
             is Function.FunctionBody.Block -> {
                 val end = entry.appendNestedBlock(bodyScope, body.block)
                 if (end != null) {
-                    if (irFunction.returnType != UnitType)
+                    if (irFunction.returnType != VoidType)
                         throw MissingReturnStatement(function)
-                    end.terminator = Return(UnitValue)
+                    end.terminator = Return(VoidValue)
                 }
             }
             is Function.FunctionBody.Expr -> {
@@ -281,7 +281,7 @@ class Flattener {
         is ReturnStatement -> {
             val (afterValue, value) = stmt.value?.let { value ->
                 appendLoadedExpression(scope, value)
-            } ?: (this to UnitValue)
+            } ?: (this to VoidValue)
 
             requireTypeMatch(stmt.position, function.returnType, value.type)
             afterValue.terminator = Return(value)
@@ -506,6 +506,7 @@ class Flattener {
             when (val str = annotation.str) {
                 "bool" -> bool
                 "i32" -> i32
+                "Unit" -> VoidType
                 in structs -> structs.getValue(str).type
 
                 else -> throw IllegalTypeException(annotation)

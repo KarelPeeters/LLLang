@@ -25,16 +25,16 @@ import language.ir.Store
 import language.ir.Terminator
 import language.ir.Type
 import language.ir.UnaryOp
-import language.ir.UnitType
-import language.ir.UnitValue
 import language.ir.Value
+import language.ir.VoidType
+import language.ir.VoidValue
 import language.ir.unpoint
 
 sealed class ValueInst(val type: Type) {
     abstract fun shortString(): String
 }
 
-object UnitInst : ValueInst(UnitType) {
+object UnitInst : ValueInst(VoidType) {
     override fun shortString() = "unit"
 }
 
@@ -211,7 +211,7 @@ class Interpreter(val program: Program) {
 
 private fun ValuesMap.getInst(key: Value, type: Type? = null): ValueInst {
     val inst = when (key) {
-        is UnitValue -> UnitInst
+        is VoidValue -> UnitInst
         is Constant -> IntegerInst(key.type, key.value)
         else -> this[key] ?: error("No valueInst found for $key")
     }

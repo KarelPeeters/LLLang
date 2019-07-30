@@ -6,5 +6,5 @@ fun %main() {
     eat(0 i32)
     jump <target>
   <target>
-    return unit Unit
+    return
 }

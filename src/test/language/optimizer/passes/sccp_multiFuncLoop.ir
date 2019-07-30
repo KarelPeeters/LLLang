@@ -10,7 +10,7 @@ fun %main() {
     jump <while.cond>
   <while.end>
     eat(%x i32)
-    return unit Unit
+    return
 }
 
 fun %replace(%x i32): i32 {
@@ -38,7 +38,7 @@ fun %main() {
     jump <while.cond>
   <while.end>
     eat(5 i32)
-    return unit Unit
+    return
 }
 
 

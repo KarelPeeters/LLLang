@@ -10,7 +10,7 @@ fun %main() {
   <end>
     %x i32 = phi[<then>: undef i32, <else>: undef i32]
     eat(%x i32)
-    return unit Unit
+    return
 }
 
 //after
@@ -25,6 +25,6 @@ fun %main() {
   <end>
     %x i32 = phi [<then>: undef i32, <else>: undef i32]
     eat(undef i32)
-    return unit Unit
+    return
 }
 

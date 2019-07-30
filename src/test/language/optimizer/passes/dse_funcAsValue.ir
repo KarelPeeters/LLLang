@@ -1,19 +1,19 @@
 //unchanged
 fun %main() {
   <entry>
-    %u1 Unit = call %foo(2 i32)
-    %u2 Unit = call %calltrough(%foo (i32) -> Unit)
-    return unit Unit
+    call %foo(2 i32)
+    call %calltrough(%foo (i32) -> Void)
+    return
 }
 
-fun %calltrough(%f (i32) -> Unit) {
+fun %calltrough(%f (i32) -> Void) {
   <entry>
-    %u Unit = call %f(5 i32)
-    return unit Unit
+    call %f(5 i32)
+    return
 }
 
 fun %foo(%x i32) {
   <entry>
     eat(%x i32)
-    return unit Unit
+    return
 }

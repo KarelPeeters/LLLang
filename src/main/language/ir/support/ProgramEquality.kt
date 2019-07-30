@@ -7,8 +7,8 @@ import language.ir.Instruction
 import language.ir.ParameterValue
 import language.ir.Program
 import language.ir.UndefinedValue
-import language.ir.UnitValue
 import language.ir.Value
+import language.ir.VoidValue
 import language.ir.visitors.ValueVisitor
 import language.util.Graph
 import language.util.TraverseOrder.BreadthFirst
@@ -25,7 +25,7 @@ fun programEquals(lProg: Program, rProg: Program): Boolean {
 
         override fun invoke(value: Constant) = value
         override fun invoke(value: UndefinedValue) = value
-        override fun invoke(value: UnitValue) = value
+        override fun invoke(value: VoidValue) = value
     }
 
     if (map(lProg.entry) != rProg.entry) return false

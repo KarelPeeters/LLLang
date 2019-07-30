@@ -3,7 +3,7 @@ fun %main() {
   <entry>
     %x i32 = call %foo()
     eat(%x i32)
-    return unit Unit
+    return
 }
 
 fun %foo(): i32 {
@@ -30,5 +30,5 @@ fun %main() {
   <entry2>
     %x i32 = phi [<foo-then>: 1 i32, <foo-else>: 2 i32]
     eat(%x i32)
-    return unit Unit
+    return
 }

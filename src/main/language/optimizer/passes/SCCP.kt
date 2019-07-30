@@ -25,8 +25,8 @@ import language.ir.Terminator
 import language.ir.Type
 import language.ir.UnaryOp
 import language.ir.UndefinedValue
-import language.ir.UnitValue
 import language.ir.Value
+import language.ir.VoidValue
 import language.ir.visitors.ValueVisitor
 import language.optimizer.FunctionPass
 import language.optimizer.OptimizerContext
@@ -119,7 +119,7 @@ private class SCCPImpl private constructor(val multiFunc: Boolean) {
         override fun invoke(value: ParameterValue) = latticeMap[value] ?: Unknown
         override fun invoke(value: Constant) = Known(value)
         override fun invoke(value: UndefinedValue) = Unknown
-        override fun invoke(value: UnitValue) = Variable
+        override fun invoke(value: VoidValue) = Variable
     }
 
     fun updateExecutableEdge(from: BasicBlock, to: BasicBlock) {

@@ -34,7 +34,7 @@ enum class IrTokenType(val string: String? = null) {
     BranchToken("branch"), JumpToken("jump"),
     ExitToken("exit"), ReturnToken("return"),
 
-    UnitTypeToken("Unit"), UnitValueToken("unit"),
+    VoidTypeToken("Void"),
     IntegerTypeToken,
 
     Annotation,

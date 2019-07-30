@@ -1,7 +1,7 @@
 //unchanged
 fun %main() {
   <entry>
-    return unit Unit
+    return
   <dead.start>
     %x i32 = add 2 i32, 3 i32
     %c i1 = blur 1 i1
@@ -14,7 +14,7 @@ fun %main() {
   <dead.end>
     %r i32 = phi [<dead1>: %y i32, <dead2>: %x i32]
     eat(%r i32)
-    return unit Unit
+    return
 }
 
 fun %foo(%x i32): i32 {

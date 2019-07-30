@@ -31,9 +31,9 @@ import language.ir.Type
 import language.ir.UNARY_OP_TYPES
 import language.ir.UnaryOp
 import language.ir.UndefinedValue
-import language.ir.UnitType
-import language.ir.UnitValue
 import language.ir.Value
+import language.ir.VoidType
+import language.ir.VoidValue
 import language.ir.pointer
 import language.ir.support.IrTokenType.*
 import language.ir.support.IrTokenType.Annotation
@@ -103,7 +103,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         val funcName = idName()
         expect(OpenB)
         val parameters = list(CloseB, ::parameter)
-        val retType = if (accept(Colon)) type() else UnitType
+        val retType = if (accept(Colon)) type() else VoidType
         expect(OpenC)
 
         val func = Function(funcName, parameters, retType, attributes)
@@ -201,6 +201,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
             val value = typedValue()
             Store(target, value)
         }
+        at(CallToken) -> callInstr(VoidType, null)
         at(Id) -> valueInstr()
         else -> expected("instruction")
     }
@@ -246,14 +247,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
                 phi
             }
             accept(BlurToken) -> Blur(name, typedValue())
-            accept(CallToken) -> {
-                val targetName = idName()
-                expect(OpenB)
-                val arguments = list(CloseB) { typedValue() }
-                val targetType = FunctionType(arguments.map { it.type }, type)
-                val target = valuePlaceholder(targetName, targetType)
-                Call(name, target, arguments)
-            }
+            at(CallToken) -> callInstr(type, name)
             accept(StructGetToken) -> GetSubValue.Struct(name, typedValue().also { expect(Comma) }, intergerLiteral())
             accept(ArrayGetToken) -> GetSubValue.Array(name, typedValue().also { expect(Comma) }, typedValue())
             accept(StructPtrToken) -> GetSubPointer.Struct(name, typedValue().also { expect(Comma) }, intergerLiteral())
@@ -279,15 +273,27 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         return instr
     }
 
+    private fun callInstr(type: Type, name: String?): Call {
+        expect(CallToken)
+        val targetName = idName()
+        expect(OpenB)
+        val arguments = list(CloseB) { typedValue() }
+        val targetType = FunctionType(arguments.map { it.type }, type)
+        val target = valuePlaceholder(targetName, targetType)
+        return Call(name, target, arguments)
+    }
+
     private fun terminator(): Terminator? = when {
         accept(BranchToken) -> Branch(typedValue(), blockPlaceholder(), blockPlaceholder())
         accept(JumpToken) -> Jump(blockPlaceholder())
         accept(ExitToken) -> Exit()
-        accept(ReturnToken) -> Return(typedValue())
+        accept(ReturnToken) -> Return(maybeTypedValue() ?: VoidValue)
         else -> null
     }
 
-    private fun typedValue(): Value = when {
+    private fun typedValue(): Value = maybeTypedValue() ?: expected("value")
+
+    private fun maybeTypedValue(): Value? = when {
         at(Id) -> {
             val name = idName()
             val type = type()
@@ -298,21 +304,17 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
             val type = type() as? IntegerType ?: error("Expected integer type")
             Constant(type, value)
         }
-        accept(UnitValueToken) -> {
-            expect(UnitTypeToken)
-            UnitValue
-        }
         accept(Undef) -> {
             val type = type()
             UndefinedValue(type)
         }
-        else -> expected("value")
+        else -> null
     }
 
     private fun type(): Type {
         val inner = when {
             at(IntegerTypeToken) -> IntegerType.width(pop().text.drop(1).toInt())
-            accept(UnitTypeToken) -> UnitType
+            accept(VoidTypeToken) -> VoidType
             at(Id) -> {
                 val text = idName()
                 structTypes[text] ?: error("Undeclared type '$text'")

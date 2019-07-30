@@ -14,7 +14,7 @@ fun %main() {
     jump <while.cond>
   <while.end>
     eat(%x2 i32)
-    return unit Unit
+    return
 }
 
 //after
@@ -31,5 +31,5 @@ fun %main() {
     jump <while.cond>
   <while.end>
     eat(5 i32)
-    return unit Unit
+    return
 }

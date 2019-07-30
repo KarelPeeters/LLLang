@@ -9,8 +9,8 @@ import language.ir.Phi
 import language.ir.Program
 import language.ir.Return
 import language.ir.UndefinedValue
-import language.ir.UnitValue
 import language.ir.Value
+import language.ir.VoidValue
 import language.ir.visitors.ValueVisitor
 import language.optimizer.DominatorInfo
 
@@ -90,7 +90,7 @@ private fun verifyOperandDominance(program: Program) {
 
             override fun invoke(value: Constant) = true
             override fun invoke(value: UndefinedValue) = true
-            override fun invoke(value: UnitValue) = true
+            override fun invoke(value: VoidValue) = true
         }
 
         fun checkDominance(instr: Instruction, op: Value) {

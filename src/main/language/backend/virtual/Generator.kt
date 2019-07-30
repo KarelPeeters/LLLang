@@ -27,8 +27,8 @@ import language.ir.Store
 import language.ir.Terminator
 import language.ir.UnaryOp
 import language.ir.UndefinedValue
-import language.ir.UnitType
-import language.ir.UnitValue
+import language.ir.VoidType
+import language.ir.VoidValue
 import language.ir.Value
 import language.ir.visitors.ValueVisitor
 import language.util.Graph
@@ -70,7 +70,7 @@ class Generator private constructor() {
         funcAddresses.getValue(function).value = nextAdress() - 1
 
         if (function.parameters.isNotEmpty()) TODO("parameters")
-        if (function.returnType != UnitType) TODO("return value")
+        if (function.returnType != VoidType) TODO("return value")
 
         //order blocks so the ifFalse block is behind the jump as often as possible
         //also puts the entry first, so no initial jump neccesary
@@ -137,7 +137,7 @@ class Generator private constructor() {
             }
             is Call -> {
                 if (instr.arguments.isNotEmpty()) TODO("arguments")
-                if (instr.type != UnitType) TODO("return value")
+                if (instr.type != VoidType) TODO("return value")
 
                 //TODO optimize this as part of real register allocation
                 //push currently used registers to stack
@@ -188,7 +188,7 @@ class Generator private constructor() {
                     return
                 }
 
-                if (term.value.type != UnitType) TODO("return value")
+                if (term.value.type != VoidType) TODO("return value")
 
                 append(VInstruction.Pop(Reg.PC))
             }
@@ -219,6 +219,6 @@ class Generator private constructor() {
 
         override fun invoke(value: Constant): Const = Const(value.value)
         override fun invoke(value: UndefinedValue): Nothing? = null
-        override fun invoke(value: UnitValue) = error("use of UnitValue")
+        override fun invoke(value: VoidValue) = error("use of UnitValue")
     }
 }

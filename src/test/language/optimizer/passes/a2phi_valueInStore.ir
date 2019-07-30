@@ -5,5 +5,5 @@ fun %main() {
     %b i32*  = alloc i32
     store %a i32** = %b i32*
     eat(%a i32**)
-    return unit Unit
+    return
 }

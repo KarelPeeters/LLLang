@@ -6,8 +6,8 @@ import language.ir.Function
 import language.ir.Instruction
 import language.ir.ParameterValue
 import language.ir.UndefinedValue
-import language.ir.UnitValue
 import language.ir.Value
+import language.ir.VoidValue
 
 interface ValueVisitor<T> {
     operator fun invoke(value: Value): T = when (value) {
@@ -17,7 +17,7 @@ interface ValueVisitor<T> {
         is ParameterValue -> invoke(value)
         is Constant -> invoke(value)
         is UndefinedValue -> invoke(value)
-        is UnitValue -> invoke(value)
+        is VoidValue -> invoke(value)
         else -> error("Unknown value type ${value::class}")
     }
 
@@ -29,5 +29,5 @@ interface ValueVisitor<T> {
 
     operator fun invoke(value: Constant): T
     operator fun invoke(value: UndefinedValue): T
-    operator fun invoke(value: UnitValue): T
+    operator fun invoke(value: VoidValue): T
 }

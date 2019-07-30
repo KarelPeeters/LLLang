@@ -3,7 +3,7 @@ fun %main() {
   <entry>
     %0 i32 = call %sum(3 i32)
     eat(%0 i32)
-    return unit Unit
+    return
 }
 
 fun %sum(%n i32): i32 {
@@ -27,7 +27,7 @@ fun %main() {
   <entry>
     %0 i32 = call %sum(3 i32)
     eat(%0 i32)
-    return unit Unit
+    return
 }
 
 fun %sum(%n i32): i32 {

@@ -4,7 +4,7 @@ fun %main() {
     %x1 i32 = call %pass(1 i32)
     %x2 i32 = call %pass(2 i32)
     eat(%x1 i32, %x2 i32)
-    return unit Unit
+    return
 }
 
 fun %pass(%x i32): i32 {

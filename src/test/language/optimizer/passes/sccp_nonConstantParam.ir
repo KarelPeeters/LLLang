@@ -1,13 +1,13 @@
 //unchanged
 fun %main() {
   <entry>
-    %u1 Unit = call %foo(5 i32)
-    %u2 Unit = call %foo(4 i32)
-    return unit Unit
+    call %foo(5 i32)
+    call %foo(4 i32)
+    return
 }
 
 fun %foo(%x i32) {
   <entry>
     eat(%x i32)
-    return unit Unit
+    return
 }

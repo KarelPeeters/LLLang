@@ -5,8 +5,8 @@ import language.ir.Constant
 import language.ir.Function
 import language.ir.Program
 import language.ir.Return
-import language.ir.UnitType
-import language.ir.UnitValue
+import language.ir.VoidType
+import language.ir.VoidValue
 import language.optimizer.OptimizerContext
 import language.optimizer.ProgramPass
 import language.util.mapIfAllInstance
@@ -34,7 +34,7 @@ object DeadSignatureElimination : ProgramPass() {
             //find unused parts of signature
             inlineCallsiteConstantParameters(function, callers)
             val usedParams = BooleanArray(paramCount) { function.parameters[it].isUsed() }
-            val unusedReturn = function.returnType != UnitType && callers.none { it.isUsed() }
+            val unusedReturn = function.returnType != VoidType && callers.none { it.isUsed() }
 
             //check if there's anyhting to change
             if (usedParams.all { it } && !unusedReturn)
@@ -42,7 +42,7 @@ object DeadSignatureElimination : ProgramPass() {
 
             //create new function
             val newParameters = function.parameters.filterIndexed { i, _ -> usedParams[i] }
-            val newReturnType = if (unusedReturn) UnitType else function.returnType
+            val newReturnType = if (unusedReturn) VoidType else function.returnType
             val replacement = function.changedSignature(newParameters, newReturnType)
 
             //fix callers
@@ -65,7 +65,7 @@ object DeadSignatureElimination : ProgramPass() {
             //fix returns
             if (unusedReturn) {
                 for (block in function.blocks)
-                    (block.terminator as? Return)?.value = UnitValue
+                    (block.terminator as? Return)?.value = VoidValue
             }
 
             //put new function in program

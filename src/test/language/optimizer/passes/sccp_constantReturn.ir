@@ -4,7 +4,7 @@ fun %main() {
     %x i32 = call %foo()
     %y i32 = call %foo()
     eat(%x i32, %y i32)
-    return unit Unit
+    return
 }
 
 fun %foo(): i32 {
@@ -18,7 +18,7 @@ fun %main() {
     %x i32 = call %foo()
     %y i32 = call %foo()
     eat(5 i32, 5 i32)
-    return unit Unit
+    return
 }
 
 fun %foo(): i32 {
