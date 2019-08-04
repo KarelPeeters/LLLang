@@ -1,0 +1,47 @@
+//before
+fun %main() {
+  <entry>
+    call %foo(2 i32)
+    branch 0 i1 <then> <else>
+  <then>
+    call %calltrough(%foo (i32) -> Void)
+    return
+  <else>
+    return
+}
+
+fun %calltrough(%f (i32) -> Void) {
+  <entry>
+    call %f(5 i32)
+    return
+}
+
+fun %foo(%x i32) {
+  <entry>
+    eat(%x i32)
+    return
+}
+
+//after
+fun %main() {
+  <entry>
+    call %foo(2 i32)
+    branch 0 i1 <then> <else>
+  <then>
+    call %calltrough(%foo (i32) -> Void)
+    return
+  <else>
+    return
+}
+
+fun %calltrough(%f (i32) -> Void) {
+  <entry>
+    call %f(5 i32)
+    return
+}
+
+fun %foo(%x i32) {
+  <entry>
+    eat(2 i32)
+    return
+}

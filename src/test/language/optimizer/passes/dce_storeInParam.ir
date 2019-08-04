@@ -1,0 +1,13 @@
+//unchanged
+fun %main() {
+  <entry>
+    %p i32* = alloc i32
+    call %foo(%p i32*)
+    return
+}
+
+fun %foo(%p i32*) {
+  <entry>
+    store %p i32* = 5 i32
+    return
+}

@@ -1,0 +1,24 @@
+//before
+fun %main() {
+  <entry>
+    %r i32 = call %foo()
+    return
+}
+
+fun %foo(): i32 {
+  <entry>
+    %v i32 = blur 5 i32
+    return %v i32
+}
+
+//after
+fun %main() {
+  <entry>
+    call %foo()
+    return
+}
+
+fun %foo() {
+  <entry>
+    return
+}

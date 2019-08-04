@@ -44,6 +44,8 @@ object Verifier {
         check(function.operands.none { it.isDeleted })
         check(function.entry in function.blocks) { "entry must be one of the blocks" }
         check(function.entry.predecessors().isEmpty()) { "entry can't be jumped to" }
+        check(function.parameters.none { it.isDeleted }) { "function parameter deleted" }
+        check(function.parameters.all { it.function == function }) { "parameter has wrong function" }
 
         //return type check
         val allReturns = function.blocks.map { it.terminator }.filterIsInstance<Return>()

@@ -1,11 +1,18 @@
 package language.ir
 
+import language.util.mapIfAllInstance
+
 class Function private constructor(
         val name: String?,
         val parameters: List<ParameterValue>,
         val returnType: Type,
         attributes: Set<Attribute>
 ) : Value(FunctionType(parameters.map(ParameterValue::type), returnType)) {
+    init {
+        for (param in parameters)
+            param.setFunction(this)
+    }
+
     var entry by operand<BasicBlock>(null)
     val blocks = mutableListOf<BasicBlock>()
     val attributes = attributes.toMutableSet()
@@ -89,6 +96,14 @@ class Function private constructor(
 
     fun entryAllocs() = entry.instructions.filterIsInstance<Alloc>()
 
+    fun returnInstructions() = blocks.mapNotNull { it.terminator as? Return }
+
+    fun usersIfOnlyCallTarget(): List<Call>? {
+        val calls = users.mapIfAllInstance<Call>() ?: return null
+        if (calls.any { this in it.arguments }) return null
+        return calls
+    }
+
     fun fullStr(env: NameEnv): String {
         blocks.forEach { env.block(it) } //preset names to keep them ordered
 
@@ -115,6 +130,13 @@ class Function private constructor(
 }
 
 class ParameterValue(val name: String?, type: Type) : Value(type) {
+    private var _function: Function? = null
+
+    val function get() = _function!!
+    fun setFunction(function: Function?) {
+        this._function = function
+    }
+
     override fun untypedStr(env: NameEnv) = "%${env.value(this)}"
 }
 

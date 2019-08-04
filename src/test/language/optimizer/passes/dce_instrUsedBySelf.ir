@@ -1,0 +1,16 @@
+//before
+fun %main() {
+  <entry>
+    jump <loop>
+  <loop>
+    %x i32 = phi [<entry>: 5 i32, <loop>: %x i32]
+    jump <loop>
+}
+
+//after
+fun %main() {
+  <entry>
+    jump <loop>
+  <loop>
+    jump <loop>
+}

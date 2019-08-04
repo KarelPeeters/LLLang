@@ -1,12 +1,11 @@
 package language.util
 
-import language.util.TraverseOrder.BreadthFirst
-import language.util.TraverseOrder.Unordered
+import language.util.TraverseOrder.*
 import java.util.*
 
 interface Graph<N> {
-    val roots: List<N>
-    fun children(node: N): List<N>
+    val roots: Collection<N>
+    fun children(node: N): Collection<N>
 }
 
 enum class TraverseOrder {
@@ -33,7 +32,7 @@ fun <N> Graph<N>.reachable(order: TraverseOrder = Unordered): Set<N> {
         if (reached.add(curr)) {
             when (order) {
                 BreadthFirst, Unordered -> toVisit.addAll(children(curr))
-                TraverseOrder.DepthFirst -> children(curr).asReversed().forEach(toVisit::addFirst)
+                DepthFirst -> children(curr).reversed().forEach(toVisit::addFirst)
             }
         }
     }

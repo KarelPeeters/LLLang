@@ -12,7 +12,6 @@ import language.ir.Terminator
 import language.ir.support.Cloner
 import language.optimizer.OptimizerContext
 import language.optimizer.ProgramPass
-import language.util.mapIfAllInstance
 
 object FunctionInlining : ProgramPass() {
     override fun OptimizerContext.optimize(program: Program) {
@@ -21,9 +20,7 @@ object FunctionInlining : ProgramPass() {
             if (Function.Attribute.NoInline in func.attributes)
                 continue
 
-            //only used by calls, also guaratees all Calls have an immediate Function target
-            val calls = func.users.mapIfAllInstance<Call>() ?: continue
-            if (calls.any { func in it.arguments }) continue
+            val calls = func.usersIfOnlyCallTarget() ?: continue
 
             //skip immediatly recursive functions
             if (calls.any { it.block.function == func })

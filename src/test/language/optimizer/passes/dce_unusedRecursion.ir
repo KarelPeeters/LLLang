@@ -1,13 +1,14 @@
 //before
 fun %main() {
   <entry>
-    call %foo(5 i32)
+    %v i32 = blur 5 i32
+    call %foo(%v i32)
     return
 }
 
 fun %foo(%x i32) {
   <entry>
-    call %foo(5 i32)
+    call %foo(%x i32)
     return
 }
 

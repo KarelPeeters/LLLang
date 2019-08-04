@@ -1,0 +1,35 @@
+//before
+fun %main() {
+  <entry>
+    %r i32 = call %bar()
+    call %foo(%r i32)
+    return
+}
+
+fun %bar(): i32 {
+  <entry>
+    return 5 i32
+}
+
+fun %foo(%x i32) {
+  <entry>
+    return
+}
+
+//after
+fun %main() {
+  <entry>
+    call %bar()
+    call %foo()
+    return
+}
+
+fun %bar() {
+  <entry>
+    return
+}
+
+fun %foo() {
+  <entry>
+    return
+}

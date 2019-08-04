@@ -35,6 +35,9 @@ class SCCPTest {
     fun funcAsValue() = testBeforeAfter("sccp_funcAsValue.ir", ProgramSCCP)
 
     @Test
+    fun funcAsValueDead() = testBeforeAfter("sccp_funcAsValueDead.ir", ProgramSCCP)
+
+    @Test
     fun passTroughFunc() = testBeforeAfter("sccp_passTroughFunc.ir", ProgramSCCP)
 
     @Test

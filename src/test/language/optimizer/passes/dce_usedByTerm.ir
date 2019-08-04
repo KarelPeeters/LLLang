@@ -1,0 +1,10 @@
+//unchanged
+fun %main() {
+  <entry>
+    %c i1 = blur 0 i1
+    branch %c i1 <then> <else>
+  <then>
+    return
+  <else>
+    return
+}
