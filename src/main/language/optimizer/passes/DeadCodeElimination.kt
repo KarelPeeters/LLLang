@@ -92,11 +92,8 @@ private fun findUsed(program: Program): Pair<Set<Value>, Set<Function>> {
             if (value is Call) {
                 val target = value.target
                 if (target is Function) {
-                    //immediate target call, make target used but mark arguments used imediatly
+                    //mark target return as used
                     usedReturn += target
-                } else {
-                    //unknown target, just make everything used (including the target value)
-                    used.addAll(value.operands)
                 }
             } else {
                 used += value.operands
@@ -147,7 +144,10 @@ private fun usageRoots(program: Program): List<Value> = sequence {
                     is Call -> {
                         //can't yield a Function nor a Call because that would immediatly mark the return as used
                         val target = instr.target
-                        if (target !is Function) yield(target)
+                        if (target !is Function) {
+                            //assume both target and arguments are used
+                            yieldAll(instr.operands)
+                        }
                     }
                     is Branch -> yield(instr.value)
                     is Eat, is Store -> yield(instr)

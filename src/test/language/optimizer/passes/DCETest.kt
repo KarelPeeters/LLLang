@@ -33,4 +33,7 @@ class DCETest {
 
     @Test
     fun storeInParam() = testBeforeAfter("dce_storeInParam.ir", DeadCodeElimination)
+
+    @Test
+    fun unusedFunction() = testBeforeAfter("dce_unusedFunction.ir", DeadCodeElimination)
 }

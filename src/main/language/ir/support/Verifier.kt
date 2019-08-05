@@ -73,8 +73,8 @@ object Verifier {
     }
 
     fun verifyInstruction(instr: Instruction) {
-        check(!instr.isDeleted)
-        check(instr.operands.none { it.isDeleted })
+        check(!instr.isDeleted) { "$instr deleted" }
+        check(instr.operands.none { it.isDeleted }) { "$instr operand deleted" }
         instr.typeCheck()
     }
 }
