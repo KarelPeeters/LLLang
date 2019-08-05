@@ -11,13 +11,52 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.fail
 
 fun testBeforeAfter(name: String, pass: OptimizerPass) {
-    val (before, after) = readFile(name)
+    val (input, expected) = readFile(name)
 
-    verifyWithMessage(before) { "before invalid" }
-    verifyWithMessage(after) { "after invalid" }
+    verifyWithMessage(input) { "input invalid" }
+    verifyWithMessage(expected) { "expected invalid" }
 
-    val shouldChange = !programEquals(before, after)
+    val shouldChange = !programEquals(input, expected)
+    val beforeValues = programUsers(input)
 
+    val changed = runPass(pass, input)
+
+    val afterValues = programUsers(input)
+
+    verifyWithMessage(input) { "result of pass invalid" }
+
+    //check input/expected match
+    if (!programEquals(input, expected)) {
+        assertEquals(expected.fullString(ProgramNameEnv()), input.fullString(ProgramNameEnv())) { "result mismatch" }
+        fail { "Programs don't equal but string representations do" }
+    }
+
+    //check change reporting
+    if (shouldChange) {
+        assert(changed) { "program changed but pass didn't report it" }
+    } else {
+        assert(!changed) { "program didn't change but pass reported it did" }
+    }
+
+    //check deletion of removed users
+    for (removed in beforeValues - afterValues) {
+        assert(removed.isDeleted) { "$removed was removed from program but not deleted" }
+    }
+}
+
+private fun programUsers(program: Program) = sequence {
+    yield(program)
+    for (func in program.functions) {
+        yield(func)
+        yieldAll(func.parameters)
+        for (block in func.blocks) {
+            yield(block)
+            yieldAll(block.instructions)
+        }
+    }
+}.toSet()
+
+private fun runPass(pass: OptimizerPass, program: Program): Boolean {
     var changed = false
     val context = object : OptimizerContext {
         override fun changed() {
@@ -28,21 +67,9 @@ fun testBeforeAfter(name: String, pass: OptimizerPass) {
     }
 
     with(pass) {
-        context.runOnProgram(before) { }
+        context.runOnProgram(program) { }
     }
-
-    verifyWithMessage(before) { "result of pass invalid" }
-
-    if (!programEquals(before, after)) {
-        assertEquals(after.fullString(ProgramNameEnv()), before.fullString(ProgramNameEnv())) { "After mismatch" }
-        fail { "Programs don't equal but string representations do" }
-    }
-
-    if (shouldChange) {
-        assert(changed) { "program changed but pass didn't report it" }
-    } else {
-        assert(!changed) { "program didn't change but pass reported it did" }
-    }
+    return changed
 }
 
 private fun verifyWithMessage(program: Program, message: () -> String) {
