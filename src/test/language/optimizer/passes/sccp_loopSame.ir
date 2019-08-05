@@ -22,8 +22,10 @@ fun %main() {
   <entry>
     jump <while.cond>
   <while.cond>
+    %x2 i32 = phi [<entry>: 5 i32, <if.then>: 6 i32, <if.else>: 5 i32]
     branch 1 i1 <while.body> <while.end>
   <while.body>
+    %2 i1 = neq 5 i32, 5 i32
     branch 0 i1 <if.then> <if.else>
   <if.then>
     jump <while.cond>

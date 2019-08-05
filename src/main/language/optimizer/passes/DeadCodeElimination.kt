@@ -49,7 +49,11 @@ object DeadCodeElimination : ProgramPass() {
         for (func in funcIter) {
             val usedParams = func.parameters.map { it in used }
             val usedRet = func.returnType is VoidType || func in usedReturn
-            funcIter.set(removeDeadSignature(func, usedParams, usedRet))
+            val replacement = removeDeadSignature(func, usedParams, usedRet)
+            if (replacement != func) {
+                funcIter.set(replacement)
+                changed()
+            }
 
             for (block in func.blocks) {
                 val instrIter = block.basicInstructions.listIterator()
@@ -57,6 +61,7 @@ object DeadCodeElimination : ProgramPass() {
                     if (instr !is Call && instr !in used) {
                         instr.delete()
                         instrIter.remove()
+                        changed()
                     }
                 }
             }

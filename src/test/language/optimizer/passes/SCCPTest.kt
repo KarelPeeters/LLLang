@@ -5,13 +5,13 @@ import org.junit.jupiter.api.Test
 
 class SCCPTest {
     @Test
-    fun loopSame() = testBeforeAfter("sccp_loopSame.ir", SCCP, DeadInstructionElimination)
+    fun loopSame() = testBeforeAfter("sccp_loopSame.ir", SCCP)
 
     @Test
     fun loopDifferent() = testBeforeAfter("sccp_loopDifferent.ir", SCCP)
 
     @Test
-    fun undef() = testBeforeAfter("sccp_undef.ir", SCCP, DeadInstructionElimination)
+    fun undef() = testBeforeAfter("sccp_undef.ir", SCCP)
 
     @Test
     fun onlyUndef() = testBeforeAfter("sccp_onlyUndef.ir", SCCP)

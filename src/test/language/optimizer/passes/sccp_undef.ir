@@ -23,6 +23,7 @@ fun %main() {
   <else>
     jump <end>
   <end>
+    %x i32 = phi[<then>: 2 i32, <else>: undef i32]
     eat(2 i32)
     return
 }

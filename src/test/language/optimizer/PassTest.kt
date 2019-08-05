@@ -1,5 +1,6 @@
 package language.optimizer
 
+import language.ir.Function
 import language.ir.Program
 import language.ir.ProgramNameEnv
 import language.ir.support.IrParser
@@ -9,20 +10,46 @@ import org.apache.commons.io.IOUtils
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.fail
 
-fun testBeforeAfter(name: String, pass: OptimizerPass, vararg passes: OptimizerPass) =
-        testBeforeAfter(name, listOf(pass) + passes)
-
-fun testBeforeAfter(name: String, passes: List<OptimizerPass>) {
+fun testBeforeAfter(name: String, pass: OptimizerPass) {
     val (before, after) = readFile(name)
 
-    Verifier.verifyProgram(before)
-    Verifier.verifyProgram(after)
+    verifyWithMessage(before) { "before invalid" }
+    verifyWithMessage(after) { "after invalid" }
 
-    Optimizer(passes = passes, repeat = false, doVerify = true).optimize(before)
+    val shouldChange = !programEquals(before, after)
+
+    var changed = false
+    val context = object : OptimizerContext {
+        override fun changed() {
+            changed = true
+        }
+
+        override fun domInfo(function: Function) = DominatorInfo(function)
+    }
+
+    with(pass) {
+        context.runOnProgram(before) { }
+    }
+
+    verifyWithMessage(before) { "result of pass invalid" }
 
     if (!programEquals(before, after)) {
         assertEquals(after.fullString(ProgramNameEnv()), before.fullString(ProgramNameEnv())) { "After mismatch" }
         fail { "Programs don't equal but string representations do" }
+    }
+
+    if (shouldChange) {
+        assert(changed) { "program changed but pass didn't report it" }
+    } else {
+        assert(!changed) { "program didn't change but pass reported it did" }
+    }
+}
+
+private fun verifyWithMessage(program: Program, message: () -> String) {
+    try {
+        Verifier.verifyProgram(program)
+    } catch (e: Exception) {
+        throw IllegalStateException(message(), e)
     }
 }
 

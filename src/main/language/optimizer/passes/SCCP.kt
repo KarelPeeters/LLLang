@@ -40,17 +40,17 @@ import java.util.*
  */
 object SCCP : FunctionPass() {
     override fun OptimizerContext.optimize(function: Function) {
-        SCCPImpl(function).run()
+        SCCPImpl(this, function).run()
     }
 }
 
 object ProgramSCCP : ProgramPass() {
     override fun OptimizerContext.optimize(program: Program) {
-        SCCPImpl(program).run()
+        SCCPImpl(this, program).run()
     }
 }
 
-private class SCCPImpl private constructor(val multiFunc: Boolean) {
+private class SCCPImpl private constructor(val context: OptimizerContext, val multiFunc: Boolean) {
     /** Keys can be [Instruction] or [ParameterValue] */
     val latticeMap = mutableMapOf<Value, LatticeState>().withDefault { Unknown }
     val returnLatticeMap = mutableMapOf<Function, LatticeState>().withDefault { Unknown }
@@ -60,20 +60,17 @@ private class SCCPImpl private constructor(val multiFunc: Boolean) {
 
     val queue: Queue<Any> = ArrayDeque()
 
-    constructor(program: Program) : this(multiFunc = true) {
+    constructor(context: OptimizerContext, program: Program) : this(context, multiFunc = true) {
         updateExecutableFunction(program.entry)
     }
 
-    constructor(function: Function) : this(multiFunc = false) {
+    constructor(context: OptimizerContext, function: Function) : this(context, multiFunc = false) {
         updateExecutableFunction(function)
     }
 
     fun run() {
         computeLattice()
         replaceValues()
-
-        if (!multiFunc)
-            check(returnLatticeMap.isEmpty())
     }
 
     private fun computeLattice() {
@@ -84,21 +81,27 @@ private class SCCPImpl private constructor(val multiFunc: Boolean) {
                 else -> error("unexpected queue item ${curr::class}")
             }
         }
+
+        if (!multiFunc)
+            check(returnLatticeMap.isEmpty()) { "somehow a return value got trached in single function mode" }
     }
 
     private fun replaceValues() {
         for ((value, state) in latticeMap) {
             val replacement = state.asValue(value.type) ?: continue
             value.replaceWith(replacement)
+            context.changed()
         }
 
         for ((func, state) in returnLatticeMap) {
             val replacement = state.asValue(func.returnType) ?: continue
 
             for (user in func.users) {
-                if (user is Call && user.target == func)
+                if (user is Call && user.target == func) {
                     user.replaceWith(replacement)
+                }
             }
+            context.changed()
         }
     }
 
