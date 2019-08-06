@@ -94,14 +94,16 @@ private fun findUsed(program: Program): Pair<Set<Value>, Set<Function>> {
 
         //instruction result used
         override fun invoke(value: Instruction) {
-            if (value is Call) {
-                val target = value.target
-                if (target is Function) {
-                    //mark target return as used
-                    usedReturn += target
+            when (value) {
+                is Call -> {
+                    val target = value.target
+                    if (target is Function) {
+                        //mark target return as used
+                        usedReturn += target
+                    }
                 }
-            } else {
-                used += value.operands
+                is Phi -> used.addAll(value.sources.values)
+                else -> used += value.operands
             }
         }
 

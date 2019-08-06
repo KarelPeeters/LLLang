@@ -36,4 +36,7 @@ class DCETest {
 
     @Test
     fun unusedFunction() = testBeforeAfter("dce_unusedFunction.ir", DeadCodeElimination)
+
+    @Test
+    fun basicPhi() = testBeforeAfter("dce_basicPhi.ir", DeadCodeElimination)
 }
