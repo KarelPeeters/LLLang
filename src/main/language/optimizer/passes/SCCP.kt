@@ -14,7 +14,6 @@ import language.ir.Function
 import language.ir.GetSubPointer
 import language.ir.GetSubValue
 import language.ir.Instruction
-import language.ir.IntegerType
 import language.ir.Load
 import language.ir.ParameterValue
 import language.ir.Phi
@@ -106,7 +105,7 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
     }
 
     private val lattice = object : ValueVisitor<LatticeState> {
-        override fun invoke(value: Function) = Variable
+        override fun invoke(value: Function) = Known(value)
         override fun invoke(value: BasicBlock) = Variable
         override fun invoke(value: Instruction) = when (value) {
             is Call -> {
@@ -223,8 +222,7 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
             when (val value = lattice(instr.value)) {
                 Unknown -> error("can't happen, value was just lowered")
                 is Known -> {
-                    check(value.value.type == IntegerType.bool)
-                    if (value.value.value == 0)
+                    if ((value.value as Constant).value == 0)
                         updateExecutableEdge(instr.block, instr.ifFalse)
                     else
                         updateExecutableEdge(instr.block, instr.ifTrue)
@@ -269,7 +267,7 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
             if (left == Variable || right == Variable)
                 Variable
             else if (left is Known && right is Known)
-                Known(instr.opType.calculate(left.value, right.value))
+                Known(instr.opType.calculate(left.value as Constant, right.value as Constant))
             else
                 Unknown
         }
@@ -277,7 +275,7 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
         is UnaryOp -> {
             when (val value = lattice(instr.value)) {
                 Unknown -> Unknown
-                is Known -> Known(instr.opType.calculate(value.value))
+                is Known -> Known(instr.opType.calculate(value.value as Constant))
                 Variable -> Variable
             }
         }
@@ -289,7 +287,7 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
                     is GetSubValue.Struct -> instr.index
                     is GetSubValue.Array -> {
                         val index = lattice(instr.index)
-                        (index as? Known)?.value?.value
+                        ((index as? Known)?.value as Constant?)?.value
                     }
                 }
 
@@ -320,7 +318,7 @@ private sealed class LatticeState(private val order: Int) {
     }
 
     /** Assumed to be constant with the given [value] */
-    data class Known(val value: Constant) : LatticeState(1) {
+    data class Known(val value: Value) : LatticeState(1) {
         override fun asValue(type: Type): Value? = value.also { check(value.type == type) }
     }
 

@@ -32,7 +32,10 @@ class SCCPTest {
     fun deadCode() = testBeforeAfter("sccp_deadCode.ir", ProgramSCCP)
 
     @Test
-    fun funcAsValue() = testBeforeAfter("sccp_funcAsValue.ir", ProgramSCCP)
+    fun funcAsValueSame() = testBeforeAfter("sccp_funcAsValueSame.ir", ProgramSCCP)
+
+    @Test
+    fun funcAsValueDiff() = testBeforeAfter("sccp_funcAsValueDiff.ir", ProgramSCCP)
 
     @Test
     fun funcAsValueDead() = testBeforeAfter("sccp_funcAsValueDead.ir", ProgramSCCP)

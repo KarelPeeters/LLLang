@@ -3,6 +3,7 @@ fun %main() {
   <entry>
     call %foo(2 i32)
     call %calltrough(%foo (i32) -> Void)
+    call %calltrough(%bar (i32) -> Void)
     return
 }
 
@@ -13,6 +14,12 @@ fun %calltrough(%f (i32) -> Void) {
 }
 
 fun %foo(%x i32) {
+  <entry>
+    eat(%x i32)
+    return
+}
+
+fun %bar(%x i32) {
   <entry>
     eat(%x i32)
     return
