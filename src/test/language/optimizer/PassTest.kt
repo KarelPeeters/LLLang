@@ -85,7 +85,12 @@ private fun readFile(name: String): Pair<Program, Program> {
 
     val (beforeString, afterString) = when {
         string.startsWith("//before") -> {
-            val parts = string.split("//after")
+            val rest = string.removePrefix("//before")
+
+            check("//before" !in rest) { "Multiple ´//before´" }
+            check("//unchanged" !in rest) { "Unexpected ´//unchanged´ after ´//before´" }
+
+            val parts = rest.split("//after")
 
             if (parts.size == 1) error("Missing '//after'")
             if (parts.size > 2) error("Multiple '//after'")
@@ -93,8 +98,13 @@ private fun readFile(name: String): Pair<Program, Program> {
             parts[0] to parts[1]
         }
         string.startsWith("//unchanged") -> {
-            val code = string.removePrefix("//unchanged")
-            code to code
+            val rest = string.removePrefix("//unchanged")
+
+            check("//unchanged" !in rest) { "Multiple ´//unchanged´" }
+            check("//before" !in rest) { "Unexpected ´//before´ after ´//unchanged´" }
+            check("//after" !in rest) { "Unexpected ´//after´ after ´//unchanged´" }
+
+            rest to rest
         }
         else -> error("unrecognized start '${string.substring(0, 10)}'")
     }
