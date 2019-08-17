@@ -20,8 +20,8 @@ import language.ir.GetSubValue
 import language.ir.IntegerType
 import language.ir.Jump
 import language.ir.Load
-import language.ir.NameEnv
 import language.ir.Phi
+import language.ir.PlaceholderValue
 import language.ir.Program
 import language.ir.Return
 import language.ir.Store
@@ -375,8 +375,4 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         if (expected != actual)
             error("Type mismatch: expected $expected, got $actual")
     }
-}
-
-private class PlaceholderValue(type: Type) : Value(type) {
-    override fun untypedStr(env: NameEnv) = "PH"
 }

@@ -22,3 +22,12 @@ inline fun <reified T> Iterable<*>.mapIfAllInstance(): List<T>? {
     }
     return result
 }
+
+/**
+ * Returns a sublist up to and _exlusing_ [until]. Throws [NoSuchElementException] if [until] is not found in the list.
+ */
+fun <T> List<T>.subListUntil(until: T): List<T> {
+    val untilIndex = indexOf(until)
+    if (untilIndex == -1) throw NoSuchElementException("Element not found")
+    return subList(0, untilIndex)
+}

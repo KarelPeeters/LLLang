@@ -11,6 +11,7 @@ import language.ir.UndefinedValue
 import language.ir.Value
 import language.optimizer.FunctionPass
 import language.optimizer.OptimizerContext
+import language.util.subListUntil
 import java.util.*
 
 object AllocToPhi : FunctionPass() {
@@ -56,7 +57,7 @@ object AllocToPhi : FunctionPass() {
                 while (true) {
                     //drop the instructions after the use instruction
                     val instructions = if (curr == block && use != null)
-                        curr.instructions.subList(0, use.indexInBlock())
+                        curr.instructions.subListUntil(use)
                     else
                         curr.instructions
 

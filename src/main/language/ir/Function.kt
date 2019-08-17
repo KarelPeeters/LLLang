@@ -17,6 +17,8 @@ class Function private constructor(
     val blocks = mutableListOf<BasicBlock>()
     val attributes = attributes.toMutableSet()
 
+    val functionType get() = type as FunctionType
+
     private var _program: Program? = null
 
     val program get() = _program!!

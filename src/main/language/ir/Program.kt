@@ -9,6 +9,12 @@ class Program : User() {
         function.setProgram(this)
     }
 
+    fun addFunctions(functions: List<Function>) {
+        this.functions.addAll(functions)
+        for (func in functions)
+            func.setProgram(this)
+    }
+
     fun removeFunction(function: Function) {
         functions.remove(function)
         function.setProgram(null)

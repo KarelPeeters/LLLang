@@ -42,6 +42,8 @@ class DominatorInfo(val function: Function) {
                 .toSet()
     }
 
+    fun strictDominators(block: BasicBlock) = dominatedBy.getValue(block) - block
+
     fun isDominatedBy(block: BasicBlock, by: BasicBlock) = by in dominatedBy.getValue(block)
 
     fun isStrictlyDominatedBy(block: BasicBlock, by: BasicBlock) = block != by && isDominatedBy(block, by)
