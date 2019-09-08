@@ -21,6 +21,7 @@ object Verifier {
         check(program.operands.none { it.isDeleted })
         check(program.entry in program.functions) { "entry must be one of the functions" }
         check(program.entry.parameters.isEmpty()) { "entry must be a parameterless function" }
+        check(program.entry.users == setOf(program)) { "entry can only be used as entry" }
 
         //duplicate checking
         val allBlocks = program.functions.flatMap { it.blocks }
