@@ -34,7 +34,7 @@ abstract class Parser<T>(private val tokenizer: Tokenizer<T>) {
     }
 
     protected fun expected(expected: String): Nothing =
-            error("Unexpected token $next, expected $expected")
+            error("Expected $expected, got token $next")
 
     protected fun error(msg: String): Nothing = throw ParseError(msg)
 

@@ -64,10 +64,11 @@ class IrTokenizer(source: String) : Tokenizer<IrTokenType>(source) {
         }
 
         //number
-        if (first() in '0'..'9') {
-            val string = expectNumber()
-            return Token(Number, string, position)
-        }
+        if (accept("-"))
+            return Token(Number, "-" + expectPositiveNumber(), position)
+
+        if (first() in ('0'..'9'))
+            return Token(Number, expectPositiveNumber(), position)
 
         //identifier
         if (first() == '%') {
@@ -104,7 +105,7 @@ class IrTokenizer(source: String) : Tokenizer<IrTokenType>(source) {
 
         //integertype
         if (accept("i")) {
-            val string = "i" + expectNumber()
+            val string = "i" + expectPositiveNumber()
             return Token(IntegerTypeToken, string, position)
         }
 
@@ -120,7 +121,7 @@ class IrTokenizer(source: String) : Tokenizer<IrTokenType>(source) {
         error("unexpected character '${first()}' at $position")
     }
 
-    private fun expectNumber(): String {
+    private fun expectPositiveNumber(): String {
         if (first() !in '0'..'9')
             error("Expected digit, got '${first()}' at ${currentPosition()}")
 
