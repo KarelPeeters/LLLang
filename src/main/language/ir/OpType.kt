@@ -1,6 +1,7 @@
 package language.ir
 
 import language.ir.ComparisonOpType.*
+import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
 import language.ir.UnaryOpType.Neg
 import language.ir.UnaryOpType.Not
@@ -45,7 +46,7 @@ sealed class ComparisonOpType(
     override fun returnType(leftType: Type, rightType: Type): Type {
         require(leftType == rightType) { "$leftType != $rightType" }
         require(leftType is IntegerType) { "$leftType is not an integer" }
-        return IntegerType.bool
+        return bool
     }
 
     override fun calculate(left: Constant, right: Constant): Constant {
@@ -71,9 +72,13 @@ sealed class UnaryOpType(val symbol: String) {
     override fun toString(): String = name
 
     object Neg : UnaryOpType("-") {
-        override fun calculate(value: Constant): Constant {
-            require(value.type == i32)
-            return Constant(i32, -value.value)
+        override fun calculate(value: Constant) = when (value.type) {
+            i32 -> Constant(i32, -value.value)
+            bool -> {
+                check(value.value == 0 || value.value == 1)
+                Constant(bool, 1 - value.value)
+            }
+            else -> error("Unexpected type ${value.type}")
         }
     }
 
