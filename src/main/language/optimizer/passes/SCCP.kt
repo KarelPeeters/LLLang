@@ -332,6 +332,8 @@ private sealed class LatticeState(private val order: Int) {
  * Short circuiting merging of LatticeStates
  */
 private fun Sequence<LatticeState>.merge(): LatticeState {
+	return Variable
+
     var current: LatticeState = Unknown
 
     for (state in this) {
