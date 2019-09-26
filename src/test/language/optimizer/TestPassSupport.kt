@@ -1,17 +1,14 @@
 package language.optimizer
 
-import language.ir.Function
 import language.ir.Program
 import language.ir.ProgramNameEnv
 import language.ir.support.IrParser
-import language.ir.support.Verifier
 import language.ir.support.programEquals
-import org.apache.commons.io.IOUtils
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.fail
 
 fun testBeforeAfter(name: String, pass: OptimizerPass) {
-    val (input, expected) = readFile(name)
+    val (input, expected) = readBeforeAfterPrograms("passes/$name")
 
     verifyWithMessage(input) { "input invalid" }
     verifyWithMessage(expected) { "expected invalid" }
@@ -56,32 +53,8 @@ private fun programUsers(program: Program) = sequence {
     }
 }.toSet()
 
-private fun runPass(pass: OptimizerPass, program: Program): Boolean {
-    var changed = false
-    val context = object : OptimizerContext {
-        override fun changed() {
-            changed = true
-        }
-
-        override fun domInfo(function: Function) = DominatorInfo(function)
-    }
-
-    with(pass) {
-        context.runOnProgram(program) { }
-    }
-    return changed
-}
-
-private fun verifyWithMessage(program: Program, message: () -> String) {
-    try {
-        Verifier.verifyProgram(program)
-    } catch (e: Exception) {
-        throw IllegalStateException(message(), e)
-    }
-}
-
-private fun readFile(name: String): Pair<Program, Program> {
-    val string = resourceToString("passes/$name").trim()
+private fun readBeforeAfterPrograms(fileName: String): Pair<Program, Program> {
+    val string = ::readBeforeAfterPrograms.javaClass.getResource(fileName).readText().trim()
 
     val (beforeString, afterString) = when {
         string.startsWith("//before") -> {
@@ -113,9 +86,4 @@ private fun readFile(name: String): Pair<Program, Program> {
     val after = IrParser.parse(afterString)
 
     return before to after
-}
-
-private fun resourceToString(path: String): String {
-    val res = ::resourceToString::class.java.getResourceAsStream(path) ?: error("'$path' not found")
-    return IOUtils.toString(res, Charsets.UTF_8)
 }
