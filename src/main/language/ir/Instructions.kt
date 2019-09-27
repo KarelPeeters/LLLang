@@ -21,7 +21,14 @@ sealed class Instruction(val name: String?, type: Type, val pure: Boolean) : Val
 
     abstract fun fullStr(env: NameEnv): String
 
-    abstract fun matches(other: Instruction, map: (Value) -> Value): Boolean
+    abstract fun matches(other: Instruction, maps: ValueMapper): Boolean
+}
+
+interface ValueMapper {
+    operator fun invoke(left: Value, right: Value): Boolean
+    operator fun invoke(left: List<Value>, right: List<Value>): Boolean
+    operator fun invoke(left: Set<Value>, right: Set<Value>): Boolean
+    operator fun invoke(left: Map<out Value, Value>, right: Map<out Value, Value>): Boolean
 }
 
 sealed class BasicInstruction(name: String?, type: Type, pure: Boolean) : Instruction(name, type, pure) {
@@ -44,7 +51,7 @@ class Alloc(name: String?, val inner: Type) : BasicInstruction(name, inner.point
         check(inner.pointer == type) { "result type must be pointer to inner type" }
     }
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
+    override fun matches(other: Instruction, maps: ValueMapper) =
             other is Alloc && inner == other.inner
 }
 
@@ -60,8 +67,8 @@ class Store(pointer: Value, value: Value) : BasicInstruction(null, VoidType, fal
 
     override fun fullStr(env: NameEnv) = "store ${pointer.str(env)} = ${value.str(env)}"
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is Store && map(pointer) == other.pointer && map(value) == other.value
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is Store && maps(pointer, other.pointer) && maps(value, other.value)
 }
 
 class Load(name: String?, pointer: Value) : BasicInstruction(name, pointer.type.unpoint!!, true) {
@@ -75,8 +82,8 @@ class Load(name: String?, pointer: Value) : BasicInstruction(name, pointer.type.
 
     override fun fullStr(env: NameEnv) = "${str(env)} = load ${pointer.str(env)}"
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is Load && map(pointer) == other.pointer
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is Load && maps(pointer, other.pointer)
 }
 
 class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Value) :
@@ -92,8 +99,8 @@ class BinaryOp(name: String?, val opType: BinaryOpType, left: Value, right: Valu
 
     override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${left.str(env)}, ${right.str(env)}"
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is BinaryOp && opType == other.opType && map(left) == other.left && map(right) == other.right
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is BinaryOp && opType == other.opType && maps(left, other.left) && maps(right, other.right)
 }
 
 class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
@@ -108,8 +115,8 @@ class UnaryOp(name: String?, val opType: UnaryOpType, value: Value) :
 
     override fun fullStr(env: NameEnv) = "${str(env)} = $opType ${value.str(env)}"
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is UnaryOp && opType == other.opType && map(value) == other.value
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is UnaryOp && opType == other.opType && maps(value, other.value)
 }
 
 class Phi(name: String?, type: Type) : BasicInstruction(name, type, true) {
@@ -134,16 +141,8 @@ class Phi(name: String?, type: Type) : BasicInstruction(name, type, true) {
         return "${str(env)} = phi [$labels]"
     }
 
-    override fun matches(other: Instruction, map: (Value) -> Value): Boolean {
-        if (other !is Phi || sources.size != other.sources.size) return false
-
-        for ((pred, value) in sources) {
-            val otherValue = other.sources[map(pred)] ?: return false
-            if (map(value) != otherValue) return false
-        }
-
-        return true
-    }
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is Phi && maps(sources, other.sources)
 }
 
 class Eat(arguments: List<Value>) : BasicInstruction(null, VoidType, false) {
@@ -155,8 +154,8 @@ class Eat(arguments: List<Value>) : BasicInstruction(null, VoidType, false) {
 
     override fun fullStr(env: NameEnv) = "eat(" + arguments.joinToString { it.str(env) } + ")"
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is Eat && arguments.map(map) == other.arguments
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is Eat && maps(arguments, other.arguments)
 }
 
 class Blur(name: String?, value: Value) : BasicInstruction(name, value.type, false) {
@@ -170,8 +169,8 @@ class Blur(name: String?, value: Value) : BasicInstruction(name, value.type, fal
 
     override fun fullStr(env: NameEnv) = "${str(env)} = blur ${value.str(env)}"
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is Blur && map(value) == other.value
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is Blur && maps(value, other.value)
 }
 
 class Call(name: String?, target: Value, arguments: List<Value>)
@@ -196,8 +195,8 @@ class Call(name: String?, target: Value, arguments: List<Value>)
         return "${retStr}call $targetStr($argStr)"
     }
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is Call && map(target) == other.target && arguments.map(map) == other.arguments
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is Call && maps(target, other.target) && maps(arguments, other.arguments)
 }
 
 sealed class GetSubValue(name: String?, type: Type)
@@ -221,8 +220,8 @@ sealed class GetSubValue(name: String?, type: Type)
 
         override fun fullStr(env: NameEnv) = "${str(env)} = sget ${target.str(env)}, $index"
 
-        override fun matches(other: Instruction, map: (Value) -> Value) =
-                other is Struct && map(target) == target && index == other.index
+        override fun matches(other: Instruction, maps: ValueMapper) =
+                other is Struct && maps(target, other.target) && index == other.index
     }
 
     class Array(name: String?, target: Value, index: Value)
@@ -242,8 +241,8 @@ sealed class GetSubValue(name: String?, type: Type)
 
         override fun fullStr(env: NameEnv) = "${str(env)} = aget ${target.str(env)}, $index"
 
-        override fun matches(other: Instruction, map: (Value) -> Value) =
-                other is Array && map(target) == other.target && map(index) == other.index
+        override fun matches(other: Instruction, maps: ValueMapper) =
+                other is Array && maps(target, other.target) && maps(index, other.index)
     }
 
     companion object {
@@ -275,8 +274,8 @@ sealed class GetSubPointer(name: String?, type: Type)
 
         override fun fullStr(env: NameEnv) = "${str(env)} = aptr ${target.str(env)}, ${index.str(env)}"
 
-        override fun matches(other: Instruction, map: (Value) -> Value) =
-                other is Array && map(target) == other.target && map(index) == other.index
+        override fun matches(other: Instruction, maps: ValueMapper) =
+                other is Array && maps(target, other.target) && maps(index, other.index)
     }
 
     class Struct(name: String?, target: Value, val index: Int)
@@ -295,8 +294,8 @@ sealed class GetSubPointer(name: String?, type: Type)
 
         override fun fullStr(env: NameEnv) = "${str(env)} = sptr ${target.str(env)}, $index"
 
-        override fun matches(other: Instruction, map: (Value) -> Value) =
-                other is Struct && map(target) == other.target && index == other.index
+        override fun matches(other: Instruction, maps: ValueMapper) =
+                other is Struct && maps(target, other.target) && index == other.index
     }
 }
 
@@ -323,8 +322,8 @@ class AggregateValue(name: String?, type: AggregateType, values: List<Value>)
         }
     }
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is AggregateValue && values.map(map) == other.values
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is AggregateValue && maps(values, other.values)
 }
 
 sealed class Terminator : Instruction(null, VoidType, false) {
@@ -347,8 +346,8 @@ class Branch(value: Value, ifTrue: BasicBlock, ifFalse: BasicBlock) : Terminator
     override fun targets() = listOf(ifTrue, ifFalse)
     override fun fullStr(env: NameEnv) = "branch ${value.str(env)} ${ifTrue.str(env)} ${ifFalse.str(env)}"
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is Branch && map(value) == other.value && map(ifTrue) == other.ifTrue && map(ifFalse) == other.ifFalse
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is Branch && maps(value, other.value) && maps(ifTrue, other.ifTrue) && maps(ifFalse, other.ifFalse)
 }
 
 class Jump(target: BasicBlock?) : Terminator() {
@@ -361,8 +360,8 @@ class Jump(target: BasicBlock?) : Terminator() {
     override fun targets() = listOf(target)
     override fun fullStr(env: NameEnv) = "jump ${target.str(env)}"
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is Jump && map(target) == other.target
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is Jump && maps(target, other.target)
 }
 
 class Exit : Terminator() {
@@ -374,7 +373,7 @@ class Exit : Terminator() {
 
     override fun fullStr(env: NameEnv) = "exit"
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
+    override fun matches(other: Instruction, maps: ValueMapper) =
             other is Exit
 }
 
@@ -391,6 +390,6 @@ class Return(value: Value) : Terminator() {
         else -> "return ${value.str(env)}"
     }
 
-    override fun matches(other: Instruction, map: (Value) -> Value) =
-            other is Return && map(value) == other.value
+    override fun matches(other: Instruction, maps: ValueMapper) =
+            other is Return && maps(value, other.value)
 }

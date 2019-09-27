@@ -22,8 +22,12 @@ fun testBeforeAfter(name: String, pass: OptimizerPass) {
 
     verifyWithMessage(input) { "result of pass invalid" }
 
+    val equals = programEquals(input, expected)
+    val flippedEquals = programEquals(expected, input)
+    assertEquals(equals, flippedEquals) { "programEquals is not reflexive" }
+
     //check input/expected match
-    if (!programEquals(input, expected)) {
+    if (!equals) {
         assertEquals(expected.fullString(ProgramNameEnv()), input.fullString(ProgramNameEnv())) { "result mismatch" }
         fail { "Programs don't equal but string representations do" }
     }
