@@ -4,6 +4,7 @@ import language.ir.Function
 import language.ir.Program
 import language.ir.support.IrParser
 import language.ir.support.Verifier
+import kotlin.reflect.KClass
 
 /**
  * Run a pass on a program, return whether the pass reported a change to the context.
@@ -29,10 +30,12 @@ fun verifyWithMessage(program: Program, message: () -> String) {
     }
 }
 
-fun readFunction(fileName: String): Function {
-    val string = ::readFunction.javaClass.getResource(fileName).readText()
-    val program = IrParser.parse(string)
+fun KClass<*>.readFunction(fileName: String): Function {
+    val program = this.readProgram(fileName)
+    return program.functions.single()
+}
 
-    check(program.functions.size == 1) { "program can only contain a single function" }
-    return program.functions.first()
+fun KClass<*>.readProgram(fileName: String): Program {
+    val string = this.java.getResource(fileName).readText()
+    return IrParser.parse(string)
 }
