@@ -1,0 +1,17 @@
+//unchanged
+fun %main() {
+  <entry>
+    %c i1 = blur 1 i1
+    branch %c i1 <end> <split>
+  <split>
+    branch undef i1 <then> <else>
+  <then>
+    jump <end>
+  <else>
+    jump <end>
+  <end>
+    %x i32 = phi [<entry>: 4 i32, <then>: 5 i32, <else>: 6 i32]
+    eat (%x i32)
+    return
+}
+

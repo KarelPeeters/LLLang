@@ -1,0 +1,30 @@
+//before
+fun %main() {
+  <entry>
+    %x i32* = alloc i32
+    jump <0>
+  <0>
+    exit
+  <2>
+    jump <0>
+  <3>
+    jump <2>
+  <5>
+    store %x i32* = 5 i32
+    jump <3>
+}
+
+//after
+fun %main() {
+  <entry>
+    jump <0>
+  <0>
+    %x i32 = phi [<entry>: undef i32, <2>: undef i32]
+    exit
+  <2>
+    jump <0>
+  <3>
+    jump <2>
+  <5>
+    jump <3>
+}

@@ -4,6 +4,8 @@ import language.ir.BasicBlock
 import language.ir.Function
 import language.ir.Instruction
 import language.ir.Terminator
+import language.util.Graph
+import language.util.reachable
 
 private fun calcDominatedBy(function: Function): Map<BasicBlock, Set<BasicBlock>> {
     val result = function.blocks.associateWithTo(mutableMapOf()) { function.blocks.toMutableSet() }
@@ -26,11 +28,25 @@ private fun calcDominatedBy(function: Function): Map<BasicBlock, Set<BasicBlock>
 class DominatorInfo(val function: Function) {
     private val dominatedBy: Map<BasicBlock, Set<BasicBlock>> = calcDominatedBy(function)
 
-    private val domParent: Map<BasicBlock, BasicBlock?> = function.blocks.associate { block ->
-        val blockDoms = dominatedBy.getValue(block).filter { it != block }
-        block to blockDoms.find { cand ->
-            val candDoms = dominatedBy.getValue(cand)
-            blockDoms.all { it in candDoms }
+    private val domParent: Map<BasicBlock, BasicBlock?>
+
+    init {
+        val reachable = object : Graph<BasicBlock> {
+            override val roots = setOf(function.entry)
+            override fun children(node: BasicBlock) = node.successors()
+        }.reachable()
+
+        domParent = function.blocks.associateWith { block ->
+            if (block !in reachable)
+                return@associateWith null
+
+            val doms = dominatedBy.getValue(block)
+            val strictDoms = doms.filter { it != block }
+
+            strictDoms.find { cand ->
+                val candDoms = dominatedBy.getValue(cand)
+                strictDoms.all { it in candDoms }
+            }
         }
     }
 
@@ -41,6 +57,8 @@ class DominatorInfo(val function: Function) {
                 .filter { candidate -> block !in dominatedBy.getValue(candidate) }
                 .toSet()
     }
+
+    fun dominators(block: BasicBlock) = dominatedBy.getValue(block)
 
     fun strictDominators(block: BasicBlock) = dominatedBy.getValue(block) - block
 

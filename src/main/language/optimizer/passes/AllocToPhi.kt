@@ -1,14 +1,7 @@
 package language.optimizer.passes
 
-import language.ir.Alloc
-import language.ir.BasicBlock
-import language.ir.BasicInstruction
+import language.ir.*
 import language.ir.Function
-import language.ir.Load
-import language.ir.Phi
-import language.ir.Store
-import language.ir.UndefinedValue
-import language.ir.Value
 import language.optimizer.FunctionPass
 import language.optimizer.OptimizerContext
 import language.util.subListUntil
@@ -97,6 +90,4 @@ object AllocToPhi : FunctionPass() {
             changed()
         }
     }
-
-    class NoValueFoundException : Exception()
 }
