@@ -48,4 +48,10 @@ class SCCPTest {
 
     @Test
     fun sumLoop() = testBeforeAfter("sccp_sumLoop.ir", ProgramSCCP)
+
+    @Test
+    fun undefBranch() = testBeforeAfter("sccp_undefBranch.ir", SCCP)
+
+    @Test
+    fun undefOps() = testBeforeAfter("sccp_undefOps.ir", SCCP)
 }

@@ -1,0 +1,23 @@
+//before
+fun %main() {
+  <entry>
+    %a i1 = mul 0 i1, undef i1
+    %b i1 = and 0 i1, undef i1
+    %c i1 = or  1 i1, undef i1
+    eat(%a i1)
+    eat(%b i1)
+    eat(%c i1)
+    return
+}
+
+//after
+fun %main() {
+  <entry>
+    %a i1 = mul 0 i1, undef i1
+    %b i1 = and 0 i1, undef i1
+    %c i1 = or  1 i1, undef i1
+    eat(0 i1)
+    eat(0 i1)
+    eat(1 i1)
+    return
+}

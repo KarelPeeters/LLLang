@@ -1,31 +1,7 @@
 package language.optimizer.passes
 
-import language.ir.AggregateValue
-import language.ir.Alloc
-import language.ir.BasicBlock
-import language.ir.BasicInstruction
-import language.ir.BinaryOp
-import language.ir.Blur
-import language.ir.Branch
-import language.ir.Call
-import language.ir.Constant
-import language.ir.Eat
+import language.ir.*
 import language.ir.Function
-import language.ir.GetSubPointer
-import language.ir.GetSubValue
-import language.ir.Instruction
-import language.ir.Load
-import language.ir.ParameterValue
-import language.ir.Phi
-import language.ir.Program
-import language.ir.Return
-import language.ir.Store
-import language.ir.Terminator
-import language.ir.Type
-import language.ir.UnaryOp
-import language.ir.UndefinedValue
-import language.ir.Value
-import language.ir.VoidValue
 import language.ir.visitors.ValueVisitor
 import language.optimizer.FunctionPass
 import language.optimizer.OptimizerContext
@@ -144,7 +120,6 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
 
     private fun updateLattice(value: Value, state: LatticeState) {
         val prev = latticeMap.put(value, state)
-        check(prev == null || prev >= state)
 
         if (prev != state) {
             for (user in value.users) {
@@ -220,7 +195,6 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
     private fun visitControlflowTerminator(instr: Terminator) {
         if (instr is Branch) {
             when (val value = lattice(instr.value)) {
-                Unknown -> error("can't happen, value was just lowered")
                 is Known -> {
                     if ((value.value as Constant).value == 0)
                         updateExecutableEdge(instr.block, instr.ifFalse)
@@ -230,6 +204,10 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
                 Variable -> {
                     updateExecutableEdge(instr.block, instr.ifTrue)
                     updateExecutableEdge(instr.block, instr.ifFalse)
+                }
+                Unknown -> {
+                    //for now just assume ifTrue is taken, this could be improved to take the "cheapest" branch instead
+                    updateExecutableEdge(instr.block, instr.ifTrue)
                 }
             }
         } else {
@@ -243,8 +221,7 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
      * This function contains the actual constant folding logic and tries to return the simplest result possible.
      */
     private fun computeInstructionResult(instr: BasicInstruction): LatticeState? = when (instr) {
-        is Alloc, is Load, is Blur -> Variable
-        is GetSubPointer.Array, is GetSubPointer.Struct -> Variable
+        is Alloc, is Blur -> Variable
         is AggregateValue -> Variable
 
         is Store, is Eat -> null
@@ -260,16 +237,27 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
             }.merge()
         }
 
+        is Load -> {
+            if (lattice(instr.pointer) == Unknown)
+                Unknown
+            else
+                Variable
+        }
+
         is BinaryOp -> {
+            //return variable even if one of the operands is unknown and the other known, because of cases
+            //like 0*unknown != unknown! this logic can be improved in the future to specifically handle those cases
+            //for every operation type
+
             val left = lattice(instr.left)
             val right = lattice(instr.right)
 
-            if (left == Variable || right == Variable)
-                Variable
-            else if (left is Known && right is Known)
+            if (left is Known && right is Known)
                 Known(instr.opType.calculate(left.value as Constant, right.value as Constant))
-            else
+            else if (left is Unknown && right is Unknown)
                 Unknown
+            else
+                Variable
         }
 
         is UnaryOp -> {
@@ -296,6 +284,18 @@ private class SCCPImpl private constructor(val context: OptimizerContext, val mu
                 else
                     Variable
             } else
+                Variable
+        }
+
+        is GetSubPointer -> {
+            val indexUnknown = when (instr) {
+                is GetSubPointer.Array -> lattice(instr.index) == Unknown
+                is GetSubPointer.Struct -> false
+            }
+
+            if (lattice(instr.target) == Unknown || indexUnknown)
+                Unknown
+            else
                 Variable
         }
     }
