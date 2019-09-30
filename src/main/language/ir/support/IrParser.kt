@@ -1,40 +1,7 @@
 package language.ir.support
 
-import language.ir.AggregateValue
-import language.ir.Alloc
-import language.ir.ArrayType
-import language.ir.BINARY_OP_TYPES
-import language.ir.BasicBlock
-import language.ir.BasicInstruction
-import language.ir.BinaryOp
-import language.ir.Blur
-import language.ir.Branch
-import language.ir.Call
-import language.ir.Constant
-import language.ir.Eat
-import language.ir.Exit
+import language.ir.*
 import language.ir.Function
-import language.ir.FunctionType
-import language.ir.GetSubPointer
-import language.ir.GetSubValue
-import language.ir.IntegerType
-import language.ir.Jump
-import language.ir.Load
-import language.ir.Phi
-import language.ir.PlaceholderValue
-import language.ir.Program
-import language.ir.Return
-import language.ir.Store
-import language.ir.StructType
-import language.ir.Terminator
-import language.ir.Type
-import language.ir.UNARY_OP_TYPES
-import language.ir.UnaryOp
-import language.ir.UndefinedValue
-import language.ir.Value
-import language.ir.VoidType
-import language.ir.VoidValue
-import language.ir.pointer
 import language.ir.support.IrTokenType.*
 import language.ir.support.IrTokenType.Annotation
 import language.ir.support.IrTokenType.Number
@@ -116,10 +83,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         localVariablePlaceholders.clear()
         localBlockPlaceholders.clear()
 
-        val blocks = mutableListOf<BasicBlock>()
-        while (at(BlockId))
-            blocks += block()
-        expect(CloseC)
+        val blocks = list(CloseC, null) { block() }
 
         //replacement map for values to ensure there are no duplicate replacements available
         val valueMap = mutableMapOf<String, Value>()
@@ -180,7 +144,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         val block = BasicBlock(name)
 
         while (true) {
-            val term = terminator()
+            val term = maybeTerminator()
             if (term != null) {
                 block.terminator = term
                 return block
@@ -207,8 +171,9 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
     }
 
     private fun valueInstr(): BasicInstruction {
-        val name = idName()
-        val type = type()
+        val target = idValue()
+        val name = target.name
+        val type = target.type
 
         expect(Assign)
 
@@ -283,7 +248,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         return Call(name, target, arguments)
     }
 
-    private fun terminator(): Terminator? = when {
+    private fun maybeTerminator(): Terminator? = when {
         accept(BranchToken) -> Branch(typedValue(), blockPlaceholder(), blockPlaceholder())
         accept(JumpToken) -> Jump(blockPlaceholder())
         accept(ExitToken) -> Exit()
@@ -294,11 +259,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
     private fun typedValue(): Value = maybeTypedValue() ?: expected("value")
 
     private fun maybeTypedValue(): Value? = when {
-        at(Id) -> {
-            val name = idName()
-            val type = type()
-            valuePlaceholder(name, type)
-        }
+        at(Id) -> idValue()
         at(Number) -> {
             val value = intergerLiteral()
             val type = type() as? IntegerType ?: error("Expected integer type")
@@ -309,6 +270,12 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
             UndefinedValue(type)
         }
         else -> null
+    }
+
+    private fun idValue(): PlaceholderValue {
+        val name = idName()
+        val type = type()
+        return valuePlaceholder(name, type)
     }
 
     private fun type(): Type {
@@ -359,7 +326,7 @@ class IrParser(tokenizer: IrTokenizer) : Parser<IrTokenType>(tokenizer) {
         val value = localVariablePlaceholders[name]
 
         return if (value == null) {
-            val new = PlaceholderValue(type)
+            val new = PlaceholderValue(name, type)
             localVariablePlaceholders[name] = new
             new
         } else {

@@ -1,38 +1,9 @@
 package language.ir.support
 
-import language.ir.Alloc
-import language.ir.BINARY_OP_TYPES
-import language.ir.BasicBlock
-import language.ir.BasicInstruction
-import language.ir.BinaryOp
-import language.ir.Blur
-import language.ir.Branch
-import language.ir.Call
-import language.ir.Constant
-import language.ir.Eat
-import language.ir.Exit
+import language.ir.*
 import language.ir.Function
-import language.ir.FunctionType
-import language.ir.Instruction
-import language.ir.IntegerType
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
-import language.ir.Jump
-import language.ir.Load
-import language.ir.Phi
-import language.ir.PlaceholderValue
-import language.ir.Program
-import language.ir.Return
-import language.ir.Store
-import language.ir.Terminator
-import language.ir.Type
-import language.ir.UNARY_OP_TYPES
-import language.ir.UnaryOp
-import language.ir.UndefinedValue
-import language.ir.Value
-import language.ir.VoidType
-import language.ir.VoidValue
-import language.ir.pointer
 import language.optimizer.DominatorInfo
 import language.util.subListUntil
 import kotlin.random.Random
@@ -48,7 +19,7 @@ class Fuzzer(val rand: Random) {
     private val functions = mutableListOf<Function>()
     private val placeHolders = mutableListOf<PlaceholderValue>()
 
-    private fun placeholder(type: Type) = PlaceholderValue(type).also { placeHolders += it }
+    private fun placeholder(type: Type) = PlaceholderValue(null, type).also { placeHolders += it }
 
     private val randomIntType = WeightedChoice<IntegerType>(
             1 to { bool },

@@ -71,6 +71,6 @@ object VoidValue : Value(VoidType) {
 /**
  * Used as a placeholder, should never actually end up in the final IR. This class has identity based equality.
  */
-class PlaceholderValue(type: Type) : Value(type) {
+class PlaceholderValue(val name: String?, type: Type) : Value(type) {
     override fun untypedStr(env: NameEnv) = "PlaceHolder"
 }
