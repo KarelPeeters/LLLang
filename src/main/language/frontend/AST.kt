@@ -206,7 +206,7 @@ class ArrayInitializer(
         val values: List<Expression>
 ) : Expression(position) {
     override fun ASTRenderer.render() {
-        print("["); printList(values); print("]")
+        print("{"); printList(values); print("}")
     }
 }
 
