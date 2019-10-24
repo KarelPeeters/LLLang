@@ -1,8 +1,0 @@
-fun %main() {
-  <entry>
-    return
-  <first>
-    jump <second>
-  <second>
-    jump <first>
-}
