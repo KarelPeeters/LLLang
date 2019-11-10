@@ -48,12 +48,15 @@ class Function(
 ) : Constant(type) {
     var entry: Region by operand()
 
+    //memory values to keep used so their effects don't die off in endless loops
+    val keepAlive by operandList<Node>()
+
     val parameters: List<Parameter> = type.parameters.map { Parameter(it) }
 
     fun fullString(namer: (Node) -> String): String {
         val params = parameters.joinToString { it.typedString(namer) }
         val retuns = type.returns.joinToString()
-        val body = visitNodes(this.entry) { it !is Function }
+        val body = visitNodes(this) { it == this || it !is Function }
                 .filterIsInstance<Instruction>()
                 .joinToString("\n") { "    " + it.fullString(namer) }
 

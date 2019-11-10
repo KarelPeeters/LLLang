@@ -10,8 +10,8 @@ import kotlin.contracts.contract
 import language.ir.BinaryOp as IrBinaryOp
 import language.ir.Call as IrCall
 import language.ir.Function as IrFunction
-import language.ir.Program as IrProgram
 import language.ir.Parameter as IrParameter
+import language.ir.Program as IrProgram
 
 data class LoadResult(val afterMem: Node, val value: Node)
 
@@ -133,7 +133,16 @@ class Flattener {
             }.hashCode() //exhaustive
         }
 
-        program.entry = functions.find { it.first.name == "main" }?.second ?: error("No main function in program")
+        val (mainFunc, mainIrFunc) = functions.singleOrNull {
+            it.first.name == "main"
+        } ?: error("There must be a single main function")
+
+        val mainTypeWithoutMem = FunctionType(
+                mainIrFunc.type.parameters.drop(1),
+                mainIrFunc.type.returns.drop(1)
+        )
+        requireTypeMatch(mainFunc.position, FunctionType(emptyList(), emptyList()), mainTypeWithoutMem)
+        program.entry = mainIrFunc
 
         //generate code
         for ((function, irFunction) in structs.values.flatMap { it.methods.values })
@@ -297,6 +306,9 @@ class Flattener {
 
                 condPhi.values[start.region] = start.mem
                 endPhi.values[condRegion] = condEnd.mem
+
+                //potentially endless loop, keep memory node alive
+                currentFunction.keepAlive += endPhi
 
                 Cont(endRegion, endPhi)
             }
