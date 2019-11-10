@@ -2,6 +2,7 @@ package language.ir
 
 import kotlin.properties.ReadOnlyProperty
 import kotlin.properties.ReadWriteProperty
+import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
 
 abstract class NodeImpl {
@@ -18,28 +19,39 @@ abstract class NodeImpl {
             holder.replaceOperand(from, to)
     }
 
-    protected fun <N : Node> operand(value: N? = null): ReadWriteProperty<Node, N> = object : ReadWriteProperty<Node, N>, OperandHolder {
-        lateinit var value: N
+    protected inline fun <reified N : Node> operand(value: N? = null, type: Type? = null) =
+            operand(value, N::class, type)
 
-        init {
-            value?.let { this.value = it }
+    protected fun <N : Node> operand(value: N?, cls: KClass<N>?, type: Type?): ReadWriteProperty<Node, N> = object : ReadWriteProperty<Node, N>, OperandHolder {
+        @Suppress("ObjectPropertyName")
+        var _value: N? = null
+
+        @Suppress("UNCHECKED_CAST")
+        fun setValue(value: Node) {
+            if (cls != null)
+                check(cls.isInstance(value)) { "value $value is not an instance of $cls" }
+            if (type != null)
+                check(value.type == type) { "value $value has type ${value.type}, expected type $type" }
+            this._value = value as N
         }
 
-        override fun getValue(thisRef: Node, property: KProperty<*>): N = this.value
+        fun getValue(): N = this._value ?: error("Attempt to get uninitialized operand")
 
-        override fun setValue(thisRef: Node, property: KProperty<*>, value: N) {
-            this.value = value
-        }
+        override fun getValue(thisRef: Node, property: KProperty<*>): N = getValue()
+        override fun setValue(thisRef: Node, property: KProperty<*>, value: N): Unit = setValue(value)
 
-        override fun operands() = listOf(this.value)
+        override fun operands() = listOf(getValue())
 
         @Suppress("UNCHECKED_CAST")
         override fun replaceOperand(from: Node, to: Node) {
-            to as N
-            if (this.value == from)
-                this.value = to
+            if (getValue() == from)
+                setValue(to)
         }
-    }.also { holders += it }
+    }.also {
+        if (value != null)
+            it.setValue(value)
+        holders += it
+    }
 
     protected fun <N : Node> operandList(values: List<N>? = null): ReadOnlyProperty<Node, MutableList<N>> = object : ReadOnlyProperty<Node, MutableList<N>>, OperandHolder {
         val list = values.orEmpty().toMutableList()

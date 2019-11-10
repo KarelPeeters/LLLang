@@ -2,7 +2,7 @@ package language.ir.support
 
 import language.ir.Node
 
-class UseInfo(root: Node) {
+class UserInfo(root: Node) {
     private val users: Map<Node, Set<Node>>
 
     init {

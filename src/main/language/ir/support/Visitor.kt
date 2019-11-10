@@ -1,5 +1,6 @@
 package language.ir.support
 
+import language.ir.Function
 import language.ir.Node
 import java.util.*
 
@@ -24,3 +25,5 @@ inline fun visitNodes(root: Node, action: (Node) -> Boolean = { true }): Set<Nod
 
     return visited
 }
+
+fun findInnerNodes(function: Function): Set<Node> = visitNodes(function) { it == function || it !is Function }

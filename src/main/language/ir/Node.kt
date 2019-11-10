@@ -1,5 +1,6 @@
 package language.ir
 
+import language.ir.support.findInnerNodes
 import language.ir.support.visitNodes
 
 /**
@@ -13,6 +14,8 @@ sealed class Node(open val type: Type) : NodeImpl() {
     var name: String? = null
 
     protected fun project(index: Int) = Project(this, index)
+
+    open fun typeCheck() {}
 
     open fun untypedString(namer: (Node) -> String) = namer(this)
 
@@ -31,11 +34,11 @@ class Project(
         node: Node,
         val index: Int
 ) : Node((node.type as TupleType)[index]) {
-    val node by operand(node)
+    val node by operand(node, node.type)
 }
 
 class Program : Node(VoidType), Instruction {
-    var entry: Function by operand()
+    var entry: Function by operand(type = FunctionType(listOf(MemType), listOf(MemType)))
 
     override fun fullString(namer: (Node) -> String): String {
         val funcs = visitNodes(this.entry).filterIsInstance<Function>()
@@ -53,10 +56,15 @@ class Function(
 
     val parameters: List<Parameter> = type.parameters.map { Parameter(it) }
 
+    override fun typeCheck() {
+        check(keepAlive.all { it.type == MemType })
+        check(findInnerNodes(this).filterIsInstance<Return>().all { it.types == type.returns })
+    }
+
     fun fullString(namer: (Node) -> String): String {
         val params = parameters.joinToString { it.typedString(namer) }
         val retuns = type.returns.joinToString()
-        val body = visitNodes(this) { it == this || it !is Function }
+        val body = findInnerNodes(this)
                 .filterIsInstance<Instruction>()
                 .joinToString("\n") { "    " + it.fullString(namer) }
 
@@ -67,7 +75,7 @@ class Function(
 class Parameter(type: Type) : Node(type)
 
 class Region : Node(RegionType), Instruction {
-    var terminator by operand<Terminator>()
+    var terminator: Terminator by operand()
 
     override val replaceAble get() = false
 
@@ -95,7 +103,7 @@ class Branch(
         ifTrue: Region,
         ifFalse: Region
 ) : Terminator() {
-    var condition by operand(condition)
+    var condition by operand(condition, type = IntegerType.bool)
     var ifTrue: Region by operand(ifTrue)
     var ifFalse: Region by operand(ifFalse)
 
@@ -113,6 +121,11 @@ class Return(
     val types = values.map { it.type }
     val values by operandList(values)
 
+    override fun typeCheck() {
+        check(types.size == values.size)
+        check((types zip values).all { (t, v) -> v.type == t })
+    }
+
     override fun fullString(namer: (Node) -> String): String {
         val v = values.joinToString { it.typedString(namer) }
         return "return $v"
@@ -124,7 +137,11 @@ class Phi(
         region: Region
 ) : Node(type), Instruction {
     var region: Region by operand(region)
-    val values: MutableMap<Region, Node> by operandValueMap()
+    val values by operandValueMap<Region, Node>()
+
+    override fun typeCheck() {
+        check(values.values.all { it.type == this.type })
+    }
 
     override fun fullString(namer: (Node) -> String): String {
         val th = this.typedString(namer)
@@ -138,7 +155,7 @@ class Eat(
         beforeMem: Node,
         value: Node
 ) : Node(MemType), Instruction {
-    var beforeMem by operand(beforeMem)
+    var beforeMem by operand(beforeMem, type = MemType)
     var value by operand(value)
 
     override fun fullString(namer: (Node) -> String): String {
@@ -153,12 +170,13 @@ class Blur(
         value: Node,
         val transparent: Boolean
 ) : Node(value.type), Instruction {
-    var value by operand(value)
+    var value by operand(value, this.type)
 
     override fun fullString(namer: (Node) -> String): String {
         val th = this.typedString(namer)
         val v = value.typedString(namer)
-        return "$th = blur $v"
+        val blur = if (transparent) "(blur)" else "blur"
+        return "$th = $blur $v"
     }
 }
 
@@ -166,7 +184,7 @@ class Alloc(
         beforeMem: Node,
         val inner: Type
 ) : Node(TupleType(MemType, inner.pointer)), Instruction {
-    var beforeMem by operand(beforeMem)
+    var beforeMem by operand(beforeMem, type = MemType)
 
     val afterMem = project(0)
     val result = project(1)
@@ -179,16 +197,12 @@ class Alloc(
     }
 }
 
-class GetSubPointer(
-
-)
-
 class Load(
         beforeMem: Node,
         address: Node
 ) : Node(TupleType(MemType, address.type.unpoint!!)), Instruction {
-    var beforeMem by operand(beforeMem)
-    var address by operand(address)
+    var beforeMem by operand(beforeMem, type = MemType)
+    var address by operand(address, type = address.type)
 
     val afterMem = project(0)
     val value = project(1)
@@ -207,9 +221,9 @@ class Store(
         address: Node,
         value: Node
 ) : Node(MemType), Instruction {
-    var beforeMem by operand(beforeMem)
-    var address by operand(address)
-    var value by operand(value)
+    var beforeMem by operand(beforeMem, type = MemType)
+    var address by operand(address, type = value.type.pointer)
+    var value by operand(value, type = value.type)
 
     override fun fullString(namer: (Node) -> String): String {
         val th = this.typedString(namer)
@@ -225,8 +239,8 @@ class BinaryOp(
         left: Node,
         right: Node
 ) : Node(opType.returnType(left.type, right.type)), Instruction {
-    var left by operand(left)
-    var right by operand(right)
+    var left by operand(left, left.type)
+    var right by operand(right, right.type)
 
     override fun fullString(namer: (Node) -> String): String {
         val l = left.typedString(namer)
@@ -242,10 +256,15 @@ class Call(
 ) : Node(TupleType((target.type as FunctionType).returns)), Instruction {
     val funcType = target.type as FunctionType
 
-    var target by operand(target)
+    var target by operand(target, type = funcType)
     val arguments by operandList(arguments)
 
     val returns = funcType.returns.indices.map { project(it) }
+
+    override fun typeCheck() {
+        check(funcType.parameters.size == arguments.size)
+        check((funcType.parameters zip arguments).all { (t, a) -> a.type == t })
+    }
 
     override fun fullString(namer: (Node) -> String): String {
         val t = target.untypedString(namer)
@@ -270,9 +289,7 @@ class IntegerConstant(
 class Undef(type: Type) : Node(type) {
     override val replaceAble get() = false
 
-    override fun untypedString(namer: (Node) -> String): String {
-        return super.untypedString(namer)
-    }
+    override fun untypedString(namer: (Node) -> String) = "undef"
 }
 
 class PlaceHolder(type: Type) : Node(type)

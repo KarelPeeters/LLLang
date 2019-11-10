@@ -202,7 +202,7 @@ class Flattener {
         }
         //store parameters into their allocs
         val afterParamStoreMem = initialAllocs.fold(afterAllocMem) { mem, (alloc, param) ->
-            if (param != null) Store(mem, alloc, param) else mem
+            if (param != null) Store(mem, alloc.result, param) else mem
         }
 
         startMem.value = afterParamStoreMem
@@ -244,7 +244,7 @@ class Flattener {
 
                 //store the value
                 if (value != null) {
-                    val store = Store(cont.mem, alloc, value)
+                    val store = Store(cont.mem, alloc.result, value)
                     Cont(cont.region, store)
                 } else
                     cont
