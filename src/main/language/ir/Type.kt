@@ -28,12 +28,19 @@ data class IntegerType(val width: Int) : Type() {
         check(width > 0) { "width must be positve, got $width" }
     }
 
+    val ZERO = IntegerConstant(this, 0)
+    val ONE = IntegerConstant(this, 1)
+
     companion object {
         val bool = IntegerType(1)
         val i32 = IntegerType(32)
     }
 
     override fun toString() = "i$width"
+}
+
+class StructType(val name: String, val properties: List<Type>) : Type() {
+    override fun toString() = "$$name"
 }
 
 object VoidType : Type() {

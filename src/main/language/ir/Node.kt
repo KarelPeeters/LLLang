@@ -146,9 +146,22 @@ class Eat(
     }
 }
 
+class Blur(
+        value: Node,
+        val transparent: Boolean
+) : Node(value.type), Instruction {
+    var value by operand(value)
+
+    override fun fullString(namer: (Node) -> String): String {
+        val th = this.typedString(namer)
+        val v = value.typedString(namer)
+        return "$th = blur $v"
+    }
+}
+
 class Alloc(
-        val inner: Type,
-        beforeMem: Node
+        beforeMem: Node,
+        val inner: Type
 ) : Node(TupleType(MemType, inner.pointer)), Instruction {
     var beforeMem by operand(beforeMem)
 
@@ -162,6 +175,10 @@ class Alloc(
         return "$r, $am = alloc $inner $bm"
     }
 }
+
+class GetSubPointer(
+
+)
 
 class Load(
         beforeMem: Node,
@@ -204,13 +221,9 @@ class BinaryOp(
         val opType: BinaryOpType,
         left: Node,
         right: Node
-) : Node(left.type), Instruction {
+) : Node(opType.returnType(left.type, right.type)), Instruction {
     var left by operand(left)
     var right by operand(right)
-
-    enum class BinaryOpType {
-        Add, Sub, Mul, Div, GT, LT, LTE, GTE, EQ, NEQ,
-    }
 
     override fun fullString(namer: (Node) -> String): String {
         val l = left.typedString(namer)
