@@ -5,8 +5,6 @@ import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
 import language.parsing.SourcePosition
 import java.util.*
-import kotlin.contracts.ExperimentalContracts
-import kotlin.contracts.contract
 import language.ir.BinaryOp as IrBinaryOp
 import language.ir.Call as IrCall
 import language.ir.Function as IrFunction
@@ -305,7 +303,7 @@ class Flattener {
                 }
 
                 condPhi.values[start.region] = start.mem
-                endPhi.values[condRegion] = condEnd.mem
+                endPhi.values[condRegion] = condPhi
 
                 //potentially endless loop, keep memory node alive
                 currentFunction.keepAlive += endPhi
@@ -370,8 +368,6 @@ class Flattener {
                 if (scope.isImmutableVal(target))
                     throw VariableImmutableException(exp.position, (exp.target as IdentifierExpression).identifier)
 
-                //TODO replace all "afterX" with "xEnd"
-
                 val (valueEnd, value) = appendLoadedExpression(targetEnd, scope, exp.value) ?: return null
                 requireTypeMatch(exp.position, target.type.unpoint!!, value.type)
 
@@ -410,14 +406,14 @@ class Flattener {
         return afterValue to RValue(result)
     }
 
-    private fun appendIncDecExpression(start: Cont, scope: Scope, exp: UnaryOp, type: BinaryOpType, pre: Boolean): Pair<Cont, RValue>? {
+    private fun appendIncDecExpression(start: Cont, scope: Scope, exp: UnaryOp, binaryOpType: BinaryOpType, pre: Boolean): Pair<Cont, RValue>? {
         val (targetEnd, target) = appendPointerExpression(start, scope, exp.value) ?: return null
         if (scope.isImmutableVal(target))
             throw VariableImmutableException(exp.position, (exp.value as IdentifierExpression).identifier)
 
         val old = Load(targetEnd.mem, target)
-        requireIntegerType(exp.value.position, old.type)
-        val new = IrBinaryOp(type, old, old.type.ONE)
+        val type = requireIntegerType(exp.value.position, old.type)
+        val new = IrBinaryOp(binaryOpType, old, type.ONE)
 
         val store = Store(targetEnd.mem, target, new)
         val cont = Cont(targetEnd.region, store)
@@ -549,13 +545,8 @@ private fun requireTypeMatch(pos: SourcePosition, expected: Type, actual: Type) 
     if (expected != actual) throw TypeMismatchException(pos, expected, actual)
 }
 
-@UseExperimental(ExperimentalContracts::class)
-private fun requireIntegerType(pos: SourcePosition, actual: Type) {
-    contract { returns() implies (actual is IntegerType) }
-
-    if (actual !is IntegerType)
-        throw ExpectedIntegerTypeException(pos, actual)
-}
+private fun requireIntegerType(pos: SourcePosition, actual: Type): IntegerType =
+        actual as? IntegerType ?: throw ExpectedIntegerTypeException(pos, actual)
 
 class IdNotFoundException(pos: SourcePosition, identifier: String)
     : Exception("$pos: '$identifier' not found")
