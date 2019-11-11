@@ -31,7 +31,7 @@ abstract class NodeImpl {
             if (cls != null)
                 check(cls.isInstance(value)) { "value $value is not an instance of $cls" }
             if (type != null)
-                check(value.type == type) { "value $value has type ${value.type}, expected type $type" }
+                checkTypeEquals(value, type)
             this._value = value as N
         }
 
@@ -39,6 +39,9 @@ abstract class NodeImpl {
 
         override fun getValue(thisRef: Node, property: KProperty<*>): N = getValue()
         override fun setValue(thisRef: Node, property: KProperty<*>, value: N): Unit = setValue(value)
+
+        //the value is continuously typechecked, nothing to do here
+        override fun typeCheck() {}
 
         override fun operands() = listOf(getValue())
 
@@ -53,10 +56,32 @@ abstract class NodeImpl {
         holders += it
     }
 
-    protected fun <N : Node> operandList(values: List<N>? = null): ReadOnlyProperty<Node, MutableList<N>> = object : ReadOnlyProperty<Node, MutableList<N>>, OperandHolder {
+    protected fun <N : Node> operandList(): ReadOnlyProperty<Node, MutableList<N>> =
+            operandList(values = null, types = null, type = null)
+
+    protected fun <N : Node> operandList(values: List<N>? = null, types: List<Type>): ReadOnlyProperty<Node, MutableList<N>> =
+            operandList(values = values, types = types, type = null)
+
+    protected fun <N : Node> operandList(values: List<N>? = null, type: Type): ReadOnlyProperty<Node, MutableList<N>> =
+            operandList(values = values, types = null, type = type)
+
+    private fun <N : Node> operandList(values: List<N>?, types: List<Type>?, type: Type?): ReadOnlyProperty<Node, MutableList<N>> = object : ReadOnlyProperty<Node, MutableList<N>>, OperandHolder {
         val list = values.orEmpty().toMutableList()
 
         override fun getValue(thisRef: Node, property: KProperty<*>) = list
+
+        override fun typeCheck() {
+            if (types != null) {
+                val actual = list.map { it.type }
+                check(actual == types) {
+                    "values $list have types $actual, expected types $types"
+                }
+            }
+            if (type != null) {
+                for (value in list)
+                    checkTypeEquals(value, type)
+            }
+        }
 
         override fun operands() = list
 
@@ -67,10 +92,17 @@ abstract class NodeImpl {
         }
     }.also { holders += it }
 
-    protected fun <K, V : Node> operandValueMap(values: Map<K, V>? = null): ReadOnlyProperty<Node, MutableMap<K, V>> = object : ReadOnlyProperty<Node, MutableMap<K, V>>, OperandHolder {
+    protected fun <K, V : Node> operandValueMap(values: Map<K, V>? = null, type: Type? = null): ReadOnlyProperty<Node, MutableMap<K, V>> = object : ReadOnlyProperty<Node, MutableMap<K, V>>, OperandHolder {
         val map = values.orEmpty().toMutableMap()
 
         override fun getValue(thisRef: Node, property: KProperty<*>) = map
+
+        override fun typeCheck() {
+            if (type != null) {
+                for (value in map.values)
+                    checkTypeEquals(value, type)
+            }
+        }
 
         override fun operands() = map.values
 
@@ -85,7 +117,12 @@ abstract class NodeImpl {
     }.also { holders += it }
 }
 
+private fun checkTypeEquals(value: Node, type: Type) = check(value.type == type) {
+    "value $value has type ${value.type}, expected type $type"
+}
+
 private interface OperandHolder {
+    fun typeCheck()
     fun operands(): Collection<Node>
     fun replaceOperand(from: Node, to: Node)
 }

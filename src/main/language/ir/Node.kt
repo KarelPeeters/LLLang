@@ -52,7 +52,7 @@ class Function(
     var entry: Region by operand()
 
     //memory values to keep used so their effects don't die off in endless loops
-    val keepAlive by operandList<Node>()
+    val keepAlive by operandList<Node>(type = MemType)
 
     val parameters: List<Parameter> = type.parameters.map { Parameter(it) }
 
@@ -119,7 +119,7 @@ class Return(
         values: List<Node>
 ) : Terminator() {
     val types = values.map { it.type }
-    val values by operandList(values)
+    val values by operandList(values, types = types)
 
     override fun typeCheck() {
         check(types.size == values.size)
@@ -137,11 +137,7 @@ class Phi(
         region: Region
 ) : Node(type), Instruction {
     var region: Region by operand(region)
-    val values by operandValueMap<Region, Node>()
-
-    override fun typeCheck() {
-        check(values.values.all { it.type == this.type })
-    }
+    val values by operandValueMap<Region, Node>(type = type)
 
     override fun fullString(namer: (Node) -> String): String {
         val th = this.typedString(namer)
@@ -257,7 +253,7 @@ class Call(
     val funcType = target.type as FunctionType
 
     var target by operand(target, type = funcType)
-    val arguments by operandList(arguments)
+    val arguments by operandList(arguments, types = funcType.parameters)
 
     val returns = funcType.returns.indices.map { project(it) }
 
