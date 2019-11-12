@@ -74,15 +74,18 @@ private data class StructInfo(
         val methods: Map<String, Pair<Function, IrFunction>>
 )
 
-class Flattener {
-    val program = IrProgram()
+class Flattener private constructor() {
+    companion object {
+        fun flatten(program: Program): IrProgram = Flattener().flatten(program)
+    }
 
     private lateinit var currentFunction: IrFunction
     private val initialAllocs = mutableListOf<Pair<Alloc, IrParameter?>>()
     private val loopStack = ArrayDeque<LoopInfo>()
     private val structs = mutableMapOf<String, StructInfo>()
 
-    fun flatten(astProgram: Program) {
+    fun flatten(astProgram: Program): language.ir.Program {
+        val irProgram = IrProgram()
         val programScope = Scope(null)
         structs.clear()
 
@@ -140,13 +143,15 @@ class Flattener {
                 mainIrFunc.type.returns.drop(1)
         )
         requireTypeMatch(mainFunc.position, FunctionType(emptyList(), emptyList()), mainTypeWithoutMem)
-        program.entry = mainIrFunc
+        irProgram.entry = mainIrFunc
 
         //generate code
         for ((function, irFunction) in structs.values.flatMap { it.methods.values })
             appendFunction(programScope.nest(), function, true, irFunction)
         for ((function, irFunction) in functions)
             appendFunction(programScope.nest(), function, false, irFunction)
+
+        return irProgram
     }
 
     private fun appendFunction(bodyScope: Scope, function: Function, isMethod: Boolean, irFunction: IrFunction) {
