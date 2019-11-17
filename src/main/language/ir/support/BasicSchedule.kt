@@ -16,13 +16,14 @@ object BasicSchedule {
         val toVisit = ArrayDeque<Node>()
         val lastPossibleRegion = mutableMapOf<Node, Region>()
         fun requireInRegion(node: Node, region: Region) {
-            if (node is Instruction) {
-                val prev = lastPossibleRegion[node]
-                val new = domInfo.commonDominator(prev ?: region, region)
-                lastPossibleRegion[node] = new
-                if (prev != new)
-                    toVisit += node
-            }
+            if (node is Phi || node is Region)
+                return
+
+            val prev = lastPossibleRegion[node]
+            val new = domInfo.commonDominator(prev ?: region, region)
+            lastPossibleRegion[node] = new
+            if (prev != new)
+                toVisit += node
         }
 
         for (node in Visitor.findInnerNodes(function)) {
@@ -45,7 +46,8 @@ object BasicSchedule {
         }
 
         for ((node, region) in lastPossibleRegion)
-            schedule.getValue(region) += node as Instruction
+            if (node is Instruction)
+                schedule.getValue(region) += node
 
         return schedule
     }

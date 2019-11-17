@@ -9,7 +9,9 @@ class DominatorInfo(function: Function) {
         regions().filterTo(mutableSetOf()) { cand -> dominates(region, cand) }
     }
     private val domParent: Map<Region, Region?> = regions().associateWith { region ->
-        regions().find { cand -> cand != region && dominators(region).all { dom -> dominates(cand, dom) } }
+        dominators(region).find { cand ->
+            cand != region && dominators(region).all { dom -> dom == region || dominates(dom, cand) }
+        }
     }
 
     /** All of the found regions */
@@ -22,11 +24,11 @@ class DominatorInfo(function: Function) {
     fun dominating(region: Region): Set<Region> = dominating.getValue(region)
 
     /** Whether [region] dominates [other] */
-    fun dominates(region: Region, other: Region): Boolean = other in dominators(region)
+    fun dominates(region: Region, other: Region): Boolean = region in dominators(other)
 
     /**
-     * The parent of [region] in the dominator tree: the single region that strictly dominates [region] but does not
-     * dominate any other region that dominates [region].
+     * The parent of [region] in the dominator tree: the single region that strictly dominates [region] and is dominated
+     * by all (other) strict dominators of [region].
      * Returns `null` for the entry region as that is the root of the tree.
      */
     fun domParent(region: Region): Region? = domParent.getValue(region)
