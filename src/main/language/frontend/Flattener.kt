@@ -3,6 +3,7 @@ package language.frontend
 import language.ir.*
 import language.ir.IntegerType.Companion.bool
 import language.ir.IntegerType.Companion.i32
+import language.ir.support.UserInfo
 import language.parsing.SourcePosition
 import java.util.*
 import language.ir.BinaryOp as IrBinaryOp
@@ -79,10 +80,12 @@ class Flattener private constructor() {
         fun flatten(program: Program): IrProgram = Flattener().flatten(program)
     }
 
+    private val structs = mutableMapOf<String, StructInfo>()
+    private val startMemBlurs = mutableListOf<Blur>()
+
     private lateinit var currentFunction: IrFunction
     private val initialAllocs = mutableListOf<Pair<Alloc, IrParameter?>>()
     private val loopStack = ArrayDeque<LoopInfo>()
-    private val structs = mutableMapOf<String, StructInfo>()
 
     fun flatten(astProgram: Program): language.ir.Program {
         val irProgram = IrProgram()
@@ -151,6 +154,11 @@ class Flattener private constructor() {
         for ((function, irFunction) in functions)
             appendFunction(programScope.nest(), function, false, irFunction)
 
+        //replace startMem transparent blurs
+        val userInfo = UserInfo(irProgram)
+        for (blur in startMemBlurs)
+            userInfo.replaceNode(blur, blur.value)
+
         return irProgram
     }
 
@@ -178,6 +186,7 @@ class Flattener private constructor() {
         }
 
         val startMem = Blur(PlaceHolder(MemType), transparent = true)
+        startMemBlurs += startMem
         val start = Cont(entry, startMem)
 
         //append body code
@@ -343,7 +352,7 @@ class Flattener private constructor() {
                     val actual = value?.type ?: VoidType
                     requireTypeMatch(stmt.position, expected, actual)
 
-                    val values = if (value != null) listOf(value) else emptyList()
+                    val values = if (value != null) listOf(valueEnd.mem, value) else listOf(valueEnd.mem)
                     valueEnd.region.terminator = Return(values)
                 }
                 null
@@ -461,7 +470,7 @@ class Flattener private constructor() {
 
             afterArgs.region to IrCall(target, listOf(thisPtr, afterArgs.mem) + arguments)
         } else {
-            //standerd function
+            //standard function
             val (afterTarget, target) = appendLoadedExpression(start, scope, exp.target) ?: return null
             val (afterArgs, args) = appendLoadedExpressionList(afterTarget, scope, exp.arguments) ?: return null
 
