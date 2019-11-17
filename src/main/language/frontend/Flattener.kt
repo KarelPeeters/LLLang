@@ -11,10 +11,10 @@ import language.ir.Function as IrFunction
 import language.ir.Parameter as IrParameter
 import language.ir.Program as IrProgram
 
-data class LoadResult(val afterMem: Node, val value: Node)
+data class ValueCont(val value: Node, val afterMem: Node)
 
 interface RValue {
-    fun loadValue(beforeMem: Node): LoadResult
+    fun loadValue(beforeMem: Node): ValueCont
 }
 
 interface LValue : RValue {
@@ -23,7 +23,7 @@ interface LValue : RValue {
 
 @Suppress("FunctionName")
 fun RValue(value: Node) = object : RValue {
-    override fun loadValue(beforeMem: Node) = LoadResult(beforeMem, value)
+    override fun loadValue(beforeMem: Node) = ValueCont(value, beforeMem)
 }
 
 
@@ -36,10 +36,10 @@ fun LValue(pointer: Node): LValue {
     check(pointer.type is PointerType)
     return object : LValue {
         override val pointer = pointer
-        override fun loadValue(beforeMem: Node): LoadResult {
+        override fun loadValue(beforeMem: Node): ValueCont {
             val load = Load(beforeMem, this.pointer)
-            load.value.name = this.pointer.name
-            return LoadResult(load.afterMem, load.value)
+            load.result.name = this.pointer.name
+            return ValueCont(load.result, load.afterMem)
         }
     }
 }
@@ -483,7 +483,7 @@ class Flattener private constructor() {
 
     private fun appendLoadedExpression(start: Cont, scope: Scope, exp: Expression): Pair<Cont, Node>? {
         val (valueEnd, target) = appendExpression(start, scope, exp) ?: return null
-        val (loadMem, value) = target.loadValue(valueEnd.mem)
+        val (value, loadMem) = target.loadValue(valueEnd.mem)
         return Cont(valueEnd.region, loadMem) to value
     }
 

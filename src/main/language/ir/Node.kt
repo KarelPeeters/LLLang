@@ -178,38 +178,56 @@ class Blur(
 
 class Alloc(
         beforeMem: Node,
-        val inner: Type
-) : Node(TupleType(MemType, inner.pointer)), Instruction {
+        val innerType: Type
+) : Node(VoidType), Instruction {
     var beforeMem by operand(beforeMem, type = MemType)
 
-    val afterMem = project(0)
-    val result = project(1)
+    val afterMem = AllocAfterMem(this)
+    val result = AllocResult(this)
 
     override fun fullString(namer: (Node) -> String): String {
         val bm = beforeMem.typedString(namer)
         val am = afterMem.typedString(namer)
         val r = result.typedString(namer)
-        return "$r, $am = alloc $inner $bm"
+        return "$r, $am = alloc $innerType $bm"
     }
+}
+
+class AllocAfterMem(alloc: Alloc) : Node(MemType) {
+    val alloc: Alloc by operand(alloc)
+}
+
+class AllocResult(alloc: Alloc) : Node(alloc.innerType.pointer) {
+    val alloc: Alloc by operand(alloc)
 }
 
 class Load(
         beforeMem: Node,
         address: Node
-) : Node(TupleType(MemType, address.type.unpoint!!)), Instruction {
+) : Node(VoidType), Instruction {
+    val resultType = address.type.unpoint!!
+
     var beforeMem by operand(beforeMem, type = MemType)
     var address by operand(address, type = address.type)
 
-    val afterMem = project(0)
-    val value = project(1)
+    val afterMem = LoadAfterMem(this)
+    val result = LoadResult(this)
 
     override fun fullString(namer: (Node) -> String): String {
         val bm = beforeMem.typedString(namer)
         val am = afterMem.typedString(namer)
         val a = address.typedString(namer)
-        val v = value.typedString(namer)
+        val v = result.typedString(namer)
         return "$v, $am = load $a $bm"
     }
+}
+
+class LoadAfterMem(load: Load) : Node(MemType) {
+    val load: Load by operand(load)
+}
+
+class LoadResult(load: Load) : Node(load.resultType) {
+    val load: Load by operand(load)
 }
 
 class Store(
@@ -255,12 +273,7 @@ class Call(
     var target by operand(target, type = funcType)
     val arguments by operandList(arguments, types = funcType.parameters)
 
-    val returns = funcType.returns.indices.map { project(it) }
-
-    override fun typeCheck() {
-        check(funcType.parameters.size == arguments.size)
-        check((funcType.parameters zip arguments).all { (t, a) -> a.type == t })
-    }
+    val returns = funcType.returns.indices.map { CallResult(this, it) }
 
     override fun fullString(namer: (Node) -> String): String {
         val t = target.untypedString(namer)
@@ -269,6 +282,10 @@ class Call(
 
         return "$r = $t($a)"
     }
+}
+
+class CallResult(call: Call, val index: Int) : Node(call.funcType.returns[index]) {
+    val call: Call by operand(call)
 }
 
 sealed class Constant(type: Type) : Node(type)
