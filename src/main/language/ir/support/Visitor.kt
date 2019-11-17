@@ -1,29 +1,55 @@
 package language.ir.support
 
+import language.ir.*
 import language.ir.Function
-import language.ir.Node
 import java.util.*
 
-/**
- * Visit all nodes reachable trough [Node.operands] from [root] exactly once.
- * The return value of [action] decides whether to continue the search trough the given node.
- */
-inline fun visitNodes(root: Node, action: (Node) -> Boolean = { true }): Set<Node> {
-    val visited = mutableSetOf<Node>()
-    val toVisit = ArrayDeque<Node>()
-    toVisit += root
+object Visitor {
+    /**
+     * Visit all nodes reachable trough [next] from [root] exactly once, and a set of all visited nodes.
+     */
+    inline fun <N : Node> visitNodes(root: N, next: (N) -> Collection<N>): Set<N> {
+        val visited = mutableSetOf<N>()
+        val toVisit = ArrayDeque<N>()
+        toVisit += root
 
-    while (true) {
-        val curr = toVisit.poll() ?: break
-        if (visited.add(curr)) {
-            if (action(curr)) {
-                val operands = curr.operands()
-                toVisit += operands
-            }
+        while (true) {
+            val curr = toVisit.poll() ?: break
+            if (visited.add(curr))
+                toVisit += next(curr)
         }
+
+        return visited
     }
 
-    return visited
-}
+    fun findFunctions(program: Program): Set<Function> = visitNodes<Node>(program.entry) { node ->
+        node.operands()
+    }.filterIsInstanceTo(mutableSetOf())
 
-fun findInnerNodes(function: Function): Set<Node> = visitNodes(function) { it == function || it !is Function }
+    fun findRegions(function: Function): Set<Region> = visitNodes(function.entry) { region ->
+        region.successors()
+    }
+
+    fun findPredecessors(function: Function): Map<Region, Set<Region>> {
+        val regions = findRegions(function)
+        val predecessors = regions.associateWith { mutableSetOf<Region>() }
+
+        for (region in regions)
+            for (successor in region.successors())
+                predecessors.getValue(successor) += region
+
+        return predecessors
+    }
+
+    fun findReturns(function: Function): Set<Return> =
+            findRegions(function)
+                    .map { it.terminator }
+                    .filterIsInstanceTo(mutableSetOf())
+
+    fun findInnerNodes(function: Function): Set<Node> = visitNodes<Node>(function) { node ->
+        if (node == function || node !is Function)
+            node.operands()
+        else
+            emptyList()
+    }
+}

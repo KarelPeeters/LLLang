@@ -3,27 +3,36 @@ package language.ir.support
 import language.ir.Node
 
 class UserInfo(root: Node) {
-    private val users: Map<Node, Set<Node>>
+    private val users: MutableMap<Node, MutableSet<Node>>
 
     init {
         val users = mutableMapOf<Node, MutableSet<Node>>()
-        visitNodes(root) { node ->
-            for (operand in node.operands())
+        Visitor.visitNodes(root) { node ->
+            val operands = node.operands()
+            for (operand in operands)
                 users.getOrPut(operand, ::mutableSetOf) += node
-            true
+            operands
         }
         this.users = users
     }
 
-    fun isUsed(node: Node): Boolean = users[node]?.isNotEmpty() ?: false
+    operator fun get(node: Node): Set<Node> = users[node] ?: emptySet()
 
-    fun users(node: Node): Set<Node> = users[node] ?: emptySet()
+    fun isUsed(node: Node): Boolean = users[node]?.isNotEmpty() ?: false
 
     fun allNodes(): Set<Node> = users.keys
 
-    fun replaceWith(from: Node, to: Node) {
-        check(from.replaceAble && to.replaceAble)
-        for (user in users(from))
+    /** Replace all usages of [from] with [to], also updating this [UserInfo] */
+    fun replaceNode(from: Node, to: Node) {
+        check(from.replaceAble)
+
+        val fromUsers = this.users[from] ?: return
+        val toUsers = this.users.getOrPut(to, ::mutableSetOf)
+
+        for (user in fromUsers)
             user.replaceOperand(from, to)
+
+        toUsers.addAll(fromUsers)
+        fromUsers.clear()
     }
 }

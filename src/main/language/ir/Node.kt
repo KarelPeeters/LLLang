@@ -1,7 +1,7 @@
 package language.ir
 
-import language.ir.support.findInnerNodes
-import language.ir.support.visitNodes
+import language.ir.support.BasicSchedule
+import language.ir.support.Visitor
 
 /**
  * The base class of all IR nodes.
@@ -13,10 +13,6 @@ sealed class Node(open val type: Type) : NodeImpl() {
 
     var name: String? = null
 
-    protected fun project(index: Int) = Project(this, index)
-
-    open fun typeCheck() {}
-
     open fun untypedString(namer: (Node) -> String) = namer(this)
 
     fun typedString(namer: (Node) -> String) = this.untypedString(namer) + " $type"
@@ -26,23 +22,12 @@ interface Instruction {
     fun fullString(namer: (Node) -> String): String
 }
 
-/**
- * [Project] represents indexing into a tuple typed result. Instances of this class should only be created at
- * construction time by the [Node] that then passes itself as the [node] parameter.
- */
-class Project(
-        node: Node,
-        val index: Int
-) : Node((node.type as TupleType)[index]) {
-    val node by operand(node, node.type)
-}
-
 class Program : Node(VoidType), Instruction {
     var entry: Function by operand(type = FunctionType(listOf(MemType), listOf(MemType)))
 
     override fun fullString(namer: (Node) -> String): String {
-        val funcs = visitNodes(this.entry).filterIsInstance<Function>()
-        return funcs.joinToString("\n\n") { it.fullString(namer) }
+        val functions = Visitor.findFunctions(this)
+        return functions.joinToString("\n\n") { it.fullString(namer) }
     }
 }
 
@@ -56,34 +41,34 @@ class Function(
 
     val parameters: List<Parameter> = type.parameters.map { Parameter(it) }
 
-    override fun typeCheck() {
-        check(keepAlive.all { it.type == MemType })
-        check(findInnerNodes(this).filterIsInstance<Return>().all { it.types == type.returns })
-    }
-
     fun fullString(namer: (Node) -> String): String {
         val params = parameters.joinToString { it.typedString(namer) }
-        val retuns = type.returns.joinToString()
-        val body = findInnerNodes(this)
-                .filterIsInstance<Instruction>()
-                .joinToString("\n") { "    " + it.fullString(namer) }
+        val returns = type.returns.joinToString()
+        val body = BasicSchedule.build((this)).asIterable().joinToString("\n\n") { (region, instructions) ->
+            (instructions.map { it.fullString(namer) } + listOf(region.fullString(namer)))
+                    .joinToString("\n") { "    $it" }
+        }
 
-        return "fun ${untypedString(namer)}($params) -> $retuns {\n$body\n}"
+        return "fun ${untypedString(namer)}($params) -> $returns {\n$body\n}"
     }
 }
 
 class Parameter(type: Type) : Node(type)
 
-class Region : Node(RegionType), Instruction {
+class Region : Node(RegionType) {
     var terminator: Terminator by operand()
 
     override val replaceAble get() = false
 
-    override fun fullString(namer: (Node) -> String) =
+    fun successors() = terminator.successors()
+
+    fun fullString(namer: (Node) -> String) =
             "${typedString(namer)} { ${terminator.fullString(namer)} }"
 }
 
 sealed class Terminator : Node(VoidType) {
+    abstract fun successors(): Set<Region>
+
     abstract fun fullString(namer: (Node) -> String): String
 }
 
@@ -91,6 +76,8 @@ class Jump(
         target: Region
 ) : Terminator() {
     var target: Region by operand(target)
+
+    override fun successors() = setOf(target)
 
     override fun fullString(namer: (Node) -> String): String {
         val t = target.untypedString(namer)
@@ -107,6 +94,8 @@ class Branch(
     var ifTrue: Region by operand(ifTrue)
     var ifFalse: Region by operand(ifFalse)
 
+    override fun successors() = setOf(ifTrue, ifFalse)
+
     override fun fullString(namer: (Node) -> String): String {
         val c = condition.typedString(namer)
         val t = ifTrue.untypedString(namer)
@@ -121,10 +110,7 @@ class Return(
     val types = values.map { it.type }
     val values by operandList(values, types = types)
 
-    override fun typeCheck() {
-        check(types.size == values.size)
-        check((types zip values).all { (t, v) -> v.type == t })
-    }
+    override fun successors() = emptySet<Region>()
 
     override fun fullString(namer: (Node) -> String): String {
         val v = values.joinToString { it.typedString(namer) }

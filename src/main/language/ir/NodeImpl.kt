@@ -26,6 +26,11 @@ abstract class NodeImpl {
         @Suppress("ObjectPropertyName")
         var _value: N? = null
 
+        init {
+            if (value != null)
+                setValue(value)
+        }
+
         @Suppress("UNCHECKED_CAST")
         fun setValue(value: Node) {
             if (cls != null)
@@ -50,11 +55,7 @@ abstract class NodeImpl {
             if (getValue() == from)
                 setValue(to)
         }
-    }.also {
-        if (value != null)
-            it.setValue(value)
-        holders += it
-    }
+    }.also { holders += it }
 
     protected fun <N : Node> operandList(): ReadOnlyProperty<Node, MutableList<N>> =
             operandList(values = null, types = null, type = null)
