@@ -65,7 +65,12 @@ private class Scope(val parent: Scope?) {
     fun nest() = Scope(this)
 }
 
-private class LoopInfo(val header: Pair<Region, Phi>, val end: Pair<Region, Phi>)
+private class LoopInfo(
+        val headerRegion: Region,
+        val headerMemPhi: Phi,
+        val endRegion: Region,
+        val endMemPhi: Phi
+)
 
 private class Cont(val region: Region, val mem: Node)
 
@@ -296,13 +301,13 @@ class Flattener private constructor() {
             is WhileStatement -> {
                 val condRegion = Region("while.cond")
                 val condPhi = Phi(MemType, condRegion)
-                val condStart = Cont(condRegion, start.mem)
+                val condStart = Cont(condRegion, condPhi)
                 val (condEnd, condValue) = appendLoadedExpression(condStart, scope, stmt.condition) ?: return null
 
                 val endRegion = Region("while.end")
                 val endPhi = Phi(MemType, endRegion)
 
-                val blocks = LoopInfo(condRegion to condPhi, endRegion to endPhi)
+                val blocks = LoopInfo(condRegion, condPhi, endRegion, endPhi)
                 loopStack.push(blocks)
                 val bodyStart = Cont(Region("while.body"), condEnd.mem)
                 val bodyEnd = appendNestedBlock(bodyStart, scope, stmt.block)
@@ -327,16 +332,16 @@ class Flattener private constructor() {
             is BreakStatement -> {
                 val info = loopStack.peek()
 
-                start.region.terminator = Jump(info.end.first)
-                info.end.second.values[start.region] = start.mem
+                start.region.terminator = Jump(info.endRegion)
+                info.endMemPhi.values[start.region] = start.mem
 
                 null
             }
             is ContinueStatement -> {
                 val info = loopStack.peek()
 
-                start.region.terminator = Jump(info.header.first)
-                info.header.second.values[start.region] = start.mem
+                start.region.terminator = Jump(info.headerRegion)
+                info.headerMemPhi.values[start.region] = start.mem
 
                 null
             }
