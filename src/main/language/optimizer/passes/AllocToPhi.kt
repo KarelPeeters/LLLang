@@ -6,8 +6,10 @@ import language.ir.support.UserInfo
 import language.optimizer.FunctionPass
 import language.optimizer.OptimizerContext
 
+/**
+ * Converts [Alloc]s only locally used in [Load]s and [Store]s into [Phi]s.
+ */
 object AllocToPhi : FunctionPass {
-
     override fun OptimizerContext.optimize(function: Function) {
         //make sure function has a single mem parameter
         val startMem = function.parameters.singleOrNull { it.type == MemType } ?: return
