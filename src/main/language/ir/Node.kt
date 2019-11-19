@@ -291,4 +291,6 @@ class Undef(type: Type) : Node(type) {
     override fun untypedString(namer: (Node) -> String) = "undef"
 }
 
-class PlaceHolder(type: Type) : Node(type)
+class PlaceHolder(type: Type) : Node(type) {
+    override fun untypedString(namer: (Node) -> String) = "PH(${namer(this)})"
+}
