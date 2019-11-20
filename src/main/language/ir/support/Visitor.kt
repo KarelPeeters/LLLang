@@ -22,9 +22,18 @@ object Visitor {
         return visited
     }
 
+    fun findNodes(program: Program): Set<Node> = visitNodes<Node>(program) { node -> node.operands() }
+
     fun findFunctions(program: Program): Set<Function> = visitNodes<Node>(program.entry) { node ->
         node.operands()
     }.filterIsInstanceTo(mutableSetOf())
+
+    fun findInnerNodes(function: Function): Set<Node> = visitNodes<Node>(function) { node ->
+        if (node == function || node !is Function)
+            node.operands()
+        else
+            emptyList()
+    }
 
     fun findRegions(function: Function): Set<Region> = visitNodes(function.entry) { region ->
         region.successors()
@@ -45,11 +54,4 @@ object Visitor {
             findRegions(function)
                     .map { it.terminator }
                     .filterIsInstanceTo(mutableSetOf())
-
-    fun findInnerNodes(function: Function): Set<Node> = visitNodes<Node>(function) { node ->
-        if (node == function || node !is Function)
-            node.operands()
-        else
-            emptyList()
-    }
 }

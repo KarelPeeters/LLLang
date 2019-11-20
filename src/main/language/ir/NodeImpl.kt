@@ -12,6 +12,11 @@ abstract class NodeImpl {
 
     private val holders = mutableListOf<OperandHolder>()
 
+    fun typeCheck() {
+        for (holder in holders)
+            holder.typeCheck()
+    }
+
     fun operands(): Collection<Node> = holders.flatMap { it.operands() }
 
     fun replaceOperand(from: Node, to: Node) {
