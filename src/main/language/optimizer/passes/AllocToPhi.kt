@@ -34,7 +34,7 @@ object AllocToPhi : FunctionPass {
             }
             is Store -> {
                 if (mem.address == alloc.result) {
-                    //if this store in into the current alloc, look at the value
+                    //if this store is into the current alloc, look at the value
                     val value = mem.value
                     val addressAlloc = ((value as? LoadResult)?.load?.address as? AllocResult)?.alloc
 
@@ -91,8 +91,8 @@ object AllocToPhi : FunctionPass {
 
 /**
  * Find all allocs that can be converted to SSA form.
- * Only looks at allocs that are part of the [start] Mem chain until it splits.
- * Convertable allocs are are taken out of this chain and returned.
+ * Only looks at allocs that are part of the [start] Mem chain until it splits or used by something other than alloc.
+ * Convertable allocs are are taken out of the chain and returned.
  */
 private fun takeConvertableAllocs(userInfo: UserInfo, start: Node): Set<Alloc> {
     val allocs = mutableSetOf<Alloc>()

@@ -25,11 +25,21 @@ object PhiSimplify : FunctionPass {
                 changed()
         }
 
+        //replace phis that are undefined or have a single value
+        val lattice = calculateLattice(phis)
+        for ((phi, value) in lattice) {
+            if (value != null) {
+                userInfo.replaceNode(phi, value)
+                changed()
+            }
+        }
+    }
+
+    private fun calculateLattice(phis: List<Phi>): Map<Phi, Node?> {
         val phiUserInfo = phis.associateWith { value ->
             phis.filter { user -> value in user.values.values }
         }
 
-        //calculate lattice
         val lattice: MutableMap<Phi, Node?> = phis.associateWithTo(mutableMapOf()) { Undef(it.type) }
 
         val toVisit = ArrayDeque<Phi>()
@@ -48,14 +58,7 @@ object PhiSimplify : FunctionPass {
                 toVisit.addAll(phiUserInfo.getValue(phi))
             }
         }
-
-        //replace phis that are undefined or have a single value
-        for ((phi, value) in lattice) {
-            if (value != null) {
-                userInfo.replaceNode(phi, value)
-                changed()
-            }
-        }
+        return lattice
     }
 }
 

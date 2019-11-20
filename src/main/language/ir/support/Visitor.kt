@@ -6,7 +6,7 @@ import java.util.*
 
 object Visitor {
     /**
-     * Visit all nodes reachable trough [next] from [root] exactly once, and a set of all visited nodes.
+     * Visit all nodes reachable trough [next] from [root] exactly once, returns a set of all visited nodes.
      */
     inline fun <N : Node> visitNodes(root: N, next: (N) -> Collection<N>): Set<N> {
         val visited = mutableSetOf<N>()

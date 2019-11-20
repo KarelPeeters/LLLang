@@ -307,8 +307,8 @@ class Flattener private constructor() {
                 val endRegion = Region("while.end")
                 val endPhi = Phi(MemType, endRegion)
 
-                val blocks = LoopInfo(condRegion, condPhi, endRegion, endPhi)
-                loopStack.push(blocks)
+                val loopInfo = LoopInfo(condRegion, condPhi, endRegion, endPhi)
+                loopStack.push(loopInfo)
                 val bodyStart = Cont(Region("while.body"), condEnd.mem)
                 val bodyEnd = appendNestedBlock(bodyStart, scope, stmt.block)
                 loopStack.pop()
@@ -418,21 +418,21 @@ class Flattener private constructor() {
         }
     }
 
-    private fun appendBasicUnaryExpression(start: Cont, scope: Scope, exp: UnaryOp, left: Int, type: BinaryOpType): Pair<Cont, RValue>? {
+    private fun appendBasicUnaryExpression(start: Cont, scope: Scope, exp: UnaryOp, left: Int, opType: BinaryOpType): Pair<Cont, RValue>? {
         val (afterValue, value) = appendLoadedExpression(start, scope, exp.value) ?: return null
-        requireIntegerType(exp.value.position, value.type)
-        val result = IrBinaryOp(type, IntegerConstant(value.type as IntegerType, left), value)
+        val type = requireIntegerType(exp.value.position, value.type)
+        val result = IrBinaryOp(opType, IntegerConstant(type, left), value)
         return afterValue to RValue(result)
     }
 
-    private fun appendIncDecExpression(start: Cont, scope: Scope, exp: UnaryOp, binaryOpType: BinaryOpType, pre: Boolean): Pair<Cont, RValue>? {
+    private fun appendIncDecExpression(start: Cont, scope: Scope, exp: UnaryOp, opType: BinaryOpType, pre: Boolean): Pair<Cont, RValue>? {
         val (targetEnd, target) = appendPointerExpression(start, scope, exp.value) ?: return null
         if (scope.isImmutableVal(target))
             throw VariableImmutableException(exp.position, (exp.value as IdentifierExpression).identifier)
 
         val old = Load(targetEnd.mem, target)
         val type = requireIntegerType(exp.value.position, old.type)
-        val new = IrBinaryOp(binaryOpType, old, type.ONE)
+        val new = IrBinaryOp(opType, old, type.ONE)
 
         val store = Store(targetEnd.mem, target, new)
         val cont = Cont(targetEnd.region, store)

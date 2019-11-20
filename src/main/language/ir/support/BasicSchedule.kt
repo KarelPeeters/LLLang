@@ -6,7 +6,7 @@ import java.util.*
 
 object BasicSchedule {
     /**
-     * Build a basic [Instruction] schedule, inteded use in the string representation of functions.
+     * Build a basic [Instruction] schedule, intended to be used in the string representation of functions.
      */
     fun build(function: Function): Map<Region, List<Instruction>> {
         val domInfo = DominatorInfo(function)
