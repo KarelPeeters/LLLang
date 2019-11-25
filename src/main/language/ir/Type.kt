@@ -51,6 +51,10 @@ object RegionType : Type() {
     override fun toString() = "Region"
 }
 
+object ControlType : Type() {
+    override fun toString() = "Ctrl"
+}
+
 object MemType : Type() {
     override fun toString() = "Mem"
 }

@@ -24,43 +24,69 @@ abstract class NodeImpl {
             holder.replaceOperand(from, to)
     }
 
-    protected inline fun <reified N : Node> operand(value: N? = null, type: Type? = null) =
-            operand(value, N::class, type)
+    protected inline fun <reified N : Node> operand(value: N? = null, type: Type? = null): ReadWriteProperty<Node, N> =
+            requiredOperand(value, N::class, type)
 
-    protected fun <N : Node> operand(value: N?, cls: KClass<N>?, type: Type?): ReadWriteProperty<Node, N> = object : ReadWriteProperty<Node, N>, OperandHolder {
-        @Suppress("ObjectPropertyName")
-        var _value: N? = null
+    protected inline fun <reified N : Node> optionalOperand(value: N? = null, type: Type? = null): ReadWriteProperty<Node, N?> =
+            optionalOperand(value, N::class, type)
 
-        init {
-            if (value != null)
-                setValue(value)
-        }
+    protected fun <N : Node> requiredOperand(value: N?, cls: KClass<N>?, type: Type?): ReadWriteProperty<Node, N> = object : ReadWriteProperty<Node, N>, OperandHolder {
+        var curr: N? = null
 
-        @Suppress("UNCHECKED_CAST")
         fun setValue(value: Node) {
-            if (cls != null)
-                check(cls.isInstance(value)) { "value $value is not an instance of $cls" }
-            if (type != null)
-                checkTypeEquals(value, type)
-            this._value = value as N
+            curr = checkValue(value, cls, type)
         }
 
-        fun getValue(): N = this._value ?: error("Attempt to get uninitialized operand")
+        fun getValue(): N = curr ?: error("Attempt to get uninitialized operand")
 
         override fun getValue(thisRef: Node, property: KProperty<*>): N = getValue()
-        override fun setValue(thisRef: Node, property: KProperty<*>, value: N): Unit = setValue(value)
 
-        //the value is continuously typechecked, nothing to do here
-        override fun typeCheck() {}
+        override fun setValue(thisRef: Node, property: KProperty<*>, value: N) = setValue(value)
 
-        override fun operands() = listOf(getValue())
+        override fun typeCheck() {
+            //only check that value has been set
+            getValue()
+        }
 
-        @Suppress("UNCHECKED_CAST")
+        override fun operands(): Collection<Node> = listOf(getValue())
+
         override fun replaceOperand(from: Node, to: Node) {
             if (getValue() == from)
                 setValue(to)
         }
-    }.also { holders += it }
+    }.also {
+        if (value != null)
+            it.setValue(value)
+        holders += it
+    }
+
+    protected fun <N : Node> optionalOperand(value: N?, cls: KClass<N>, type: Type?): ReadWriteProperty<Node, N?> = object : ReadWriteProperty<Node, N?>, OperandHolder {
+        var curr: N? = null
+
+        fun setValue(value: N?) {
+            if (value != null)
+                checkValue(value, cls, type)
+            curr = value
+        }
+
+        override fun getValue(thisRef: Node, property: KProperty<*>): N? = curr
+
+        override fun setValue(thisRef: Node, property: KProperty<*>, value: N?) = setValue(value)
+
+        override fun typeCheck() {}
+
+        override fun operands(): Collection<Node> = curr?.let(::listOf) ?: emptyList()
+
+        @Suppress("UNCHECKED_CAST")
+        override fun replaceOperand(from: Node, to: Node) {
+            if (curr == from)
+                setValue(to as N)
+        }
+    }.also {
+        if (value != null)
+            it.setValue(value)
+        holders += it
+    }
 
     protected fun <N : Node> operandList(): ReadOnlyProperty<Node, MutableList<N>> =
             operandList(values = null, types = null, type = null)
@@ -93,7 +119,7 @@ abstract class NodeImpl {
 
         @Suppress("UNCHECKED_CAST")
         override fun replaceOperand(from: Node, to: Node) {
-            to as N
+            val to = checkValue<N>(to, null, type)
             list.replaceAll { if (it == from) to else it }
         }
     }.also { holders += it }
@@ -114,13 +140,22 @@ abstract class NodeImpl {
 
         @Suppress("UNCHECKED_CAST")
         override fun replaceOperand(from: Node, to: Node) {
-            to as V
+            val to = checkValue<V>(to, null, type)
             map.replaceAll { k, v ->
                 if (k == from) error("Trying to replace key $k with $to")
                 if (v == from) to else v
             }
         }
     }.also { holders += it }
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun <T : Node> checkValue(value: Node, cls: KClass<T>?, type: Type?): T {
+    if (cls != null)
+        check(cls.isInstance(value)) { "value $value is not an instance of $cls" }
+    if (type != null)
+        checkTypeEquals(value, type)
+    return value as T
 }
 
 private fun checkTypeEquals(value: Node, type: Type) = check(value.type == type) {

@@ -19,12 +19,6 @@ object PhiSimplify : FunctionPass {
         val phis = Visitor.findInnerNodes(function).filterIsInstance<Phi>()
         val regions = Visitor.findRegions(function)
 
-        //remove unreachable regions from phi values
-        for (phi in phis) {
-            if (phi.values.entries.removeIf { it.key !in regions })
-                changed()
-        }
-
         //replace phis that are undefined or have a single value
         val lattice = calculateLattice(phis)
         for ((phi, value) in lattice) {
@@ -37,7 +31,7 @@ object PhiSimplify : FunctionPass {
 
     private fun calculateLattice(phis: List<Phi>): Map<Phi, Node?> {
         val phiUserInfo = phis.associateWith { value ->
-            phis.filter { user -> value in user.values.values }
+            phis.filter { user -> value in user.values }
         }
 
         val lattice: MutableMap<Phi, Node?> = phis.associateWithTo(mutableMapOf()) { Undef(it.type) }
@@ -49,7 +43,7 @@ object PhiSimplify : FunctionPass {
             val phi = toVisit.poll() ?: break
 
             val prev = lattice.getValue(phi)
-            val new = phi.values.values.map {
+            val new = phi.values.map {
                 if (it is Phi) lattice.getValue(it) else it
             }.merge(phi.type)
 

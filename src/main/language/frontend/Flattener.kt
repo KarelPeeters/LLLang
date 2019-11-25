@@ -15,7 +15,7 @@ import language.ir.Program as IrProgram
 data class ValueCont(val value: Node, val afterMem: Node)
 
 interface RValue {
-    fun loadValue(beforeMem: Node): ValueCont
+    fun loadValue(pos: SourcePosition, beforeMem: Node): ValueCont
 }
 
 interface LValue : RValue {
@@ -24,12 +24,13 @@ interface LValue : RValue {
 
 @Suppress("FunctionName")
 fun RValue(value: Node) = object : RValue {
-    override fun loadValue(beforeMem: Node) = ValueCont(value, beforeMem)
+    override fun loadValue(pos: SourcePosition, beforeMem: Node) = ValueCont(value, beforeMem)
 }
 
 
 object VoidRValue : RValue {
-    override fun loadValue(beforeMem: Node) = throw IllegalLoadVoidValueException()
+    override fun loadValue(pos: SourcePosition, beforeMem: Node) =
+            throw IllegalLoadVoidValueException(pos)
 }
 
 @Suppress("FunctionName")
@@ -37,7 +38,7 @@ fun LValue(pointer: Node): LValue {
     check(pointer.type is PointerType)
     return object : LValue {
         override val pointer = pointer
-        override fun loadValue(beforeMem: Node): ValueCont {
+        override fun loadValue(pos: SourcePosition, beforeMem: Node): ValueCont {
             val load = Load(beforeMem, this.pointer)
             load.result.name = this.pointer.name
             return ValueCont(load.result, load.afterMem)
@@ -66,8 +67,8 @@ private class Scope(val parent: Scope?) {
 }
 
 private class LoopInfo(
-        val headerRegion: Region,
-        val headerMemPhi: Phi,
+        val condRegion: Region,
+        val condMemPhi: Phi,
         val endRegion: Region,
         val endMemPhi: Phi
 )
@@ -80,6 +81,14 @@ private data class StructInfo(
         val methods: Map<String, Pair<Function, IrFunction>>
 )
 
+private class CurrentFunctionInfo(
+        val irFunction: IrFunction,
+        val returnType: Type,
+        val retRegion: Region,
+        val retMemPhi: Phi,
+        val retValuePhi: Phi
+)
+
 class Flattener private constructor() {
     companion object {
         fun flatten(program: Program): IrProgram = Flattener().flatten(program)
@@ -88,7 +97,8 @@ class Flattener private constructor() {
     private val structs = mutableMapOf<String, StructInfo>()
     private val startMemBlurs = mutableListOf<Blur>()
 
-    private lateinit var currentFunction: IrFunction
+    private lateinit var currentFunction: CurrentFunctionInfo
+
     private val initialAllocs = mutableListOf<Pair<Alloc, IrParameter?>>()
     private val loopStack = ArrayDeque<LoopInfo>()
 
@@ -151,7 +161,7 @@ class Flattener private constructor() {
                 mainIrFunc.type.returns.drop(1)
         )
         requireTypeMatch(mainFunc.position, FunctionType(emptyList(), emptyList()), mainTypeWithoutMem)
-        irProgram.entry = mainIrFunc
+        irProgram.end = mainIrFunc
 
         //generate code
         for ((function, irFunction) in structs.values.flatMap { it.methods.values })
@@ -159,7 +169,8 @@ class Flattener private constructor() {
         for ((function, irFunction) in functions)
             appendFunction(programScope.nest(), function, false, irFunction)
 
-        //replace startMem transparent blurs
+        //remove initial memory blurs
+        //TODO remove when there's an appropritate pass for this
         val userInfo = UserInfo(irProgram)
         for (blur in startMemBlurs)
             userInfo.replaceNode(blur, blur.value)
@@ -169,10 +180,6 @@ class Flattener private constructor() {
 
     private fun appendFunction(bodyScope: Scope, function: Function, isMethod: Boolean, irFunction: IrFunction) {
         check(loopStack.isEmpty())
-        currentFunction = irFunction
-
-        val entry = Region("entry")
-        irFunction.entry = entry
 
         //register & alloc parameters
         for ((i, irParam) in irFunction.parameters.withIndex()) {
@@ -190,8 +197,20 @@ class Flattener private constructor() {
             }
         }
 
+        val returnType = irFunction.type.returns.getOrNull(1) ?: VoidType
+
+        //create return
+        val retRegion = Region("return")
+        val retMemPhi = Phi(MemType, retRegion)
+        val retValuePhi = Phi(returnType, retRegion)
+        currentFunction = CurrentFunctionInfo(irFunction, returnType, retRegion, retMemPhi, retValuePhi)
+
+        //create entry
+        val entry = Region("entry")
+        entry.predecessors += irFunction.start
         val startMem = Blur(PlaceHolder(MemType), transparent = true)
         startMemBlurs += startMem
+
         val start = Cont(entry, startMem)
 
         //append body code
@@ -199,16 +218,27 @@ class Flattener private constructor() {
             is Function.FunctionBody.Block -> {
                 val end = appendNestedBlock(start, bodyScope, body.block)
                 if (end != null) {
-                    if (irFunction.type.returns.size != 1)
+                    if (returnType != VoidType)
                         throw MissingReturnStatement(function)
-                    end.region.terminator = Return(listOf(end.mem))
+
+                    retRegion.predecessors += Jump(end.region)
+                    retMemPhi.values += end.mem
                 }
             }
             is Function.FunctionBody.Expr -> {
                 val (end, value) = appendLoadedExpression(start, bodyScope, body.exp) ?: return
-                requireTypeMatch(body.position, irFunction.type.returns[1], value.type)
-                end.region.terminator = Return(listOf(end.mem, value))
+                requireTypeMatch(body.position, returnType, value.type)
+
+                retRegion.predecessors += Jump(end.region)
+                retMemPhi.values += end.mem
+                retValuePhi.values += value
             }
+        }
+
+        //add return if applicable
+        if (retRegion.predecessors.isNotEmpty()) {
+            val values = if (returnType == VoidType) listOf(retMemPhi) else listOf(retMemPhi, retValuePhi)
+            irFunction.ret = Return(retRegion, values)
         }
 
         //string all allocs together (including later declared variables)
@@ -217,6 +247,7 @@ class Flattener private constructor() {
             alloc.beforeMem = mem
             alloc.afterMem
         }
+
         //store parameters into their allocs
         val afterParamStoreMem = initialAllocs.fold(afterAllocMem) { mem, (alloc, param) ->
             if (param != null) Store(mem, alloc.result, param) else mem
@@ -280,25 +311,28 @@ class Flattener private constructor() {
                 else
                     elseStart
 
-                afterCond.region.terminator = Branch(condValue, thenStart.region, elseStart.region)
+                val branch = Branch(condValue, afterCond.region)
+                thenStart.region.predecessors += branch.controlTrue
+                elseStart.region.predecessors += branch.controlFalse
 
                 if (thenEnd != null || elseEnd != null) {
                     val end = Region("if.end")
                     val endMem = Phi(MemType, end)
 
                     if (thenEnd != null) {
-                        thenEnd.region.terminator = Jump(end)
-                        endMem.values[thenEnd.region] = thenEnd.mem
+                        end.predecessors += Jump(thenEnd.region)
+                        endMem.values += thenEnd.mem
                     }
                     if (elseEnd != null) {
-                        elseEnd.region.terminator = Jump(end)
-                        endMem.values[elseEnd.region] = elseEnd.mem
+                        end.predecessors += Jump(elseEnd.region)
+                        endMem.values += elseEnd.mem
                     }
 
                     Cont(end, endMem)
                 } else null
             }
             is WhileStatement -> {
+                //generate code
                 val condRegion = Region("while.cond")
                 val condPhi = Phi(MemType, condRegion)
                 val condStart = Cont(condRegion, condPhi)
@@ -313,35 +347,41 @@ class Flattener private constructor() {
                 val bodyEnd = appendNestedBlock(bodyStart, scope, stmt.block)
                 loopStack.pop()
 
-                start.region.terminator = Jump(condRegion)
-                condEnd.region.terminator = Branch(condValue, bodyStart.region, endRegion)
+                //connect control nodes
+                condRegion.predecessors += Jump(start.region)
+                condPhi.values += start.mem
+
+                val branch = Branch(condValue, condEnd.region)
+
+                bodyStart.region.predecessors += branch.controlTrue
+
+                endRegion.predecessors += branch.controlFalse
+                endPhi.values += condEnd.mem
 
                 if (bodyEnd != null) {
-                    bodyEnd.region.terminator = Jump(condRegion)
-                    condPhi.values[bodyEnd.region] = bodyEnd.mem
+                    condRegion.predecessors += Jump(bodyEnd.region)
+                    condPhi.values += bodyEnd.mem
                 }
 
-                condPhi.values[start.region] = start.mem
-                endPhi.values[condRegion] = condPhi
-
-                //potentially endless loop, keep memory node alive
-                currentFunction.keepAlive += endPhi
+                //potentially endless loop, keep memory and control alive
+                currentFunction.irFunction.keepAliveMems += condPhi
+                currentFunction.irFunction.keepAliveRegions += condRegion
 
                 Cont(endRegion, endPhi)
             }
             is BreakStatement -> {
                 val info = loopStack.peek()
 
-                start.region.terminator = Jump(info.endRegion)
-                info.endMemPhi.values[start.region] = start.mem
+                info.endRegion.predecessors += Jump(start.region)
+                info.endMemPhi.values += start.mem
 
                 null
             }
             is ContinueStatement -> {
                 val info = loopStack.peek()
 
-                start.region.terminator = Jump(info.headerRegion)
-                info.headerMemPhi.values[start.region] = start.mem
+                info.condRegion.predecessors += Jump(start.region)
+                info.condMemPhi.values += start.mem
 
                 null
             }
@@ -353,13 +393,17 @@ class Flattener private constructor() {
                 }
 
                 if (valueEnd != null) {
-                    val expected = currentFunction.type.returns.getOrNull(1) ?: VoidType
                     val actual = value?.type ?: VoidType
-                    requireTypeMatch(stmt.position, expected, actual)
+                    requireTypeMatch(stmt.position, currentFunction.returnType, actual)
 
-                    val values = if (value != null) listOf(valueEnd.mem, value) else listOf(valueEnd.mem)
-                    valueEnd.region.terminator = Return(values)
+                    currentFunction.run {
+                        retRegion.predecessors += Jump(valueEnd.region)
+                        retMemPhi.values += valueEnd.mem
+                        if (value != null)
+                            retValuePhi.values += value
+                    }
                 }
+
                 null
             }
         }
@@ -497,7 +541,7 @@ class Flattener private constructor() {
 
     private fun appendLoadedExpression(start: Cont, scope: Scope, exp: Expression): Pair<Cont, Node>? {
         val (valueEnd, target) = appendExpression(start, scope, exp) ?: return null
-        val (value, loadMem) = target.loadValue(valueEnd.mem)
+        val (value, loadMem) = target.loadValue(exp.position, valueEnd.mem)
         return Cont(valueEnd.region, loadMem) to value
     }
 
@@ -611,8 +655,8 @@ class IllegalCallTargetException(pos: SourcePosition, type: Type)
 class IllegalDotIndexTargetException(pos: SourcePosition, type: Type)
     : Exception("Can't dot index type '$type' at $pos")
 
-class IllegalLoadVoidValueException
-    : Exception("Attempting to load VoidValue")
+class IllegalLoadVoidValueException(pos: SourcePosition)
+    : Exception("Attempting to load VoidValue at $pos")
 
 class UnexpectedVoidType
     : Exception("Unexpected VoidType")

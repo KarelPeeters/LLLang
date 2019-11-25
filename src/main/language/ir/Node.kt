@@ -18,14 +18,18 @@ sealed class Node(open val type: Type) : NodeImpl() {
     fun typedString(namer: (Node) -> String) = this.untypedString(namer) + " $type"
 }
 
+/**
+ * A [Node] that has an instruction-like string representation.
+ * Note that this interface does not mean anything for the semantics of the node.
+ */
 interface Instruction {
     fun fullString(namer: (Node) -> String): String
 }
 
-class Program : Node(VoidType), Instruction {
-    var entry: Function by operand(type = FunctionType(listOf(MemType), listOf(MemType)))
+class Program : Node(VoidType) {
+    var end: Function by operand(type = FunctionType(listOf(MemType), listOf(MemType)))
 
-    override fun fullString(namer: (Node) -> String): String {
+    fun fullString(namer: (Node) -> String): String {
         val functions = Visitor.findFunctions(this)
         return functions.joinToString("\n\n") { it.fullString(namer) }
     }
@@ -34,18 +38,22 @@ class Program : Node(VoidType), Instruction {
 class Function(
         override val type: FunctionType
 ) : Constant(type) {
-    var entry: Region by operand()
-
-    //memory values to keep used so their effects don't die off in endless loops
-    val keepAlive by operandList<Node>(type = MemType)
-
+    val start = StartControl()
     val parameters: List<Parameter> = type.parameters.map { Parameter(it) }
+
+    var ret: Return? by optionalOperand()
+
+    val keepAliveMems by operandList<Node>(type = MemType)
+    val keepAliveRegions by operandList<Region>()
+
+    fun endRegions(): Collection<Region> =
+            listOfNotNull(ret?.from) + keepAliveRegions
 
     fun fullString(namer: (Node) -> String): String {
         val params = parameters.joinToString { it.typedString(namer) }
         val returns = type.returns.joinToString()
         val body = BasicSchedule.build((this)).asIterable().joinToString("\n\n") { (region, instructions) ->
-            (instructions.map { it.fullString(namer) } + listOf(region.fullString(namer)))
+            (listOf(region.fullString(namer)) + instructions.map { it.fullString(namer) })
                     .joinToString("\n") { "    $it" }
         }
 
@@ -55,62 +63,78 @@ class Function(
 
 class Parameter(type: Type) : Node(type)
 
+class StartControl : ControlNode() {
+    override val from: Region? get() = null
+
+    override fun untypedString(namer: (Node) -> String) = "start"
+}
+
+interface Terminator : Instruction {
+    val from: Region
+
+}
+
+sealed class ControlNode : Node(ControlType) {
+    abstract val from: Region?
+
+}
+
 class Region : Node(RegionType) {
-    var terminator: Terminator by operand()
+    val predecessors by operandList<ControlNode>()
 
     override val replaceAble get() = false
 
-    fun successors() = terminator.successors()
+    fun fullString(namer: (Node) -> String): String {
+        val th = typedString(namer)
+        val pr = predecessors.joinToString { it.typedString(namer) }
 
-    fun fullString(namer: (Node) -> String) =
-            "${typedString(namer)} { ${terminator.fullString(namer)} }"
-}
-
-sealed class Terminator : Node(VoidType) {
-    abstract fun successors(): Set<Region>
-
-    abstract fun fullString(namer: (Node) -> String): String
+        return "$th <- [$pr]"
+    }
 }
 
 class Jump(
-        target: Region
-) : Terminator() {
-    var target: Region by operand(target)
-
-    override fun successors() = setOf(target)
+        from: Region
+) : ControlNode(), Terminator {
+    override var from: Region by operand(from)
 
     override fun fullString(namer: (Node) -> String): String {
-        val t = target.untypedString(namer)
-        return "jump $t"
+        val th = this.typedString(namer)
+        return "jump -> $th"
     }
 }
 
 class Branch(
         condition: Node,
-        ifTrue: Region,
-        ifFalse: Region
-) : Terminator() {
+        from: Region
+) : Node(VoidType), Terminator {
     var condition by operand(condition, type = IntegerType.bool)
-    var ifTrue: Region by operand(ifTrue)
-    var ifFalse: Region by operand(ifFalse)
+    override var from: Region by operand(from)
 
-    override fun successors() = setOf(ifTrue, ifFalse)
+    var controlTrue = BranchControl(this, true)
+    var controlFalse = BranchControl(this, false)
 
     override fun fullString(namer: (Node) -> String): String {
+        val t = controlTrue.typedString(namer)
+        val f = controlFalse.typedString(namer)
         val c = condition.typedString(namer)
-        val t = ifTrue.untypedString(namer)
-        val f = ifFalse.untypedString(namer)
-        return "branch $c $t $f"
+        return "branch $c -> $t $f"
     }
 }
 
-class Return(
-        values: List<Node>
-) : Terminator() {
-    val types = values.map { it.type }
-    val values by operandList(values, types = types)
+class BranchControl(branch: Branch, val cond: Boolean) : ControlNode() {
+    val branch: Branch by operand(branch)
 
-    override fun successors() = emptySet<Region>()
+    override val from: Region? get() = branch.from
+}
+
+class Return(
+        from: Region,
+        values: List<Node>
+) : Node(VoidType), Terminator {
+    val types = values.map { it.type }
+
+    override var from: Region by operand(from)
+    val values by operandList(values, types = types)
 
     override fun fullString(namer: (Node) -> String): String {
         val v = values.joinToString { it.typedString(namer) }
@@ -123,13 +147,19 @@ class Phi(
         region: Region
 ) : Node(type), Instruction {
     var region: Region by operand(region)
-    val values by operandValueMap<Region, Node>(type = type)
+    val values by operandList<Node>(type = type)
+
+    fun zippedValues(): Map<ControlNode, Node> {
+        check(values.size == region.predecessors.size) { "phi values has different size than region predecessors" }
+        val map = region.predecessors.withIndex().associateBy({ it.value }, { values[it.index] })
+        check(map.size == values.size) { "region predecessors aren't distinct" }
+        return map
+    }
 
     override fun fullString(namer: (Node) -> String): String {
         val th = this.typedString(namer)
-        val r = region.untypedString(namer)
-        val v = values.toList().joinToString { (k, v) -> (k.untypedString(namer)) + ": " + v.untypedString(namer) }
-        return "$th = phi $r [$v]"
+        val v = values.joinToString { it.untypedString(namer) }
+        return "$th = phi [$v]"
     }
 }
 

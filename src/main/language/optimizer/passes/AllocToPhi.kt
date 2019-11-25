@@ -23,14 +23,14 @@ object AllocToPhi : FunctionPass {
         //maps (memPhi, alloc) to valuePhi
         val phis = mutableMapOf<Pair<Phi, Alloc>, Phi>()
 
-        fun findStoreValue(alloc: Alloc, mem: Node): Node = when (mem) {
+        fun findStoredValue(alloc: Alloc, mem: Node): Node = when (mem) {
             startMem -> {
                 //reached the start without finding any stores
                 Undef(alloc.innerType)
             }
             is LoadAfterMem -> {
                 //load doesn't affect value, continue searching before
-                findStoreValue(alloc, mem.load.beforeMem)
+                findStoredValue(alloc, mem.load.beforeMem)
             }
             is Store -> {
                 if (mem.address == alloc.result) {
@@ -40,19 +40,19 @@ object AllocToPhi : FunctionPass {
 
                     if (addressAlloc != null && addressAlloc in allocs) {
                         //if the value is a load from an alloc that will be also be replaced recurse for that alloc
-                        findStoreValue(addressAlloc, value.load.beforeMem)
+                        findStoredValue(addressAlloc, value.load.beforeMem)
                     } else {
                         //otherwise this is the final value
                         mem.value
                     }
                 } else {
                     //store with different address doesn't affect value, continue searching before
-                    findStoreValue(alloc, mem.beforeMem)
+                    findStoredValue(alloc, mem.beforeMem)
                 }
             }
             is CallResult -> {
                 //the alloc is guaranteed local to this function, so called functions can't affect the value
-                findStoreValue(alloc, mem.call.arguments.single { it.type == MemType })
+                findStoredValue(alloc, mem.call.arguments.single { it.type == MemType })
             }
             is Phi -> {
                 //create a new phi for the value based on this mem phi
@@ -64,20 +64,22 @@ object AllocToPhi : FunctionPass {
                     phis[mem to alloc] = phi
 
                     //look for corresponding values
-                    for ((pred, value) in mem.values) {
-                        phi.values.getOrPut(pred) {
-                            findStoreValue(alloc, value)
-                        }
-                    }
+                    phi.values.addAll(mem.values.map { m -> findStoredValue(alloc, m) })
+
                     phi
                 }
+            }
+            is Blur -> {
+                check(mem.transparent) { "AllocToPhi does not support non-transparant blurs" }
+                //if the blur is transparant continue searching before
+                findStoredValue(alloc, mem.value)
             }
             else -> error("unknown mem source $mem")
         }
 
         for (alloc in allocs) {
             for (load in userInfo[alloc.result].filterIsInstance<Load>()) {
-                userInfo.replaceNode(load.result, findStoreValue(alloc, load.beforeMem))
+                userInfo.replaceNode(load.result, findStoredValue(alloc, load.beforeMem))
                 userInfo.replaceNode(load.afterMem, load.beforeMem)
             }
 

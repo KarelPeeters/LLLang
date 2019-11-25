@@ -62,18 +62,19 @@ class DominatorInfo(function: Function) {
 }
 
 private fun calcDominatedBy(function: Function): Map<Region, Set<Region>> {
-    val predecessors = Visitor.findPredecessors(function)
-    val regions = predecessors.keys
+    val regions = Visitor.findRegions(function)
 
     val result = regions.associateWithTo(mutableMapOf()) { regions.toMutableSet() }
-    result[function.entry] = mutableSetOf(function.entry)
+    val entry = regions.single { it.predecessors == listOf(function.start) }
+
+    result[entry] = mutableSetOf(entry)
 
     do {
         var changed = false
         for ((region, domSet) in result) {
             domSet.remove(region)
-            for (pred in predecessors.getValue(region))
-                if (domSet.retainAll(result.getValue(pred)))
+            for (pred in region.predecessors)
+                if (domSet.retainAll(result.getValue(pred.from ?: continue)))
                     changed = true
             domSet.add(region)
         }

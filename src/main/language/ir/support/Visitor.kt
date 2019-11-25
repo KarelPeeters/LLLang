@@ -1,17 +1,24 @@
 package language.ir.support
 
-import language.ir.*
 import language.ir.Function
+import language.ir.Node
+import language.ir.Program
+import language.ir.Region
 import java.util.*
 
 object Visitor {
     /**
-     * Visit all nodes reachable trough [next] from [root] exactly once, returns a set of all visited nodes.
+     * Visit all nodes reachable trough [next] from [root] exactly once, returns the set of all visited nodes.
      */
-    inline fun <N : Node> visitNodes(root: N, next: (N) -> Collection<N>): Set<N> {
+    inline fun <N : Node> visitNodes(root: N, next: (N) -> Collection<N>): Set<N> = visitNodes(listOf(root), next)
+
+    /**
+     * Visit all nodes reachable trough [next] from [roots] exactly once, returns the set of all visited nodes.
+     */
+    inline fun <N : Node> visitNodes(roots: Collection<N>, next: (N) -> Collection<N>): Set<N> {
         val visited = mutableSetOf<N>()
         val toVisit = ArrayDeque<N>()
-        toVisit += root
+        toVisit.addAll(roots)
 
         while (true) {
             val curr = toVisit.poll() ?: break
@@ -24,7 +31,7 @@ object Visitor {
 
     fun findNodes(program: Program): Set<Node> = visitNodes<Node>(program) { node -> node.operands() }
 
-    fun findFunctions(program: Program): Set<Function> = visitNodes<Node>(program.entry) { node ->
+    fun findFunctions(program: Program): Set<Function> = visitNodes<Node>(program.end) { node ->
         node.operands()
     }.filterIsInstanceTo(mutableSetOf())
 
@@ -35,23 +42,9 @@ object Visitor {
             emptyList()
     }
 
-    fun findRegions(function: Function): Set<Region> = visitNodes(function.entry) { region ->
-        region.successors()
+    fun findRegions(function: Function): Set<Region> {
+        return visitNodes(function.endRegions()) { node ->
+            node.predecessors.mapNotNull { it.from }
+        }
     }
-
-    fun findPredecessors(function: Function): Map<Region, Set<Region>> {
-        val regions = findRegions(function)
-        val predecessors = regions.associateWith { mutableSetOf<Region>() }
-
-        for (region in regions)
-            for (successor in region.successors())
-                predecessors.getValue(successor) += region
-
-        return predecessors
-    }
-
-    fun findReturns(function: Function): Set<Return> =
-            findRegions(function)
-                    .map { it.terminator }
-                    .filterIsInstanceTo(mutableSetOf())
 }
